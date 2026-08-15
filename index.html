@@ -15,6 +15,12 @@
   <style>
     .no-zoom { touch-action: manipulation; }
     .smooth-update { transition: all 0.3s ease-in-out; }
+    /* 讓相機影片能跟隨容器滿版呈現 */
+    #reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
@@ -79,12 +85,13 @@
     </div>
   </div>
 
-  <!-- Camera Modal -->
+  <!-- Camera Modal (調整相機 Modal 為彈性高度以利滿版展示) -->
   <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
-      <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
-      <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_camera_title">掃描 ISO 7010 QR-Code</h3>
-      <div id="reader" class="w-full h-64 bg-black rounded-lg overflow-hidden"></div>
+    <div class="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
+      <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold z-10">&times;</button>
+      <h3 class="text-lg font-bold mb-3 text-gray-900" data-i18n="modal_camera_title">掃描 ISO 7010 QR-Code</h3>
+      <!-- 高度調大，讓全畫面視野更好 -->
+      <div id="reader" class="w-full h-80 bg-black rounded-lg overflow-hidden relative"></div>
       <p id="camera-status" class="text-xs text-gray-500 mt-3" data-i18n="camera_status_hint">請對準標誌上的 QR-Code</p>
     </div>
   </div>
@@ -114,7 +121,6 @@
   </div>
 
   <script>
-    // 請填寫您的 GAS Web App 部署網址
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
     let isoSignsData = []; 
@@ -163,16 +169,15 @@
     let dynamicSubDirectories = {};
     let currentViewMode = "SINGLE";
     let activeSignId = "";
+    let html5QrCode = null; // 全局相機實例
 
     document.addEventListener("DOMContentLoaded", async () => {
       initI18n();
       setupEventListeners();
       setupHeaderLongPress();
       
-      // 步驟 1: 從 Google Sheet 載入標誌清單
       await fetchSignsFromSheet();
 
-      // 步驟 2: 開始載入動態數據並設置 10 秒自動輪詢
       fetchGASData();
       setInterval(fetchGASData, 10000);
     });
@@ -260,7 +265,6 @@
       card.innerHTML = `
         <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
           <div class="flex flex-col items-center text-center">
-            <!-- 強化 SVG 載入與跨域容錯 -->
             <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border">
               <img src="${sign.svgUrl}" class="w-full h-full object-contain" alt="${signTitleName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-decagram-outline.svg';">
             </div>
@@ -511,6 +515,22 @@
       }
     };
 
+    // 關閉相機及清理資源的輔助函式
+    async function stopCamera() {
+      if (html5QrCode) {
+        try {
+          if (html5QrCode.isScanning) {
+            await html5QrCode.stop();
+          }
+          await html5QrCode.clear();
+        } catch (e) {
+          console.warn("停止相機時發生小錯誤:", e);
+        }
+        html5QrCode = null;
+      }
+      document.getElementById("modal-camera").classList.add("hidden");
+    }
+
     function setupEventListeners() {
       document.getElementById("btn-text-search").addEventListener("click", () => {
         document.getElementById("modal-search").classList.remove("hidden");
@@ -533,18 +553,27 @@
         renderCurrentView();
       });
 
-      let html5QrCode = null;
-      document.getElementById("btn-camera").addEventListener("click", () => {
+      // 相機開啟監聽（修改為全畫面掃描）
+      document.getElementById("btn-camera").addEventListener("click", async () => {
         const modalCam = document.getElementById("modal-camera");
         modalCam.classList.remove("hidden");
 
+        // 若先前有殘留的相機實例先清理
+        if (html5QrCode) await stopCamera();
+
         html5QrCode = new Html5Qrcode("reader");
+
+        // 設定：不傳入 qrbox 參數 -> 預設使用全相機畫面進行辨識
+        const config = { 
+          fps: 15, 
+          aspectRatio: 1.0 
+        };
+
         html5QrCode.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 200, height: 200 } },
+          config,
           (decodedText) => {
-            html5QrCode.stop();
-            modalCam.classList.add("hidden");
+            stopCamera();
             activeSignId = decodedText;
             currentViewMode = "SINGLE";
             renderCurrentView();
@@ -552,13 +581,12 @@
           (err) => {}
         ).catch(err => {
           alert("無法取得相機權限，相機程式已關閉。");
-          modalCam.classList.add("hidden");
+          stopCamera();
         });
       });
 
       document.getElementById("btn-camera-close").addEventListener("click", () => {
-        if (html5QrCode) html5QrCode.stop().catch(() => {});
-        document.getElementById("modal-camera").classList.add("hidden");
+        stopCamera();
       });
 
       document.getElementById("btn-approval-close").addEventListener("click", () => {
