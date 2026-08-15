@@ -142,6 +142,7 @@
         confirm: "確認",
         close: "關閉",
         approve: "通過",
+        reject: "拒絕",
         camera_status_hint: "請對準標誌上的 QR-Code",
         not_found: "找不到符合該流水號的標誌資訊！",
         double_click_hint: "雙擊框格編輯提交",
@@ -167,6 +168,7 @@
         confirm: "Confirm",
         close: "Close",
         approve: "Approve",
+        reject: "Reject",
         camera_status_hint: "Align QR-Code within frame",
         not_found: "No matching sign found for this Serial ID!",
         double_click_hint: "Double click to edit & submit",
@@ -192,6 +194,7 @@
         confirm: "Bestätigen",
         close: "Schließen",
         approve: "Genehmigen",
+        reject: "Ablehnen",
         camera_status_hint: "Richten Sie den QR-Code aus",
         not_found: "Kein Übereinstimmendes Schild Gefunden!",
         double_click_hint: "Doppelklick zum Bearbeiten",
@@ -400,11 +403,14 @@
       }).join('');
     }
 
+    // 💡 修正 1：同時相容手機 Touch 與電腦 Double Click 雙擊觸發編輯
     function bindSubFieldEvents() {
       document.querySelectorAll(".sub-field-box").forEach(box => {
         let pressTimer = null;
+        let lastTapTime = 0; // 用於手機雙擊時間差計算
 
-        box.addEventListener("touchstart", startPress);
+        // 長按 3 秒展開詳情
+        box.addEventListener("touchstart", startPress, { passive: true });
         box.addEventListener("mousedown", startPress);
         box.addEventListener("touchend", cancelPress);
         box.addEventListener("mouseup", cancelPress);
@@ -421,13 +427,30 @@
           if (pressTimer) clearTimeout(pressTimer);
         }
 
+        // 📱 手機雙擊觸發 (兩次點擊時間間隔 < 300ms)
+        box.addEventListener("touchend", (e) => {
+          const currentTime = new Date().getTime();
+          const tapLength = currentTime - lastTapTime;
+          
+          if (tapLength < 300 && tapLength > 0) {
+            e.preventDefault(); // 防手勢放大
+            triggerBoxEdit(box);
+          }
+          lastTapTime = currentTime;
+        });
+
+        // 💻 電腦滑鼠雙擊觸發
         box.addEventListener("dblclick", () => {
-          const signId = box.getAttribute("data-sign-id");
-          const fieldKey = box.getAttribute("data-field-key");
-          const fieldName = i18nDict[currentLang].fields[fieldKey];
-          promptSubmitInput(signId, fieldKey, fieldName);
+          triggerBoxEdit(box);
         });
       });
+    }
+
+    function triggerBoxEdit(box) {
+      const signId = box.getAttribute("data-sign-id");
+      const fieldKey = box.getAttribute("data-field-key");
+      const fieldName = i18nDict[currentLang].fields[fieldKey];
+      promptSubmitInput(signId, fieldKey, fieldName);
     }
 
     function promptSubmitInput(signId, fieldKey, fieldName) {
@@ -477,7 +500,7 @@
       let pressTimer = null;
 
       titleEl.addEventListener("mousedown", startPress);
-      titleEl.addEventListener("touchstart", startPress);
+      titleEl.addEventListener("touchstart", startPress, { passive: true });
       titleEl.addEventListener("mouseup", cancelPress);
       titleEl.addEventListener("touchend", cancelPress);
       titleEl.addEventListener("mouseleave", cancelPress);
@@ -491,7 +514,7 @@
       }
     }
 
-    // 開啟審批 Modal
+    // 💡 修正 2-A：開啟審批 Modal 並渲染「通過」與「拒絕」按鈕
     async function openApprovalModal() {
       const modal = document.getElementById("modal-approval");
       const listContainer = document.getElementById("approval-list");
@@ -518,16 +541,23 @@
             }
 
             const itemDiv = document.createElement("div");
-            itemDiv.className = "p-4 bg-gray-50 rounded-xl border flex justify-between items-center hover:bg-gray-100 transition mb-2";
+            itemDiv.className = "p-4 bg-gray-50 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-gray-100 transition mb-2 gap-3";
             itemDiv.innerHTML = `
               <div>
                 <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${parsedContent.path || '資料區塊'}</span>
                 <p class="text-sm font-semibold text-gray-800 mt-1">${parsedContent.value}</p>
                 <span class="text-[10px] text-gray-400">申請者: ${item.applicant} | 時間: ${new Date(item.timestamp).toLocaleTimeString()}</span>
               </div>
-              <button onclick="approveItem('${item.rowId}')" class="px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
-                ${i18nDict[currentLang].approve}
-              </button>
+              
+              <!-- 通過與拒絕按鈕組 -->
+              <div class="flex space-x-2 self-end sm:self-center">
+                <button onclick="reviewItem('${item.rowId}', 'APPROVED')" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
+                  ${i18nDict[currentLang].approve || '通過'}
+                </button>
+                <button onclick="reviewItem('${item.rowId}', 'REJECTED')" class="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition">
+                  ${i18nDict[currentLang].reject || '拒絕'}
+                </button>
+              </div>
             `;
             listContainer.appendChild(itemDiv);
           });
@@ -539,12 +569,15 @@
       }
     }
 
-    // 審核通過
-    window.approveItem = async function(rowId) {
+    // 💡 修正 2-B：通用的審核發送函式 (可傳入 APPROVED 或 REJECTED)
+    window.reviewItem = async function(rowId, status) {
+      const actionText = status === "APPROVED" ? "核准" : "拒絕";
+      if (!confirm(`確定要【${actionText}】此筆申請嗎？`)) return;
+
       const payload = {
         action: "REVIEW",
         rowId: rowId,
-        reviewStatus: "APPROVED",
+        reviewStatus: status,
         reviewer: "管理員"
       };
 
@@ -559,14 +592,14 @@
         const result = await res.json();
         
         if (result.status === "success") {
-          alert("✅ 審核完成！已同步至各終端。");
-          openApprovalModal();
-          fetchGASData();
+          alert(`✅ 已成功【${actionText}】該筆申請！`);
+          openApprovalModal(); // 刷新審批清單
+          fetchGASData();      // 刷新前端視圖
         } else {
           alert("審核失敗：" + result.message);
         }
       } catch (err) {
-        alert("審核請求傳送失敗！");
+        alert("審核請求傳送失敗，請檢查網路連線！");
       }
     };
 
@@ -635,7 +668,7 @@
       document.getElementById("modal-detail").classList.remove("hidden");
     }
 
-    // ==================== 核心優化：智慧條件式輪詢 (Smart Polling) ====================
+    // ==================== 智慧條件式輪詢 (Smart Polling) ====================
     async function fetchGASData() {
       if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "YOUR_GAS_WEB_APP_URL_HERE") return;
 
@@ -647,20 +680,15 @@
         const response = await res.json();
 
         if (response.status === "success" && Array.isArray(response.data)) {
-          
-          // 1. 生成資料特徵快照 (Snapshot)
           const currentSnapshot = JSON.stringify(response.data);
 
-          // 2. 比對快照：如果資料沒有任何改變，直接退出，不刷新 UI (無感知)
           if (currentSnapshot === lastDataSnapshot) {
             return;
           }
 
-          // 3. 資料確定有變更，更新快照並執行渲染
           console.log("⚡ 偵測到雲端資料有變更，正在自動更新頁面...");
           lastDataSnapshot = currentSnapshot;
 
-          // 重新掛載資料
           dynamicSubDirectories = {};
           response.data.forEach(item => {
             try {
@@ -680,7 +708,6 @@
             }
           });
 
-          // 觸發 UI 繪製
           renderCurrentView();
         }
       } catch (err) {
