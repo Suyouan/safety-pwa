@@ -1,613 +1,415 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>安全文化與意識</title>
-  
-  <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22%E5%AE%89%E5%85%A8%E6%96%87%E5%8C%96%E8%88%87%E6%84%8F%E8%AD%98%22%2C%22short_name%22%3A%22%E5%AE%89%E5%85%A8%E6%A8%99%E8%AA%8C%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f3f4f6%22%2C%22theme_color%22%3A%22%231f2937%22%7D">
-  <meta name="theme-color" content="#1f2937">
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-
-  <style>
-    .no-zoom { touch-action: manipulation; }
-    .smooth-update { transition: all 0.3s ease-in-out; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>點讀筆聲音告示牌對照表</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Html5-Qrcode (用於相機掃描) -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        .page-break {
+            page-break-after: always;
+        }
+        @media print {
+            body {
+                background: white;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .shadow-xl, .shadow-md, .shadow-sm {
+                box-shadow: none !important;
+            }
+            .border {
+                border-color: #000 !important;
+            }
+        }
+        /* 確保 html5-qrcode 裡面的 video 填滿容器且不變形 */
+        #reader video {
+            object-fit: cover;
+            border-radius: 0.5rem;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-12">
 
-  <!-- Header -->
-  <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
-    <h1 id="app-title" class="text-xl font-bold select-none cursor-pointer tracking-wide hover:text-blue-400 transition" title="長按3秒進入審批流程">
-      安全文化與意識
-    </h1>
-
-    <div class="flex items-center space-x-2">
-      <label for="lang-select" class="text-sm hidden sm:inline">語言 / Lang:</label>
-      <select id="lang-select" class="bg-gray-800 text-white text-sm border border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <option value="zh" selected>繁體中文</option>
-        <option value="en">English</option>
-        <option value="de">Deutsch</option>
-      </select>
-    </div>
-  </header>
-
-  <!-- Main Content -->
-  <main class="flex-grow container mx-auto px-4 py-6 max-w-4xl">
-    
-    <!-- Top Nav Buttons -->
-    <div class="grid grid-cols-3 gap-4 mb-8">
-      <button id="btn-text-search" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-blue-500 group">
-        <span class="text-3xl font-extrabold text-blue-600 group-hover:scale-110 transition">T</span>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_text_search">文字搜尋</span>
-      </button>
-
-      <button id="btn-camera" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-green-500 group">
-        <svg class="w-8 h-8 text-green-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_camera">掃描 QR</span>
-      </button>
-
-      <button id="btn-database" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-purple-500 group">
-        <svg class="w-8 h-8 text-purple-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8-1.79-8-4"></path>
-        </svg>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_database">資料庫</span>
-      </button>
-    </div>
-
-    <!-- Content Area -->
-    <div id="content-area" class="w-full">
-      <div class="text-center py-12 text-gray-500 font-medium">資料庫同步載入中...</div>
-    </div>
-  </main>
-
-  <!-- Search Modal -->
-  <div id="modal-search" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-      <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_search_title">輸入標誌流水編號</h3>
-      <input type="text" id="search-input" placeholder="例: W-HighVoltage-(2)" class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-      <div class="flex justify-end space-x-3">
-        <button id="btn-search-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" data-i18n="cancel">取消</button>
-        <button id="btn-search-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" data-i18n="confirm">確認</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Camera Modal -->
-  <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
-      <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
-      <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_camera_title">掃描 ISO 7010 QR-Code</h3>
-      <div id="reader" class="w-full h-64 bg-black rounded-lg overflow-hidden"></div>
-      <p id="camera-status" class="text-xs text-gray-500 mt-3" data-i18n="camera_status_hint">請對準標誌上的 QR-Code</p>
-    </div>
-  </div>
-
-  <!-- Approval Modal -->
-  <div id="modal-approval" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
-      <div class="flex justify-between items-center mb-4 border-b pb-3">
-        <h3 class="text-xl font-bold text-gray-900" data-i18n="admin_approval_title">後台審批矩陣 (管理員)</h3>
-        <button id="btn-approval-close" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
-      </div>
-      <div id="approval-list" class="flex-grow overflow-y-auto space-y-3 p-1">
-        <!-- 審批動態內容 -->
-      </div>
-    </div>
-  </div>
-
-  <!-- Detail Modal -->
-  <div id="modal-detail" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-      <h3 id="modal-detail-title" class="text-lg font-bold mb-2 text-gray-900">詳細資訊</h3>
-      <div id="modal-detail-content" class="text-sm text-gray-700 whitespace-pre-wrap max-h-60 overflow-y-auto bg-gray-50 p-3 rounded-lg border mb-4"></div>
-      <div class="flex justify-end">
-        <button id="btn-detail-close" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition" data-i18n="close">關閉</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // 請填寫您的 GAS Web App 部署網址
-    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
-
-    let isoSignsData = []; 
-    let lastDataSnapshot = "";
-    let currentLang = "zh";
-
-    const i18nDict = {
-      zh: {
-        app_title: "安全文化與意識",
-        nav_text_search: "文字搜尋",
-        nav_camera: "掃描 QR",
-        nav_database: "資料庫",
-        modal_search_title: "輸入標誌流水編號",
-        modal_camera_title: "掃描 ISO 7010 QR-Code",
-        admin_approval_title: "後台審批矩陣 (管理員)",
-        cancel: "取消", confirm: "確認", close: "關閉", approve: "通過", reject: "拒絕",
-        camera_status_hint: "請對準標誌上的 QR-Code",
-        not_found: "找不到符合該流水號的標誌資訊！",
-        double_click_hint: "雙擊框格編輯提交",
-        fields: {
-          freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級"
-        }
-      },
-      en: {
-        app_title: "Safety Culture & Awareness",
-        nav_text_search: "Search ID", nav_camera: "Scan QR", nav_database: "Database",
-        modal_search_title: "Enter Sign Serial ID", modal_camera_title: "Scan ISO 7010 QR-Code", admin_approval_title: "Approval Workflow (Admin)",
-        cancel: "Cancel", confirm: "Confirm", close: "Close", approve: "Approve", reject: "Reject",
-        camera_status_hint: "Align QR-Code within frame", not_found: "No matching sign found for this Serial ID!", double_click_hint: "Double click to edit & submit",
-        fields: {
-          freq: "Frequency", elim: "Elimination", sub: "Substitution", eng: "Engineering Controls", admin: "Administrative Controls", ppe: "PPE", risk: "Risk Level"
-        }
-      },
-      de: {
-        app_title: "Sicherheitskultur & Bewusstsein",
-        nav_text_search: "ID Suchen", nav_camera: "QR Scannen", nav_database: "Datenbank",
-        modal_search_title: "Sicherheits-ID Eingeben", modal_camera_title: "ISO 7010 QR-Code Scannen", admin_approval_title: "Genehmigungsmatrix (Admin)",
-        cancel: "Cancel", confirm: "Bestätigen", close: "Schließen", approve: "Genehmigen", reject: "Ablehnen",
-        camera_status_hint: "Richten Sie den QR-Code aus", not_found: "Kein Übereinstimmendes Schild Gefunden!", double_click_hint: "Doppelklick zum Bearbeiten",
-        fields: {
-          freq: "Häufigkeit", elim: "Beseitigung", sub: "Substitution", eng: "Technische Kontrollen", admin: "Organisatorische Maßnahmen", ppe: "PSA", risk: "Risikostufe"
-        }
-      }
-    };
-
-    let dynamicSubDirectories = {};
-    let currentViewMode = "SINGLE";
-    let activeSignId = "";
-
-    document.addEventListener("DOMContentLoaded", async () => {
-      initI18n();
-      setupEventListeners();
-      setupHeaderLongPress();
-      
-      // 步驟 1: 從 Google Sheet 載入標誌清單
-      await fetchSignsFromSheet();
-
-      // 步驟 2: 開始載入動態數據並設置 10 秒自動輪詢
-      fetchGASData();
-      setInterval(fetchGASData, 10000);
-    });
-
-    async function fetchSignsFromSheet() {
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
-        const result = await res.json();
-        
-        if (result.status === "success" && result.data.length > 0) {
-          isoSignsData = result.data.map(item => ({
-            id: item.id,
-            category: item.category,
-            meaning: item.meaning,
-            level: item.level || null,
-            name: {
-              zh: item.name_zh || item.id,
-              en: item.name_en || item.id,
-              de: item.name_de || item.id
-            },
-            svgUrl: item.svg_url
-          }));
-
-          if (!activeSignId && isoSignsData.length > 0) {
-            activeSignId = isoSignsData[0].id;
-          }
-          renderCurrentView();
-        }
-      } catch (err) {
-        console.error("載入 Signs 清單失敗:", err);
-      }
-    }
-
-    function initI18n() {
-      document.getElementById("lang-select").addEventListener("change", (e) => {
-        currentLang = e.target.value;
-        updatePageLanguage();
-      });
-    }
-
-    function updatePageLanguage() {
-      const dict = i18nDict[currentLang];
-      document.getElementById("app-title").textContent = dict.app_title;
-      document.querySelectorAll("[data-i18n]").forEach(el => {
-        const key = el.getAttribute("data-i18n");
-        if (dict[key]) el.textContent = dict[key];
-      });
-      renderCurrentView();
-    }
-
-    function renderCurrentView() {
-      const container = document.getElementById("content-area");
-      container.innerHTML = "";
-
-      if (currentViewMode === "SINGLE") {
-        renderSingleSignDetail(container, activeSignId);
-      } else if (currentViewMode === "DATABASE") {
-        renderDatabaseListView(container);
-      }
-    }
-
-    function renderSingleSignDetail(container, signId) {
-      const sign = isoSignsData.find(s => s.id.toLowerCase() === signId.toLowerCase());
-      if (!sign) {
-        container.innerHTML = `<div class="text-center py-12 text-gray-500 font-medium">${i18nDict[currentLang].not_found}</div>`;
-        return;
-      }
-
-      const signTitleName = sign.name[currentLang] || sign.name.zh;
-      const levelHtml = (sign.category === "W" && sign.level) 
-        ? `<div class="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-400 text-yellow-900 font-black text-sm rounded-full inline-block shadow-sm">等級 ${sign.level}</div>` 
-        : '';
-
-      const subFieldsHtml = (sign.category === "W") ? `
-        <div class="mt-6 border-t pt-4 space-y-2">
-          <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            ${renderSubFieldsHtml(sign.id)}
-          </div>
-        </div>
-      ` : '';
-
-      const card = document.createElement("div");
-      card.className = "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 max-w-2xl mx-auto smooth-update";
-      card.innerHTML = `
-        <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
-          <div class="flex flex-col items-center text-center">
-            <!-- 強化 SVG 載入與跨域容錯 -->
-            <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border">
-              <img src="${sign.svgUrl}" class="w-full h-full object-contain" alt="${signTitleName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-decagram-outline.svg';">
+    <!-- 頂部導覽列 (不列印) -->
+    <header class="bg-indigo-900 text-white shadow-lg no-print sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <i data-lucide="volume-2" class="w-8 h-8 text-amber-400"></i>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide">點讀筆聲音告示牌對照系統</h1>
+                    <p class="text-xs text-indigo-200">聲音檔編號與實體告示牌對應檢索</p>
+                </div>
             </div>
-            ${levelHtml}
-            <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
-          </div>
-
-          <div class="flex flex-col items-center sm:items-end">
-            <div id="qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}" class="p-2 bg-white border rounded-xl shadow-inner"></div>
-            <span class="mt-3 text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-md border">${sign.id}</span>
-          </div>
-        </div>
-        ${subFieldsHtml}
-      `;
-
-      container.appendChild(card);
-
-      setTimeout(() => {
-        const qrContainer = document.getElementById(`qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}`);
-        if (qrContainer) {
-          qrContainer.innerHTML = "";
-          new QRCode(qrContainer, { text: sign.id, width: 90, height: 90 });
-        }
-      }, 50);
-
-      if (sign.category === "W") {
-        bindSubFieldEvents();
-      }
-    }
-
-    function renderDatabaseListView(container) {
-      const grid = document.createElement("div");
-      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
-
-      isoSignsData.forEach(sign => {
-        const signName = sign.name[currentLang] || sign.name.zh;
-        const item = document.createElement("div");
-        item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
-        
-        item.innerHTML = `
-          <div class="w-16 h-16 flex items-center justify-center mb-1">
-            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${signName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-circle-outline.svg';">
-          </div>
-          <span class="mt-2 font-bold text-gray-800 text-sm">${signName}</span>
-          <span class="text-[10px] text-gray-400 font-mono mt-0.5">${sign.id}</span>
-        `;
-
-        item.addEventListener("click", () => {
-          activeSignId = sign.id;
-          currentViewMode = "SINGLE";
-          renderCurrentView();
-        });
-
-        grid.appendChild(item);
-      });
-
-      container.appendChild(grid);
-    }
-
-    function renderSubFieldsHtml(signId) {
-      const fieldKeys = ["freq", "elim", "sub", "eng", "admin", "ppe", "risk"];
-      const fieldsDict = i18nDict[currentLang].fields;
-
-      return fieldKeys.map(key => {
-        const fieldName = fieldsDict[key];
-        const approvedValues = (dynamicSubDirectories[signId] && dynamicSubDirectories[signId][key]) || [];
-        let displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(" | ");
-        
-        const isOverflow = displayContent.length > 25;
-        const truncatedContent = isOverflow ? displayContent.substring(0, 25) + "..." : displayContent || "-";
-
-        return `
-          <div class="sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom"
-               data-sign-id="${signId}" data-field-key="${key}" data-full-text="${displayContent}">
-            <div class="flex justify-between font-semibold text-gray-600 mb-1">
-              <span>${fieldName}</span>
+            
+            <div class="flex items-center gap-2">
+                <button id="btn-camera" class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition text-sm shadow">
+                    <i data-lucide="camera" class="w-4 h-4"></i>
+                    <span>掃描 QR</span>
+                </button>
+                <button id="btn-print" class="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 transition text-sm border border-indigo-500">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span>列印本頁</span>
+                </button>
             </div>
-            <div class="text-gray-800 font-medium truncate-text">${truncatedContent}</div>
-          </div>
-        `;
-      }).join('');
-    }
+        </div>
+    </header>
 
-    function bindSubFieldEvents() {
-      document.querySelectorAll(".sub-field-box").forEach(box => {
-        let pressTimer = null;
-        let lastTapTime = 0;
+    <!-- 相機 Modal (不列印) -->
+    <div id="modal-camera" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-xl max-w-md w-full p-4 relative shadow-2xl">
+            <button id="btn-close-camera" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 p-1">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h3 class="text-lg font-bold mb-3 text-slate-800 flex items-center gap-2">
+                <i data-lucide="scan" class="w-5 h-5 text-indigo-600"></i>
+                掃描告示牌 QR Code
+            </h3>
+            <!-- 修改點：使用 aspect-square 確保畫面保持 1:1 正方形區域，解決長方形變形問題 -->
+            <div id="reader" class="w-full aspect-square max-h-[60vh] bg-black rounded-lg overflow-hidden"></div>
+            <p class="text-xs text-slate-500 mt-3 text-center">請將對照表上的 QR Code 對準鏡頭中央即可自動跳轉</p>
+        </div>
+    </div>
 
-        box.addEventListener("touchstart", startPress, { passive: true });
-        box.addEventListener("mousedown", startPress);
-        box.addEventListener("touchend", cancelPress);
-        box.addEventListener("mouseup", cancelPress);
-        box.addEventListener("mouseleave", cancelPress);
+    <!-- 主要內容區 -->
+    <main class="max-w-6xl mx-auto px-4 mt-6">
 
-        function startPress() {
-          pressTimer = setTimeout(() => {
-            const fullText = box.getAttribute("data-full-text");
-            if (fullText) showDetailModal("詳細危害控制資訊", fullText);
-          }, 3000);
-        }
-
-        function cancelPress() {
-          if (pressTimer) clearTimeout(pressTimer);
-        }
-
-        box.addEventListener("touchend", (e) => {
-          const currentTime = new Date().getTime();
-          const tapLength = currentTime - lastTapTime;
-          if (tapLength < 300 && tapLength > 0) {
-            e.preventDefault();
-            triggerBoxEdit(box);
-          }
-          lastTapTime = currentTime;
-        });
-
-        box.addEventListener("dblclick", () => {
-          triggerBoxEdit(box);
-        });
-      });
-    }
-
-    function triggerBoxEdit(box) {
-      const signId = box.getAttribute("data-sign-id");
-      const fieldKey = box.getAttribute("data-field-key");
-      const fieldName = i18nDict[currentLang].fields[fieldKey];
-      promptSubmitInput(signId, fieldKey, fieldName);
-    }
-
-    function promptSubmitInput(signId, fieldKey, fieldName) {
-      const userInput = prompt(`【待審批提交】請輸入 ${signId} 之「${fieldName}」資訊：`);
-      if (userInput && userInput.trim() !== "") {
-        submitPendingData(signId, fieldKey, userInput.trim());
-      }
-    }
-
-    async function submitPendingData(signId, fieldKey, val) {
-      const payload = {
-        action: "SUBMIT",
-        applicant: "使用者",
-        content: JSON.stringify({
-          id: signId, field: fieldKey, value: val, path: `ISO7010 > ${signId} > ${fieldKey}`
-        })
-      };
-
-      try {
-        const res = await fetch(GAS_WEB_APP_URL, {
-          method: "POST", mode: "cors", redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        if (result.status === "success") {
-          alert("🎉 提交成功！資料已寫入雲端待審批矩陣。");
-          fetchGASData();
-        } else {
-          alert("❌ 提交失敗：" + result.message);
-        }
-      } catch (err) {
-        alert("網路通訊失敗，請檢查網路連線。");
-      }
-    }
-
-    function setupHeaderLongPress() {
-      const titleEl = document.getElementById("app-title");
-      let pressTimer = null;
-
-      titleEl.addEventListener("mousedown", startPress);
-      titleEl.addEventListener("touchstart", startPress, { passive: true });
-      titleEl.addEventListener("mouseup", cancelPress);
-      titleEl.addEventListener("touchend", cancelPress);
-      titleEl.addEventListener("mouseleave", cancelPress);
-
-      function startPress() {
-        pressTimer = setTimeout(() => { openApprovalModal(); }, 3000);
-      }
-
-      function cancelPress() {
-        if (pressTimer) clearTimeout(pressTimer);
-      }
-    }
-
-    async function openApprovalModal() {
-      const modal = document.getElementById("modal-approval");
-      const listContainer = document.getElementById("approval-list");
-      listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">雲端資料加載中...</div>`;
-      modal.classList.remove("hidden");
-
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
-        const result = await res.json();
-
-        if (result.status === "success" && result.data.length > 0) {
-          listContainer.innerHTML = "";
-          result.data.forEach((item) => {
-            let parsedContent = {};
-            try { parsedContent = JSON.parse(item.content); } catch (e) { parsedContent = { path: "未定義路徑", value: item.content }; }
-
-            const itemDiv = document.createElement("div");
-            itemDiv.className = "p-4 bg-gray-50 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-gray-100 transition mb-2 gap-3";
-            itemDiv.innerHTML = `
-              <div>
-                <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${parsedContent.path || '資料區塊'}</span>
-                <p class="text-sm font-semibold text-gray-800 mt-1">${parsedContent.value}</p>
-                <span class="text-[10px] text-gray-400">申請者: ${item.applicant} | 時間: ${new Date(item.timestamp).toLocaleTimeString()}</span>
-              </div>
-              <div class="flex space-x-2 self-end sm:self-center">
-                <button onclick="reviewItem('${item.rowId}', 'APPROVED')" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
-                  ${i18nDict[currentLang].approve || '通過'}
-                </button>
-                <button onclick="reviewItem('${item.rowId}', 'REJECTED')" class="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition">
-                  ${i18nDict[currentLang].reject || '拒絕'}
-                </button>
-              </div>
-            `;
-            listContainer.appendChild(itemDiv);
-          });
-        } else {
-          listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">目前雲端無待審批的訊息。</div>`;
-        }
-      } catch (err) {
-        listContainer.innerHTML = `<div class="text-center py-8 text-red-500">加載待審資料失敗，請確認網路！</div>`;
-      }
-    }
-
-    window.reviewItem = async function(rowId, status) {
-      const actionText = status === "APPROVED" ? "核准" : "拒絕";
-      if (!confirm(`確定要【${actionText}】此筆申請嗎？`)) return;
-
-      const payload = { action: "REVIEW", rowId: rowId, reviewStatus: status, reviewer: "管理員" };
-
-      try {
-        const res = await fetch(GAS_WEB_APP_URL, {
-          method: "POST", mode: "cors", redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        
-        if (result.status === "success") {
-          alert(`✅ 已成功【${actionText}】該筆申請！`);
-          openApprovalModal();
-          fetchGASData();
-        } else {
-          alert("審核失敗：" + result.message);
-        }
-      } catch (err) {
-        alert("審核請求傳送失敗，請檢查網路連線！");
-      }
-    };
-
-    function setupEventListeners() {
-      document.getElementById("btn-text-search").addEventListener("click", () => {
-        document.getElementById("modal-search").classList.remove("hidden");
-      });
-      document.getElementById("btn-search-cancel").addEventListener("click", () => {
-        document.getElementById("modal-search").classList.add("hidden");
-      });
-      document.getElementById("btn-search-confirm").addEventListener("click", () => {
-        const query = document.getElementById("search-input").value.trim();
-        document.getElementById("modal-search").classList.add("hidden");
-        if (query) {
-          activeSignId = query;
-          currentViewMode = "SINGLE";
-          renderCurrentView();
-        }
-      });
-
-      document.getElementById("btn-database").addEventListener("click", () => {
-        currentViewMode = "DATABASE";
-        renderCurrentView();
-      });
-
-      let html5QrCode = null;
-      document.getElementById("btn-camera").addEventListener("click", () => {
-        const modalCam = document.getElementById("modal-camera");
-        modalCam.classList.remove("hidden");
-
-        html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 200, height: 200 } },
-          (decodedText) => {
-            html5QrCode.stop();
-            modalCam.classList.add("hidden");
-            activeSignId = decodedText;
-            currentViewMode = "SINGLE";
-            renderCurrentView();
-          },
-          (err) => {}
-        ).catch(err => {
-          alert("無法取得相機權限，相機程式已關閉。");
-          modalCam.classList.add("hidden");
-        });
-      });
-
-      document.getElementById("btn-camera-close").addEventListener("click", () => {
-        if (html5QrCode) html5QrCode.stop().catch(() => {});
-        document.getElementById("modal-camera").classList.add("hidden");
-      });
-
-      document.getElementById("btn-approval-close").addEventListener("click", () => {
-        document.getElementById("modal-approval").classList.add("hidden");
-      });
-
-      document.getElementById("btn-detail-close").addEventListener("click", () => {
-        document.getElementById("modal-detail").classList.add("hidden");
-      });
-    }
-
-    function showDetailModal(title, content) {
-      document.getElementById("modal-detail-title").textContent = title;
-      document.getElementById("modal-detail-content").textContent = content;
-      document.getElementById("modal-detail").classList.remove("hidden");
-    }
-
-    async function fetchGASData() {
-      if (!GAS_WEB_APP_URL) return;
-
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=APPROVED`, { method: "GET", redirect: "follow" });
-        const response = await res.json();
-
-        if (response.status === "success" && Array.isArray(response.data)) {
-          const currentSnapshot = JSON.stringify(response.data);
-          if (currentSnapshot === lastDataSnapshot) return;
-
-          lastDataSnapshot = currentSnapshot;
-          dynamicSubDirectories = {};
-
-          response.data.forEach(item => {
-            try {
-              const parsed = JSON.parse(item.content);
-              if (parsed.id && parsed.field && parsed.value) {
-                if (!dynamicSubDirectories[parsed.id]) dynamicSubDirectories[parsed.id] = {};
-                if (!dynamicSubDirectories[parsed.id][parsed.field]) dynamicSubDirectories[parsed.id][parsed.field] = [];
+        <!-- 搜尋與篩選列 (不列印) -->
+        <section class="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-200 mb-6 no-print">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                 
-                dynamicSubDirectories[parsed.id][parsed.field].push({
-                  zh: parsed.value, en: parsed.value, de: parsed.value
-                });
-              }
-            } catch (e) {}
-          });
+                <!-- 搜尋框 -->
+                <div class="md:col-span-5 relative">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">關鍵字搜尋 (標題 / 語音內容)</label>
+                    <div class="relative">
+                        <i data-lucide="search" class="w-5 h-5 absolute left-3 top-2.5 text-slate-400"></i>
+                        <input type="text" id="input-search" placeholder="輸入告示牌名稱或語音內容..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                    </div>
+                </div>
 
-          renderCurrentView();
+                <!-- 選擇告示牌編號 -->
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">直接選擇告示牌編號</label>
+                    <select id="select-sign" class="w-full py-2 px-3 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                        <option value="">-- 顯示全部 (清單模式) --</option>
+                    </select>
+                </div>
+
+                <!-- 模式切換 -->
+                <div class="md:col-span-3 flex items-end gap-2">
+                    <button id="btn-mode-all" class="flex-1 py-2 px-3 bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200 rounded-lg text-sm flex items-center justify-center gap-1">
+                        <i data-lucide="list" class="w-4 h-4"></i>
+                        <span>總覽模式</span>
+                    </button>
+                    <button id="btn-reset" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm transition" title="重設條件">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- 視圖 1: 單一告示牌詳細模式 (適合點對點查看或列印單張) -->
+        <article id="view-single" class="hidden">
+            <div class="bg-white rounded-xl border-2 border-indigo-600 shadow-md overflow-hidden max-w-2xl mx-auto">
+                <div class="bg-indigo-600 text-white p-4 flex justify-between items-center">
+                    <span id="single-id" class="text-xl font-black bg-white text-indigo-900 px-3 py-1 rounded-md shadow-inner"></span>
+                    <span class="text-sm font-medium bg-indigo-700 px-3 py-1 rounded-full text-indigo-100">告示牌聲音對照卡</span>
+                </div>
+                
+                <div class="p-6 space-y-6">
+                    <div>
+                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">告示牌名稱</h2>
+                        <p id="single-title" class="text-2xl font-bold text-slate-800"></p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <div>
+                            <span class="text-xs text-slate-500 block">點讀筆語音檔編號</span>
+                            <span id="single-audio-id" class="text-xl font-bold text-indigo-600 font-mono"></span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-500 block">告示牌類別</span>
+                            <span id="single-category" class="text-sm font-semibold text-slate-700"></span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
+                            點讀筆語音播報逐字稿
+                        </h3>
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-slate-800 text-base leading-relaxed" id="single-script">
+                        </div>
+                    </div>
+
+                    <!-- 附帶 QR Code 區域 (方便列印後掃描對照) -->
+                    <div class="pt-4 border-t border-slate-200 flex justify-between items-center">
+                        <div class="text-xs text-slate-400">
+                            <p>點讀筆專用系統對照表</p>
+                            <p>掃描右側 QR 可直接於手機開啟此牌</p>
+                        </div>
+                        <div id="single-qrcode" class="w-20 h-20 bg-slate-100 border p-1 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <!-- 視圖 2: 全部/搜尋結果表格模式 (適合總覽、批次列印) -->
+        <article id="view-table" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <span class="text-sm font-bold text-slate-700">資料列表 (<span id="count-total">0</span> 筆)</span>
+                <span class="text-xs text-slate-500 no-print">可點擊列表快速檢視單一告示牌</span>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                            <th class="p-3 font-bold w-24">告示牌 ID</th>
+                            <th class="p-3 font-bold w-32">音檔編號</th>
+                            <th class="p-3 font-bold w-48">告示牌名稱</th>
+                            <th class="p-3 font-bold">點讀筆語音逐字稿</th>
+                            <th class="p-3 font-bold w-24 text-center no-print">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-slate-200 text-sm">
+                        <!-- 由 JS 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+    </main>
+
+    <!-- 腳本 -->
+    <script>
+        // 1. 假資料庫 (預設對照表)
+        const SIGNS_DATA = [
+            { id: "SIGN-001", audioId: "AUD-001", title: "主要入口指示牌", category: "導覽告示", script: "歡迎光臨！本園區開放時間為上午九點至下午五點，請勿攜帶寵物入園。" },
+            { id: "SIGN-002", audioId: "AUD-002", title: "緊急避難圖", category: "安全告示", script: "緊急避難位置提示：若發生地震或火災，請保持冷靜，順著綠色指示燈前往中央草坪集結。" },
+            { id: "SIGN-003", audioId: "AUD-003", title: "無障礙電梯說明", category: "設施告示", script: "本電梯為無障礙優先電梯，設有低位按鈕與語音提示，請優先讓行動不便者使用。" },
+            { id: "SIGN-004", audioId: "AUD-004", title: "洗手間與哺集乳室", category: "設施告示", script: "前方左轉為男女洗手間，右側設有獨立哺集乳室，配有熱水器與換尿布台。" },
+            { id: "SIGN-005", audioId: "AUD-005", title: "生態池注意事項", category: "警示告示", script: "水深危險！請勿靠近池邊嬉戲，嚴禁餵食池內魚類與野生鴨子。" },
+            { id: "SIGN-006", audioId: "AUD-006", title: "歷史展覽館介紹", category: "景點介紹", script: "本展館建於1920年，展示了在地產業發展史。請勿在館內飲食或使用閃光燈拍照。" },
+            { id: "SIGN-007", audioId: "AUD-007", title: "垃圾分類回收站", category: "環境告示", script: "請做好垃圾分類，由左至右分別為：一般垃圾、資源回收、以及廚餘回收桶。" }
+        ];
+
+        // 全域變數
+        let currentSearch = "";
+        let activeSignId = "";
+        let currentViewMode = "ALL"; // 'ALL' 或 'SINGLE'
+        let html5QrCode = null;
+
+        // 初始化
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            populateSelectOptions();
+            renderCurrentView();
+
+            // 綁定事件
+            document.getElementById("input-search").addEventListener("input", (e) => {
+                currentSearch = e.target.value.trim().toLowerCase();
+                currentViewMode = "ALL";
+                activeSignId = "";
+                document.getElementById("select-sign").value = "";
+                renderCurrentView();
+            });
+
+            document.getElementById("select-sign").addEventListener("change", (e) => {
+                activeSignId = e.target.value;
+                if(activeSignId) {
+                    currentViewMode = "SINGLE";
+                } else {
+                    currentViewMode = "ALL";
+                }
+                renderCurrentView();
+            });
+
+            document.getElementById("btn-mode-all").addEventListener("click", () => {
+                currentViewMode = "ALL";
+                activeSignId = "";
+                document.getElementById("select-sign").value = "";
+                renderCurrentView();
+            });
+
+            document.getElementById("btn-reset").addEventListener("click", () => {
+                currentSearch = "";
+                activeSignId = "";
+                currentViewMode = "ALL";
+                document.getElementById("input-search").value = "";
+                document.getElementById("select-sign").value = "";
+                renderCurrentView();
+            });
+
+            document.getElementById("btn-print").addEventListener("click", () => {
+                window.print();
+            });
+
+            // 相機開關邏輯 (已優化掃描框為正方形)
+            document.getElementById("btn-camera").addEventListener("click", () => {
+                const modalCam = document.getElementById("modal-camera");
+                modalCam.classList.remove("hidden");
+                
+                html5QrCode = new Html5Qrcode("reader");
+                
+                // 動態計算 qrbox 的尺寸，確保在任何螢幕長寬比下皆為完美的正方形
+                const qrboxFunction = function(viewfinderWidth, viewfinderHeight) {
+                    let minEdgePercentage = 0.7; // 佔用取景視窗較短邊的 70%
+                    let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                    let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+                    return {
+                        width: qrboxSize,
+                        height: qrboxSize
+                    };
+                };
+
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    { 
+                        fps: 10, 
+                        qrbox: qrboxFunction,
+                        aspectRatio: 1.0 // 強制保持正方形比例
+                    },
+                    (decodedText, decodedResult) => {
+                        // 成功掃描到的處理
+                        html5QrCode.stop();
+                        modalCam.classList.add("hidden");
+                        
+                        // 簡單搜尋匹配：直接比對 ID 或純文字
+                        const found = SIGNS_DATA.find(s => s.id === decodedText || decodedText.includes(s.id));
+                        if(found) {
+                            activeSignId = found.id;
+                            currentViewMode = "SINGLE";
+                            document.getElementById("select-sign").value = found.id;
+                        } else {
+                            alert("掃描成功，內容為：" + decodedText + "\n未在預設資料庫中找到精確匹配，將為您帶入搜尋。");
+                            document.getElementById("input-search").value = decodedText;
+                            currentSearch = decodedText.toLowerCase();
+                            currentViewMode = "ALL";
+                        }
+                        renderCurrentView();
+                    },
+                    (errorMessage) => {
+                        // 掃描過程中的失敗/持續對焦，通常不處理
+                    }
+                ).catch(err => {
+                    alert("無法啟動相機，請確認已給予相機權限。");
+                    modalCam.classList.add("hidden");
+                });
+            });
+
+            document.getElementById("btn-close-camera").addEventListener("click", () => {
+                if(html5QrCode && html5QrCode.isScanning) {
+                    html5QrCode.stop().then(() => {
+                        document.getElementById("modal-camera").classList.add("hidden");
+                    });
+                } else {
+                    document.getElementById("modal-camera").classList.add("hidden");
+                }
+            });
+        });
+
+        // 填滿下拉選單
+        function populateSelectOptions() {
+            const select = document.getElementById("select-sign");
+            SIGNS_DATA.forEach(item => {
+                const opt = document.createElement("option");
+                opt.value = item.id;
+                opt.textContent = `${item.id} - ${item.title}`;
+                select.appendChild(opt);
+            });
         }
-      } catch (err) {}
-    }
-  </script>
+
+        // 渲染畫面
+        function renderCurrentView() {
+            const viewSingle = document.getElementById("view-single");
+            const viewTable = document.getElementById("view-table");
+
+            if (currentViewMode === "SINGLE" && activeSignId) {
+                const item = SIGNS_DATA.find(s => s.id === activeSignId);
+                if (item) {
+                    viewSingle.classList.remove("hidden");
+                    viewTable.classList.add("hidden");
+
+                    document.getElementById("single-id").textContent = item.id;
+                    document.getElementById("single-title").textContent = item.title;
+                    document.getElementById("single-audio-id").textContent = item.audioId;
+                    document.getElementById("single-category").textContent = item.category;
+                    document.getElementById("single-script").textContent = item.script;
+                    
+                    // 簡易 QR code 圖片生成 (使用外部 API)
+                    const qrContainer = document.getElementById("single-qrcode");
+                    qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(item.id)}" alt="QR" class="w-full h-full object-contain"/>`;
+                }
+            } else {
+                // ALL 模式
+                viewSingle.classList.add("hidden");
+                viewTable.classList.remove("hidden");
+
+                // 篩選資料
+                const filtered = SIGNS_DATA.filter(item => {
+                    const matchSearch = item.title.toLowerCase().includes(currentSearch) || 
+                                        item.script.toLowerCase().includes(currentSearch) ||
+                                        item.id.toLowerCase().includes(currentSearch) ||
+                                        item.audioId.toLowerCase().includes(currentSearch);
+                    return matchSearch;
+                });
+
+                document.getElementById("count-total").textContent = filtered.length;
+
+                const tbody = document.getElementById("table-body");
+                tbody.innerHTML = "";
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">找不到符合條件的告示牌資料</td></tr>`;
+                    return;
+                }
+
+                filtered.forEach(item => {
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-50 transition cursor-pointer";
+                    tr.innerHTML = `
+                        <td class="p-3 font-bold text-indigo-700 font-mono">${item.id}</td>
+                        <td class="p-3 font-mono text-slate-600">${item.audioId}</td>
+                        <td class="p-3 font-semibold text-slate-800">${item.title}</td>
+                        <td class="p-3 text-slate-600 max-w-md truncate" title="${item.script}">${item.script}</td>
+                        <td class="p-3 text-center no-print">
+                            <button onclick="selectSingleSign('${item.id}')" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2.5 py-1 rounded border border-indigo-200 transition">
+                                查看
+                            </button>
+                        </td>
+                    `;
+                    // 點擊整行直接開啟單一檢視
+                    tr.addEventListener("click", (e) => {
+                        if(e.target.tagName !== 'BUTTON') {
+                            selectSingleSign(item.id);
+                        }
+                    });
+                    tbody.appendChild(tr);
+                });
+            }
+            lucide.createIcons();
+        }
+
+        // 全域切換選擇特定項目的 function
+        function selectSingleSign(id) {
+            activeSignId = id;
+            currentViewMode = "SINGLE";
+            document.getElementById("select-sign").value = id;
+            renderCurrentView();
+        }
+    </script>
 </body>
 </html>
