@@ -117,7 +117,7 @@
     // 請填寫您的 GAS Web App 部署網址
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
-    let isoSignsData = []; // 改為動態從 Google Sheet 載入
+    let isoSignsData = []; 
     let lastDataSnapshot = "";
     let currentLang = "zh";
 
@@ -130,11 +130,7 @@
         modal_search_title: "輸入標誌流水編號",
         modal_camera_title: "掃描 ISO 7010 QR-Code",
         admin_approval_title: "後台審批矩陣 (管理員)",
-        cancel: "取消",
-        confirm: "確認",
-        close: "關閉",
-        approve: "通過",
-        reject: "拒絕",
+        cancel: "取消", confirm: "確認", close: "關閉", approve: "通過", reject: "拒絕",
         camera_status_hint: "請對準標誌上的 QR-Code",
         not_found: "找不到符合該流水號的標誌資訊！",
         double_click_hint: "雙擊框格編輯提交",
@@ -144,16 +140,10 @@
       },
       en: {
         app_title: "Safety Culture & Awareness",
-        nav_text_search: "Search ID",
-        nav_camera: "Scan QR",
-        nav_database: "Database",
-        modal_search_title: "Enter Sign Serial ID",
-        modal_camera_title: "Scan ISO 7010 QR-Code",
-        admin_approval_title: "Approval Workflow (Admin)",
+        nav_text_search: "Search ID", nav_camera: "Scan QR", nav_database: "Database",
+        modal_search_title: "Enter Sign Serial ID", modal_camera_title: "Scan ISO 7010 QR-Code", admin_approval_title: "Approval Workflow (Admin)",
         cancel: "Cancel", confirm: "Confirm", close: "Close", approve: "Approve", reject: "Reject",
-        camera_status_hint: "Align QR-Code within frame",
-        not_found: "No matching sign found for this Serial ID!",
-        double_click_hint: "Double click to edit & submit",
+        camera_status_hint: "Align QR-Code within frame", not_found: "No matching sign found for this Serial ID!", double_click_hint: "Double click to edit & submit",
         fields: {
           freq: "Frequency", elim: "Elimination", sub: "Substitution", eng: "Engineering Controls", admin: "Administrative Controls", ppe: "PPE", risk: "Risk Level"
         }
@@ -179,15 +169,14 @@
       setupEventListeners();
       setupHeaderLongPress();
       
-      // 步驟 1: 先載入雲端 Signs 標誌資料庫
+      // 步驟 1: 從 Google Sheet 載入標誌清單
       await fetchSignsFromSheet();
 
-      // 步驟 2: 開始載入動態欄位並設置每 10 秒自動同步
+      // 步驟 2: 開始載入動態數據並設置 10 秒自動輪詢
       fetchGASData();
       setInterval(fetchGASData, 10000);
     });
 
-    // 從 Google Sheet (Signs頁籤) 獲取標誌清單
     async function fetchSignsFromSheet() {
       try {
         const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
@@ -271,7 +260,10 @@
       card.innerHTML = `
         <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
           <div class="flex flex-col items-center text-center">
-            <img src="${sign.svgUrl}" class="w-28 h-28 object-contain" alt="${signTitleName}">
+            <!-- 強化 SVG 載入與跨域容錯 -->
+            <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border">
+              <img src="${sign.svgUrl}" class="w-full h-full object-contain" alt="${signTitleName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-decagram-outline.svg';">
+            </div>
             ${levelHtml}
             <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
           </div>
@@ -309,7 +301,9 @@
         item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
         
         item.innerHTML = `
-          <img src="${sign.svgUrl}" class="w-16 h-16 object-contain group-hover:scale-105 transition" alt="${signName}">
+          <div class="w-16 h-16 flex items-center justify-center mb-1">
+            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${signName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-circle-outline.svg';">
+          </div>
           <span class="mt-2 font-bold text-gray-800 text-sm">${signName}</span>
           <span class="text-[10px] text-gray-400 font-mono mt-0.5">${sign.id}</span>
         `;
