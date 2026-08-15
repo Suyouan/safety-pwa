@@ -5,32 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>安全文化與意識</title>
   
-  <!-- PWA Manifest & Meta -->
   <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22%E5%AE%89%E5%85%A8%E6%96%87%E5%8C%96%E8%88%87%E6%84%8F%E8%AD%98%22%2C%22short_name%22%3A%22%E5%AE%89%E5%85%A8%E6%A8%99%E8%AA%8C%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f3f4f6%22%2C%22theme_color%22%3A%22%231f2937%22%7D">
   <meta name="theme-color" content="#1f2937">
   
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- QRCode.js Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- HTML5-QRCode Scanner Library -->
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
-    .no-zoom {
-      touch-action: manipulation;
-    }
-    .smooth-update {
-      transition: all 0.3s ease-in-out;
-    }
+    .no-zoom { touch-action: manipulation; }
+    .smooth-update { transition: all 0.3s ease-in-out; }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
 
-  <!-- 頂部導覽列 Header -->
+  <!-- Header -->
   <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
-    <h1 id="app-title" class="text-xl font-bold select-none cursor-pointer tracking-wide hover:text-blue-400 transition"
-        title="長按3秒進入審批流程">
+    <h1 id="app-title" class="text-xl font-bold select-none cursor-pointer tracking-wide hover:text-blue-400 transition" title="長按3秒進入審批流程">
       安全文化與意識
     </h1>
 
@@ -44,10 +35,10 @@
     </div>
   </header>
 
-  <!-- 主內容區域 -->
+  <!-- Main Content -->
   <main class="flex-grow container mx-auto px-4 py-6 max-w-4xl">
     
-    <!-- 頂部三大功能按鈕 -->
+    <!-- Top Nav Buttons -->
     <div class="grid grid-cols-3 gap-4 mb-8">
       <button id="btn-text-search" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-blue-500 group">
         <span class="text-3xl font-extrabold text-blue-600 group-hover:scale-110 transition">T</span>
@@ -70,13 +61,13 @@
       </button>
     </div>
 
-    <!-- 主要內容動態展現區域 -->
+    <!-- Content Area -->
     <div id="content-area" class="w-full">
-      <!-- 內容區 -->
+      <div class="text-center py-12 text-gray-500 font-medium">資料庫同步載入中...</div>
     </div>
   </main>
 
-  <!-- 文字搜尋 Modal -->
+  <!-- Search Modal -->
   <div id="modal-search" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
       <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_search_title">輸入標誌流水編號</h3>
@@ -88,7 +79,7 @@
     </div>
   </div>
 
-  <!-- 相機 QR 掃描 Modal -->
+  <!-- Camera Modal -->
   <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
       <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
@@ -98,7 +89,7 @@
     </div>
   </div>
 
-  <!-- 後台「審批流程」Modal -->
+  <!-- Approval Modal -->
   <div id="modal-approval" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center mb-4 border-b pb-3">
@@ -106,12 +97,12 @@
         <button id="btn-approval-close" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
       </div>
       <div id="approval-list" class="flex-grow overflow-y-auto space-y-3 p-1">
-        <!-- 待審批資料動態渲染 -->
+        <!-- 審批動態內容 -->
       </div>
     </div>
   </div>
 
-  <!-- 詳情長按展開 Modal -->
+  <!-- Detail Modal -->
   <div id="modal-detail" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
       <h3 id="modal-detail-title" class="text-lg font-bold mb-2 text-gray-900">詳細資訊</h3>
@@ -123,11 +114,12 @@
   </div>
 
   <script>
-    // ==================== 全局設定與資料結構 ====================
+    // 請填寫您的 GAS Web App 部署網址
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
-    // 快照比對機制：用於判斷雲端資料是否有變更
+    let isoSignsData = []; // 改為動態從 Google Sheet 載入
     let lastDataSnapshot = "";
+    let currentLang = "zh";
 
     const i18nDict = {
       zh: {
@@ -147,13 +139,7 @@
         not_found: "找不到符合該流水號的標誌資訊！",
         double_click_hint: "雙擊框格編輯提交",
         fields: {
-          freq: "發生頻率",
-          elim: "消除",
-          sub: "取代",
-          eng: "工程管制",
-          admin: "行政管制",
-          ppe: "個人防護用具",
-          risk: "風險等級"
+          freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級"
         }
       },
       en: {
@@ -164,106 +150,72 @@
         modal_search_title: "Enter Sign Serial ID",
         modal_camera_title: "Scan ISO 7010 QR-Code",
         admin_approval_title: "Approval Workflow (Admin)",
-        cancel: "Cancel",
-        confirm: "Confirm",
-        close: "Close",
-        approve: "Approve",
-        reject: "Reject",
+        cancel: "Cancel", confirm: "Confirm", close: "Close", approve: "Approve", reject: "Reject",
         camera_status_hint: "Align QR-Code within frame",
         not_found: "No matching sign found for this Serial ID!",
         double_click_hint: "Double click to edit & submit",
         fields: {
-          freq: "Frequency",
-          elim: "Elimination",
-          sub: "Substitution",
-          eng: "Engineering Controls",
-          admin: "Administrative Controls",
-          ppe: "PPE",
-          risk: "Risk Level"
+          freq: "Frequency", elim: "Elimination", sub: "Substitution", eng: "Engineering Controls", admin: "Administrative Controls", ppe: "PPE", risk: "Risk Level"
         }
       },
       de: {
         app_title: "Sicherheitskultur & Bewusstsein",
-        nav_text_search: "ID Suchen",
-        nav_camera: "QR Scannen",
-        nav_database: "Datenbank",
-        modal_search_title: "Sicherheits-ID Eingeben",
-        modal_camera_title: "ISO 7010 QR-Code Scannen",
-        admin_approval_title: "Genehmigungsmatrix (Admin)",
-        cancel: "Cancel",
-        confirm: "Bestätigen",
-        close: "Schließen",
-        approve: "Genehmigen",
-        reject: "Ablehnen",
-        camera_status_hint: "Richten Sie den QR-Code aus",
-        not_found: "Kein Übereinstimmendes Schild Gefunden!",
-        double_click_hint: "Doppelklick zum Bearbeiten",
+        nav_text_search: "ID Suchen", nav_camera: "QR Scannen", nav_database: "Datenbank",
+        modal_search_title: "Sicherheits-ID Eingeben", modal_camera_title: "ISO 7010 QR-Code Scannen", admin_approval_title: "Genehmigungsmatrix (Admin)",
+        cancel: "Cancel", confirm: "Bestätigen", close: "Schließen", approve: "Genehmigen", reject: "Ablehnen",
+        camera_status_hint: "Richten Sie den QR-Code aus", not_found: "Kein Übereinstimmendes Schild Gefunden!", double_click_hint: "Doppelklick zum Bearbeiten",
         fields: {
-          freq: "Häufigkeit",
-          elim: "Beseitigung",
-          sub: "Substitution",
-          eng: "Technische Kontrollen",
-          admin: "Organisatorische Maßnahmen",
-          ppe: "PSA",
-          risk: "Risikostufe"
+          freq: "Häufigkeit", elim: "Beseitigung", sub: "Substitution", eng: "Technische Kontrollen", admin: "Organisatorische Maßnahmen", ppe: "PSA", risk: "Risikostufe"
         }
       }
     };
 
-    let currentLang = "zh";
-
-    const isoSignsData = [
-      {
-        category: "W",
-        meaning: "HighVoltage",
-        level: "2",
-        id: "W-HighVoltage-(2)",
-        name: { zh: "當心觸電", en: "Warning; Electricity", de: "Warnung vor gefährlicher elektrischer Spannung" },
-        svg: `<polygon points="50,5 95,90 5,90" fill="#FACC15" stroke="#000" stroke-width="6"/><path d="M50,25 L35,55 L50,55 L45,80 L65,48 L50,48 Z" fill="#000"/>`
-      },
-      {
-        category: "W",
-        meaning: "ToxicMaterial",
-        level: "4",
-        id: "W-ToxicMaterial-(4)",
-        name: { zh: "當心有毒物質", en: "Warning; Toxic material", de: "Warnung vor giftigen Stoffen" },
-        svg: `<polygon points="50,5 95,90 5,90" fill="#FACC15" stroke="#000" stroke-width="6"/><circle cx="50" cy="45" r="12" fill="#000"/><path d="M35,65 L65,65 M40,55 L60,75 M60,55 L40,75" stroke="#000" stroke-width="4"/>`
-      },
-      {
-        category: "P",
-        meaning: "NoSmoking",
-        level: null,
-        id: "P-NoSmoking",
-        name: { zh: "禁止吸菸", en: "No smoking", de: "Rauchen verboten" },
-        svg: `<circle cx="50" cy="50" r="42" fill="none" stroke="#DC2626" stroke-width="10"/><line x1="20" y1="20" x2="80" y2="80" stroke="#DC2626" stroke-width="10"/><rect x="30" y="46" width="35" height="8" fill="#000"/>`
-      },
-      {
-        category: "M",
-        meaning: "WearEarProtection",
-        level: null,
-        id: "M-WearEarProtection",
-        name: { zh: "必須戴聽力防護具", en: "Wear ear protection", de: "Gehörschutz benutzen" },
-        svg: `<circle cx="50" cy="50" r="45" fill="#2563EB"/><circle cx="50" cy="50" r="22" fill="none" stroke="#FFF" stroke-width="6"/><path d="M30,50 Q30,30 50,30 Q70,30 70,50" fill="none" stroke="#FFF" stroke-width="6"/>`
-      }
-    ];
-
     let dynamicSubDirectories = {};
-    let pendingApprovalMatrix = [];
     let currentViewMode = "SINGLE";
-    let activeSignId = "W-HighVoltage-(2)";
+    let activeSignId = "";
 
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
       initI18n();
-      renderCurrentView();
       setupEventListeners();
       setupHeaderLongPress();
       
-      // 首次載入
+      // 步驟 1: 先載入雲端 Signs 標誌資料庫
+      await fetchSignsFromSheet();
+
+      // 步驟 2: 開始載入動態欄位並設置每 10 秒自動同步
       fetchGASData();
-      
-      // 開啟條件式輪詢：每 10 秒檢查一次變動
       setInterval(fetchGASData, 10000);
     });
+
+    // 從 Google Sheet (Signs頁籤) 獲取標誌清單
+    async function fetchSignsFromSheet() {
+      try {
+        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
+        const result = await res.json();
+        
+        if (result.status === "success" && result.data.length > 0) {
+          isoSignsData = result.data.map(item => ({
+            id: item.id,
+            category: item.category,
+            meaning: item.meaning,
+            level: item.level || null,
+            name: {
+              zh: item.name_zh || item.id,
+              en: item.name_en || item.id,
+              de: item.name_de || item.id
+            },
+            svgUrl: item.svg_url
+          }));
+
+          if (!activeSignId && isoSignsData.length > 0) {
+            activeSignId = isoSignsData[0].id;
+          }
+          renderCurrentView();
+        }
+      } catch (err) {
+        console.error("載入 Signs 清單失敗:", err);
+      }
+    }
 
     function initI18n() {
       document.getElementById("lang-select").addEventListener("change", (e) => {
@@ -301,7 +253,6 @@
       }
 
       const signTitleName = sign.name[currentLang] || sign.name.zh;
-      
       const levelHtml = (sign.category === "W" && sign.level) 
         ? `<div class="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-400 text-yellow-900 font-black text-sm rounded-full inline-block shadow-sm">等級 ${sign.level}</div>` 
         : '';
@@ -320,7 +271,7 @@
       card.innerHTML = `
         <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
           <div class="flex flex-col items-center text-center">
-            <svg class="w-28 h-28" viewBox="0 0 100 100">${sign.svg}</svg>
+            <img src="${sign.svgUrl}" class="w-28 h-28 object-contain" alt="${signTitleName}">
             ${levelHtml}
             <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
           </div>
@@ -339,11 +290,7 @@
         const qrContainer = document.getElementById(`qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}`);
         if (qrContainer) {
           qrContainer.innerHTML = "";
-          new QRCode(qrContainer, {
-            text: sign.id,
-            width: 90,
-            height: 90
-          });
+          new QRCode(qrContainer, { text: sign.id, width: 90, height: 90 });
         }
       }, 50);
 
@@ -362,7 +309,7 @@
         item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
         
         item.innerHTML = `
-          <svg class="w-16 h-16 group-hover:scale-105 transition" viewBox="0 0 100 100">${sign.svg}</svg>
+          <img src="${sign.svgUrl}" class="w-16 h-16 object-contain group-hover:scale-105 transition" alt="${signName}">
           <span class="mt-2 font-bold text-gray-800 text-sm">${signName}</span>
           <span class="text-[10px] text-gray-400 font-mono mt-0.5">${sign.id}</span>
         `;
@@ -403,13 +350,11 @@
       }).join('');
     }
 
-    // 💡 修正 1：同時相容手機 Touch 與電腦 Double Click 雙擊觸發編輯
     function bindSubFieldEvents() {
       document.querySelectorAll(".sub-field-box").forEach(box => {
         let pressTimer = null;
-        let lastTapTime = 0; // 用於手機雙擊時間差計算
+        let lastTapTime = 0;
 
-        // 長按 3 秒展開詳情
         box.addEventListener("touchstart", startPress, { passive: true });
         box.addEventListener("mousedown", startPress);
         box.addEventListener("touchend", cancelPress);
@@ -427,19 +372,16 @@
           if (pressTimer) clearTimeout(pressTimer);
         }
 
-        // 📱 手機雙擊觸發 (兩次點擊時間間隔 < 300ms)
         box.addEventListener("touchend", (e) => {
           const currentTime = new Date().getTime();
           const tapLength = currentTime - lastTapTime;
-          
           if (tapLength < 300 && tapLength > 0) {
-            e.preventDefault(); // 防手勢放大
+            e.preventDefault();
             triggerBoxEdit(box);
           }
           lastTapTime = currentTime;
         });
 
-        // 💻 電腦滑鼠雙擊觸發
         box.addEventListener("dblclick", () => {
           triggerBoxEdit(box);
         });
@@ -460,28 +402,21 @@
       }
     }
 
-    // 提交資料到雲端
     async function submitPendingData(signId, fieldKey, val) {
       const payload = {
         action: "SUBMIT",
         applicant: "使用者",
         content: JSON.stringify({
-          id: signId,
-          field: fieldKey,
-          value: val,
-          path: `ISO7010 > ${signId} > ${fieldKey}`
+          id: signId, field: fieldKey, value: val, path: `ISO7010 > ${signId} > ${fieldKey}`
         })
       };
 
       try {
         const res = await fetch(GAS_WEB_APP_URL, {
-          method: "POST",
-          mode: "cors",
-          redirect: "follow",
+          method: "POST", mode: "cors", redirect: "follow",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload)
         });
-        
         const result = await res.json();
         if (result.status === "success") {
           alert("🎉 提交成功！資料已寫入雲端待審批矩陣。");
@@ -490,7 +425,6 @@
           alert("❌ 提交失敗：" + result.message);
         }
       } catch (err) {
-        console.error(err);
         alert("網路通訊失敗，請檢查網路連線。");
       }
     }
@@ -514,7 +448,6 @@
       }
     }
 
-    // 💡 修正 2-A：開啟審批 Modal 並渲染「通過」與「拒絕」按鈕
     async function openApprovalModal() {
       const modal = document.getElementById("modal-approval");
       const listContainer = document.getElementById("approval-list");
@@ -522,23 +455,14 @@
       modal.classList.remove("hidden");
 
       try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, {
-          method: "GET",
-          redirect: "follow"
-        });
+        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
         const result = await res.json();
 
         if (result.status === "success" && result.data.length > 0) {
           listContainer.innerHTML = "";
-          pendingApprovalMatrix = result.data;
-
-          pendingApprovalMatrix.forEach((item) => {
+          result.data.forEach((item) => {
             let parsedContent = {};
-            try {
-              parsedContent = JSON.parse(item.content);
-            } catch (e) {
-              parsedContent = { path: "未定義路徑", value: item.content };
-            }
+            try { parsedContent = JSON.parse(item.content); } catch (e) { parsedContent = { path: "未定義路徑", value: item.content }; }
 
             const itemDiv = document.createElement("div");
             itemDiv.className = "p-4 bg-gray-50 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-gray-100 transition mb-2 gap-3";
@@ -548,8 +472,6 @@
                 <p class="text-sm font-semibold text-gray-800 mt-1">${parsedContent.value}</p>
                 <span class="text-[10px] text-gray-400">申請者: ${item.applicant} | 時間: ${new Date(item.timestamp).toLocaleTimeString()}</span>
               </div>
-              
-              <!-- 通過與拒絕按鈕組 -->
               <div class="flex space-x-2 self-end sm:self-center">
                 <button onclick="reviewItem('${item.rowId}', 'APPROVED')" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
                   ${i18nDict[currentLang].approve || '通過'}
@@ -569,23 +491,15 @@
       }
     }
 
-    // 💡 修正 2-B：通用的審核發送函式 (可傳入 APPROVED 或 REJECTED)
     window.reviewItem = async function(rowId, status) {
       const actionText = status === "APPROVED" ? "核准" : "拒絕";
       if (!confirm(`確定要【${actionText}】此筆申請嗎？`)) return;
 
-      const payload = {
-        action: "REVIEW",
-        rowId: rowId,
-        reviewStatus: status,
-        reviewer: "管理員"
-      };
+      const payload = { action: "REVIEW", rowId: rowId, reviewStatus: status, reviewer: "管理員" };
 
       try {
         const res = await fetch(GAS_WEB_APP_URL, {
-          method: "POST",
-          mode: "cors",
-          redirect: "follow",
+          method: "POST", mode: "cors", redirect: "follow",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload)
         });
@@ -593,8 +507,8 @@
         
         if (result.status === "success") {
           alert(`✅ 已成功【${actionText}】該筆申請！`);
-          openApprovalModal(); // 刷新審批清單
-          fetchGASData();      // 刷新前端視圖
+          openApprovalModal();
+          fetchGASData();
         } else {
           alert("審核失敗：" + result.message);
         }
@@ -668,28 +582,20 @@
       document.getElementById("modal-detail").classList.remove("hidden");
     }
 
-    // ==================== 智慧條件式輪詢 (Smart Polling) ====================
     async function fetchGASData() {
-      if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "YOUR_GAS_WEB_APP_URL_HERE") return;
+      if (!GAS_WEB_APP_URL) return;
 
       try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=APPROVED`, {
-          method: "GET",
-          redirect: "follow"
-        });
+        const res = await fetch(`${GAS_WEB_APP_URL}?status=APPROVED`, { method: "GET", redirect: "follow" });
         const response = await res.json();
 
         if (response.status === "success" && Array.isArray(response.data)) {
           const currentSnapshot = JSON.stringify(response.data);
+          if (currentSnapshot === lastDataSnapshot) return;
 
-          if (currentSnapshot === lastDataSnapshot) {
-            return;
-          }
-
-          console.log("⚡ 偵測到雲端資料有變更，正在自動更新頁面...");
           lastDataSnapshot = currentSnapshot;
-
           dynamicSubDirectories = {};
+
           response.data.forEach(item => {
             try {
               const parsed = JSON.parse(item.content);
@@ -698,33 +604,15 @@
                 if (!dynamicSubDirectories[parsed.id][parsed.field]) dynamicSubDirectories[parsed.id][parsed.field] = [];
                 
                 dynamicSubDirectories[parsed.id][parsed.field].push({
-                  zh: parsed.value,
-                  en: parsed.value,
-                  de: parsed.value
+                  zh: parsed.value, en: parsed.value, de: parsed.value
                 });
               }
-            } catch (e) {
-              console.log("解析跳過：", item);
-            }
+            } catch (e) {}
           });
 
           renderCurrentView();
         }
-      } catch (err) {
-        console.log("Fetch error:", err);
-      }
-    }
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        const swCode = `
-          self.addEventListener('install', e => self.skipWaiting());
-          self.addEventListener('activate', e => self.clients.claim());
-          self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response("Offline"))));
-        `;
-        const blob = new Blob([swCode], { type: 'application/javascript' });
-        navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
-      });
+      } catch (err) {}
     }
   </script>
 </body>
