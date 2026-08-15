@@ -84,7 +84,7 @@
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
       <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
       <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_camera_title">掃描 ISO 7010 QR-Code</h3>
-      <div id="reader" class="w-full h-full bg-black rounded-lg overflow-hidden"></div>
+      <div id="reader" class="w-full aspect-square bg-black rounded-lg overflow-hidden relative"></div>
       <p id="camera-status" class="text-xs text-gray-500 mt-3" data-i18n="camera_status_hint">請對準標誌上的 QR-Code</p>
     </div>
   </div>
@@ -541,7 +541,7 @@
         html5QrCode = new Html5Qrcode("reader");
         html5QrCode.start(
           { facingMode: "environment" },
-          { fps: 30, qrbox: (viewfinderWidth, viewfinderHeight) => ({ width: viewfinderWidth*0.7, height: viewfinderWidth*0.7 }) },
+          { fps: 10,aspectRatio: 1.0, qrbox: { width: 250, height: 250},
           (decodedText) => {
             html5QrCode.stop();
             modalCam.classList.add("hidden");
