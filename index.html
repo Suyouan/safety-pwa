@@ -15,22 +15,18 @@
   <style>
     .no-zoom { touch-action: manipulation; }
     .smooth-update { transition: all 0.3s ease-in-out; }
-    /* 防止選取文字干擾長按觸發 */
-    .prevent-select { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
 
-  <!-- 需求 7: 主標題設為「安全文化與意識」 -->
+  <!-- Header -->
   <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
-    <!-- 需求 3: 長按 3 秒進入後台審批流程 -->
-    <h1 id="app-title" class="text-xl font-bold prevent-select cursor-pointer tracking-wide hover:text-blue-400 transition" title="長按3秒進入審批流程">
+    <h1 id="app-title" class="text-xl font-bold select-none cursor-pointer tracking-wide hover:text-blue-400 transition" title="長按3秒進入審批流程">
       安全文化與意識
     </h1>
 
-    <!-- 需求 8: 語言切換選單 (繁中、英文、德文) -->
     <div class="flex items-center space-x-2">
-      <label for="lang-select" class="text-sm hidden sm:inline" id="lbl-lang">語言 / Lang:</label>
+      <label for="lang-select" class="text-sm hidden sm:inline">語言 / Lang:</label>
       <select id="lang-select" class="bg-gray-800 text-white text-sm border border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="zh" selected>繁體中文</option>
         <option value="en">English</option>
@@ -42,7 +38,7 @@
   <!-- Main Content -->
   <main class="flex-grow container mx-auto px-4 py-6 max-w-4xl">
     
-    <!-- 需求 2: 頂部導航按鈕 (T, 相機, 資料庫) -->
+    <!-- Top Nav Buttons -->
     <div class="grid grid-cols-3 gap-4 mb-8">
       <button id="btn-text-search" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-blue-500 group">
         <span class="text-3xl font-extrabold text-blue-600 group-hover:scale-110 transition">T</span>
@@ -65,17 +61,17 @@
       </button>
     </div>
 
-    <!-- 主要內容動態渲染區域 -->
+    <!-- Content Area -->
     <div id="content-area" class="w-full">
-      <div class="text-center py-12 text-gray-500 font-medium" data-i18n="loading">資料同步載入中...</div>
+      <div class="text-center py-12 text-gray-500 font-medium">資料庫同步載入中...</div>
     </div>
   </main>
 
-  <!-- 搜尋 Modal -->
+  <!-- Search Modal -->
   <div id="modal-search" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
       <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_search_title">輸入標誌流水編號</h3>
-      <input type="text" id="search-input" placeholder="例: W-HighVoltage-2" class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      <input type="text" id="search-input" placeholder="例: W-HighVoltage-(2)" class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
       <div class="flex justify-end space-x-3">
         <button id="btn-search-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" data-i18n="cancel">取消</button>
         <button id="btn-search-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" data-i18n="confirm">確認</button>
@@ -83,7 +79,7 @@
     </div>
   </div>
 
-  <!-- 相機 Modal -->
+  <!-- Camera Modal -->
   <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
       <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
@@ -93,7 +89,7 @@
     </div>
   </div>
 
-  <!-- 需求 3: 後台審批矩陣 Modal -->
+  <!-- Approval Modal -->
   <div id="modal-approval" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center mb-4 border-b pb-3">
@@ -101,12 +97,12 @@
         <button id="btn-approval-close" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
       </div>
       <div id="approval-list" class="flex-grow overflow-y-auto space-y-3 p-1">
-        <!-- 待審批動態項目 -->
+        <!-- 審批動態內容 -->
       </div>
     </div>
   </div>
 
-  <!-- 需求 6: 詳細資訊展開 Modal (長按 3 秒彈出) -->
+  <!-- Detail Modal -->
   <div id="modal-detail" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
       <h3 id="modal-detail-title" class="text-lg font-bold mb-2 text-gray-900">詳細資訊</h3>
@@ -118,20 +114,26 @@
   </div>
 
   <script>
-    // GAS 部署網址
+    // 請填寫您的 GAS Web App 部署網址
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
-    // 需求 8: 三國語言字典配置
+    let isoSignsData = []; 
+    let lastDataSnapshot = "";
+    let currentLang = "zh";
+
     const i18nDict = {
       zh: {
         app_title: "安全文化與意識",
-        nav_text_search: "文字搜尋", nav_camera: "掃描 QR", nav_database: "資料庫",
-        modal_search_title: "輸入標誌流水編號", modal_camera_title: "掃描 ISO 7010 QR-Code", admin_approval_title: "後台審批矩陣 (管理員)",
+        nav_text_search: "文字搜尋",
+        nav_camera: "掃描 QR",
+        nav_database: "資料庫",
+        modal_search_title: "輸入標誌流水編號",
+        modal_camera_title: "掃描 ISO 7010 QR-Code",
+        admin_approval_title: "後台審批矩陣 (管理員)",
         cancel: "取消", confirm: "確認", close: "關閉", approve: "通過", reject: "拒絕",
         camera_status_hint: "請對準標誌上的 QR-Code",
         not_found: "找不到符合該流水號的標誌資訊！",
-        double_click_hint: "提示：雙擊框格編輯提交，長按3秒展開查看全文",
-        loading: "資料同步載入中...",
+        double_click_hint: "雙擊框格編輯提交",
         fields: {
           freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級"
         }
@@ -141,10 +143,7 @@
         nav_text_search: "Search ID", nav_camera: "Scan QR", nav_database: "Database",
         modal_search_title: "Enter Sign Serial ID", modal_camera_title: "Scan ISO 7010 QR-Code", admin_approval_title: "Approval Workflow (Admin)",
         cancel: "Cancel", confirm: "Confirm", close: "Close", approve: "Approve", reject: "Reject",
-        camera_status_hint: "Align QR-Code within frame",
-        not_found: "No matching sign found for this Serial ID!",
-        double_click_hint: "Hint: Double click to edit, long press 3s to view details",
-        loading: "Synchronizing data...",
+        camera_status_hint: "Align QR-Code within frame", not_found: "No matching sign found for this Serial ID!", double_click_hint: "Double click to edit & submit",
         fields: {
           freq: "Frequency", elim: "Elimination", sub: "Substitution", eng: "Engineering Controls", admin: "Administrative Controls", ppe: "PPE", risk: "Risk Level"
         }
@@ -153,22 +152,16 @@
         app_title: "Sicherheitskultur & Bewusstsein",
         nav_text_search: "ID Suchen", nav_camera: "QR Scannen", nav_database: "Datenbank",
         modal_search_title: "Sicherheits-ID Eingeben", modal_camera_title: "ISO 7010 QR-Code Scannen", admin_approval_title: "Genehmigungsmatrix (Admin)",
-        cancel: "Stornieren", confirm: "Bestätigen", close: "Schließen", approve: "Genehmigen", reject: "Ablehnen",
-        camera_status_hint: "Richten Sie den QR-Code aus",
-        not_found: "Kein Übereinstimmendes Schild Gefunden!",
-        double_click_hint: "Hinweis: Doppelklick zum Bearbeiten, 3s gedrückt halten für Details",
-        loading: "Daten werden synchronisiert...",
+        cancel: "Cancel", confirm: "Bestätigen", close: "Schließen", approve: "Genehmigen", reject: "Ablehnen",
+        camera_status_hint: "Richten Sie den QR-Code aus", not_found: "Kein Übereinstimmendes Schild Gefunden!", double_click_hint: "Doppelklick zum Bearbeiten",
         fields: {
           freq: "Häufigkeit", elim: "Beseitigung", sub: "Substitution", eng: "Technische Kontrollen", admin: "Organisatorische Maßnahmen", ppe: "PSA", risk: "Risikostufe"
         }
       }
     };
 
-    let isoSignsData = []; 
     let dynamicSubDirectories = {};
-    let lastDataSnapshot = "";
-    let currentLang = "zh";
-    let currentViewMode = "SINGLE"; // "SINGLE" 或 "DATABASE"
+    let currentViewMode = "SINGLE";
     let activeSignId = "";
 
     document.addEventListener("DOMContentLoaded", async () => {
@@ -176,9 +169,10 @@
       setupEventListeners();
       setupHeaderLongPress();
       
+      // 步驟 1: 從 Google Sheet 載入標誌清單
       await fetchSignsFromSheet();
 
-      // 需求 9: 10 秒即時輪詢且防止畫面閃頻
+      // 步驟 2: 開始載入動態數據並設置 10 秒自動輪詢
       fetchGASData();
       setInterval(fetchGASData, 10000);
     });
@@ -190,10 +184,10 @@
         
         if (result.status === "success" && result.data.length > 0) {
           isoSignsData = result.data.map(item => ({
-            id: item.id, // 需求 4: 格式 [分類]-[意思]-[等級]
+            id: item.id,
             category: item.category,
             meaning: item.meaning,
-            level: item.level || null, // 需求 1: 注意標誌三角形下方的等級數字
+            level: item.level || null,
             name: {
               zh: item.name_zh || item.id,
               en: item.name_en || item.id,
@@ -208,7 +202,7 @@
           renderCurrentView();
         }
       } catch (err) {
-        console.error("載入標誌清單失敗:", err);
+        console.error("載入 Signs 清單失敗:", err);
       }
     }
 
@@ -240,7 +234,6 @@
       }
     }
 
-    // 需求 1, 2, 4, 5: 渲染單一標誌完整資訊（包含等級、QR Code、7 大子目錄）
     function renderSingleSignDetail(container, signId) {
       const sign = isoSignsData.find(s => s.id.toLowerCase() === signId.toLowerCase());
       if (!sign) {
@@ -249,13 +242,10 @@
       }
 
       const signTitleName = sign.name[currentLang] || sign.name.zh;
-      
-      // 需求 1: 三角形標誌（W類別）下方呈現等級數字
       const levelHtml = (sign.category === "W" && sign.level) 
         ? `<div class="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-400 text-yellow-900 font-black text-sm rounded-full inline-block shadow-sm">等級 ${sign.level}</div>` 
         : '';
 
-      // 需求 1: 每個「注意標誌」下方包含 7 個資訊子目錄
       const subFieldsHtml = (sign.category === "W") ? `
         <div class="mt-6 border-t pt-4 space-y-2">
           <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
@@ -270,6 +260,7 @@
       card.innerHTML = `
         <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
           <div class="flex flex-col items-center text-center">
+            <!-- 強化 SVG 載入與跨域容錯 -->
             <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border">
               <img src="${sign.svgUrl}" class="w-full h-full object-contain" alt="${signTitleName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-decagram-outline.svg';">
             </div>
@@ -277,7 +268,6 @@
             <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
           </div>
 
-          <!-- 需求 1: 解碼需與流水編號一致的獨有 QR Code 與 ID -->
           <div class="flex flex-col items-center sm:items-end">
             <div id="qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}" class="p-2 bg-white border rounded-xl shadow-inner"></div>
             <span class="mt-3 text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-md border">${sign.id}</span>
@@ -288,7 +278,6 @@
 
       container.appendChild(card);
 
-      // 需求 1: 生成 QR-Code (內容完全等於標誌流水 ID)
       setTimeout(() => {
         const qrContainer = document.getElementById(`qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}`);
         if (qrContainer) {
@@ -302,7 +291,6 @@
       }
     }
 
-    // 需求 2: 點選「資料庫」顯示所有標誌，點擊後展開詳細子目錄
     function renderDatabaseListView(container) {
       const grid = document.createElement("div");
       grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
@@ -332,26 +320,21 @@
       container.appendChild(grid);
     }
 
-    // 需求 1 & 6: 渲染 7 個子目錄資訊，並且能併列顯示「舊有與新增」過審資料
     function renderSubFieldsHtml(signId) {
-      // 需求 1: 精確 7 個資訊子目錄
       const fieldKeys = ["freq", "elim", "sub", "eng", "admin", "ppe", "risk"];
       const fieldsDict = i18nDict[currentLang].fields;
 
       return fieldKeys.map(key => {
         const fieldName = fieldsDict[key];
         const approvedValues = (dynamicSubDirectories[signId] && dynamicSubDirectories[signId][key]) || [];
+        let displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(" | ");
         
-        // 需求 6: 顯示舊有與新增的核准資料 (用逗點合併顯示)
-        let displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(", ");
-        
-        // 需求 6: 訊息太多時以 ... 帶過
-        const isOverflow = displayContent.length > 20;
-        const truncatedContent = isOverflow ? displayContent.substring(0, 20) + "..." : (displayContent || "-");
+        const isOverflow = displayContent.length > 25;
+        const truncatedContent = isOverflow ? displayContent.substring(0, 25) + "..." : displayContent || "-";
 
         return `
-          <div class="sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom prevent-select"
-               data-sign-id="${signId}" data-field-key="${key}" data-full-text="${displayContent || '暫無資料'}">
+          <div class="sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom"
+               data-sign-id="${signId}" data-field-key="${key}" data-full-text="${displayContent}">
             <div class="flex justify-between font-semibold text-gray-600 mb-1">
               <span>${fieldName}</span>
             </div>
@@ -361,12 +344,11 @@
       }).join('');
     }
 
-    // 需求 6: 綁定雙擊提交 (Double Click) 與長按 3 秒展開完整內容 (Long Press)
     function bindSubFieldEvents() {
       document.querySelectorAll(".sub-field-box").forEach(box => {
         let pressTimer = null;
+        let lastTapTime = 0;
 
-        // 長按 3 秒事件 (展開查看詳細全文)
         box.addEventListener("touchstart", startPress, { passive: true });
         box.addEventListener("mousedown", startPress);
         box.addEventListener("touchend", cancelPress);
@@ -376,9 +358,7 @@
         function startPress() {
           pressTimer = setTimeout(() => {
             const fullText = box.getAttribute("data-full-text");
-            const fieldKey = box.getAttribute("data-field-key");
-            const fieldName = i18nDict[currentLang].fields[fieldKey];
-            showDetailModal(`詳細資訊 - ${fieldName}`, fullText);
+            if (fullText) showDetailModal("詳細危害控制資訊", fullText);
           }, 3000);
         }
 
@@ -386,7 +366,16 @@
           if (pressTimer) clearTimeout(pressTimer);
         }
 
-        // 需求 6: 點選兩次 (雙擊) 觸發提交輸入
+        box.addEventListener("touchend", (e) => {
+          const currentTime = new Date().getTime();
+          const tapLength = currentTime - lastTapTime;
+          if (tapLength < 300 && tapLength > 0) {
+            e.preventDefault();
+            triggerBoxEdit(box);
+          }
+          lastTapTime = currentTime;
+        });
+
         box.addEventListener("dblclick", () => {
           triggerBoxEdit(box);
         });
@@ -400,16 +389,14 @@
       promptSubmitInput(signId, fieldKey, fieldName);
     }
 
-    // 需求 6: 提交後進入「待審批狀態」，前端絕不提示使用者已通過，直到雲端核准才更新
     function promptSubmitInput(signId, fieldKey, fieldName) {
-      const userInput = prompt(`【提交待審批資料】\n請輸入 ${signId} 之「${fieldName}」內容：`);
+      const userInput = prompt(`【待審批提交】請輸入 ${signId} 之「${fieldName}」資訊：`);
       if (userInput && userInput.trim() !== "") {
         submitPendingData(signId, fieldKey, userInput.trim());
       }
     }
 
     async function submitPendingData(signId, fieldKey, val) {
-      // 需求 3: 紀錄完整矩陣路徑 ISO7010 > [signId] > [fieldKey]
       const payload = {
         action: "SUBMIT",
         applicant: "使用者",
@@ -426,16 +413,16 @@
         });
         const result = await res.json();
         if (result.status === "success") {
-          alert("提交成功！資料已送出進行審核。");
+          alert("🎉 提交成功！資料已寫入雲端待審批矩陣。");
+          fetchGASData();
         } else {
-          alert("提交失敗：" + result.message);
+          alert("❌ 提交失敗：" + result.message);
         }
       } catch (err) {
-        alert("網路發送失敗，請檢查網路連線。");
+        alert("網路通訊失敗，請檢查網路連線。");
       }
     }
 
-    // 需求 3: 主標題長按 3 秒進入後台「審批流程」
     function setupHeaderLongPress() {
       const titleEl = document.getElementById("app-title");
       let pressTimer = null;
@@ -455,11 +442,10 @@
       }
     }
 
-    // 需求 3: 展示後台審批矩陣，管理員點選確認通過或拒絕
     async function openApprovalModal() {
       const modal = document.getElementById("modal-approval");
       const listContainer = document.getElementById("approval-list");
-      listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">審批資料載入中...</div>`;
+      listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">雲端資料加載中...</div>`;
       modal.classList.remove("hidden");
 
       try {
@@ -476,31 +462,29 @@
             itemDiv.className = "p-4 bg-gray-50 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-gray-100 transition mb-2 gap-3";
             itemDiv.innerHTML = `
               <div>
-                <!-- 需求 3: 呈現輸入的路徑矩陣與內容 -->
-                <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${parsedContent.path || '矩陣路徑'}</span>
+                <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${parsedContent.path || '資料區塊'}</span>
                 <p class="text-sm font-semibold text-gray-800 mt-1">${parsedContent.value}</p>
                 <span class="text-[10px] text-gray-400">申請者: ${item.applicant} | 時間: ${new Date(item.timestamp).toLocaleTimeString()}</span>
               </div>
               <div class="flex space-x-2 self-end sm:self-center">
                 <button onclick="reviewItem('${item.rowId}', 'APPROVED')" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
-                  ${i18nDict[currentLang].approve}
+                  ${i18nDict[currentLang].approve || '通過'}
                 </button>
                 <button onclick="reviewItem('${item.rowId}', 'REJECTED')" class="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition">
-                  ${i18nDict[currentLang].reject}
+                  ${i18nDict[currentLang].reject || '拒絕'}
                 </button>
               </div>
             `;
             listContainer.appendChild(itemDiv);
           });
         } else {
-          listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">目前無待審批的數據。</div>`;
+          listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">目前雲端無待審批的訊息。</div>`;
         }
       } catch (err) {
-        listContainer.innerHTML = `<div class="text-center py-8 text-red-500">無法加載審批資料！</div>`;
+        listContainer.innerHTML = `<div class="text-center py-8 text-red-500">加載待審資料失敗，請確認網路！</div>`;
       }
     }
 
-    // 需求 3: 審核通過後，資料庫新增該訊息，且不主動跳提示通知使用者（靜默式寫入）
     window.reviewItem = async function(rowId, status) {
       const actionText = status === "APPROVED" ? "核准" : "拒絕";
       if (!confirm(`確定要【${actionText}】此筆申請嗎？`)) return;
@@ -516,18 +500,18 @@
         const result = await res.json();
         
         if (result.status === "success") {
+          alert(`✅ 已成功【${actionText}】該筆申請！`);
           openApprovalModal();
-          fetchGASData(); // 立即輪詢同步資料
+          fetchGASData();
         } else {
           alert("審核失敗：" + result.message);
         }
       } catch (err) {
-        alert("審核請求傳送失敗！");
+        alert("審核請求傳送失敗，請檢查網路連線！");
       }
     };
 
     function setupEventListeners() {
-      // 需求 2: 點選 "T" 文字搜尋
       document.getElementById("btn-text-search").addEventListener("click", () => {
         document.getElementById("modal-search").classList.remove("hidden");
       });
@@ -544,13 +528,11 @@
         }
       });
 
-      // 需求 2: 點選 "資料庫" 按鈕
       document.getElementById("btn-database").addEventListener("click", () => {
         currentViewMode = "DATABASE";
         renderCurrentView();
       });
 
-      // 需求 5: 相機權限與 QR Code 掃描處理
       let html5QrCode = null;
       document.getElementById("btn-camera").addEventListener("click", () => {
         const modalCam = document.getElementById("modal-camera");
@@ -561,7 +543,6 @@
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 200, height: 200 } },
           (decodedText) => {
-            // 解碼後取得流水號，顯示資訊與文字搜尋完全一致
             html5QrCode.stop();
             modalCam.classList.add("hidden");
             activeSignId = decodedText;
@@ -570,7 +551,6 @@
           },
           (err) => {}
         ).catch(err => {
-          // 需求 5: 若使用者未開啟相機權限，直接關閉相機程式
           alert("無法取得相機權限，相機程式已關閉。");
           modalCam.classList.add("hidden");
         });
@@ -596,7 +576,6 @@
       document.getElementById("modal-detail").classList.remove("hidden");
     }
 
-    // 需求 9: 全員同步最新資訊，並且採用快照比對 (Snapshot) 防止頁面閃頻 (Flicker)
     async function fetchGASData() {
       if (!GAS_WEB_APP_URL) return;
 
@@ -606,8 +585,6 @@
 
         if (response.status === "success" && Array.isArray(response.data)) {
           const currentSnapshot = JSON.stringify(response.data);
-          
-          // 若資料未變動，不做任何更新動作（防止閃頻）
           if (currentSnapshot === lastDataSnapshot) return;
 
           lastDataSnapshot = currentSnapshot;
@@ -620,7 +597,6 @@
                 if (!dynamicSubDirectories[parsed.id]) dynamicSubDirectories[parsed.id] = {};
                 if (!dynamicSubDirectories[parsed.id][parsed.field]) dynamicSubDirectories[parsed.id][parsed.field] = [];
                 
-                // 需求 6: 新增與舊有的歷史通過資料皆併入陣列
                 dynamicSubDirectories[parsed.id][parsed.field].push({
                   zh: parsed.value, en: parsed.value, de: parsed.value
                 });
@@ -628,7 +604,6 @@
             } catch (e) {}
           });
 
-          // 只有資料真正有新核准項時，才平滑渲染更新畫面
           renderCurrentView();
         }
       } catch (err) {}
