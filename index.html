@@ -541,7 +541,7 @@
         html5QrCode = new Html5Qrcode("reader");
         html5QrCode.start(
           { facingMode: "environment" },
-          { fps: 30, qrbox: (viewfinderWidth, viewfinderHeight) => ({ width: viewfinderWidth * 0.7, height: viewfinderWidth * 0.7 }) },
+          { fps: 30, qrbox: (viewfinderWidth, viewfinderHeight) => ({ width: viewfinderWidth, height: viewfinderWidth }) },
           (decodedText) => {
             html5QrCode.stop();
             modalCam.classList.add("hidden");
