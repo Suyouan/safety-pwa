@@ -26,12 +26,14 @@
 
   <!-- Header -->
   <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
-    <div class="flex items-center space-x-3 cursor-pointer select-none group" id="header-title-container" title="長按3秒進入審批流程">
-      <h1 id="app-title" class="text-xl font-bold tracking-wide group-hover:text-blue-400 transition">
+    <div class="flex items-center space-x-3 cursor-pointer select-none" id="header-title-container" title="長按3秒進入審批流程">
+      <h1 id="app-title" class="text-xl font-bold tracking-wide hover:text-blue-400 transition">
         安全文化與意識
       </h1>
-      <!-- 尚未審批數量徽章 -->
-      <span id="pending-badge" class="hidden bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow animate-pulse">0</span>
+      <!-- 待審批數量 Badge -->
+      <span id="pending-badge" class="hidden bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse shadow-sm">
+        0 待審
+      </span>
     </div>
 
     <div class="flex items-center space-x-2">
@@ -175,8 +177,9 @@
       
       await fetchSignsFromSheet();
       fetchGASData();
+      fetchPendingCount(); // 初始化抓取待審批數量
       setInterval(fetchGASData, 10000);
-      fetchPendingCount(); // 初始化時獲取未審批數量
+      setInterval(fetchPendingCount, 15000); // 定期輪詢待審批數量
     });
 
     async function fetchSignsFromSheet() {
@@ -205,6 +208,26 @@
         }
       } catch (err) {
         console.error("載入 Signs 清單失敗:", err);
+      }
+    }
+
+    // 取得待審批數量並即時更新 Header Badge
+    async function fetchPendingCount() {
+      try {
+        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
+        const result = await res.json();
+        const badge = document.getElementById("pending-badge");
+        if (result.status === "success" && Array.isArray(result.data)) {
+          const count = result.data.length;
+          if (count > 0) {
+            badge.textContent = `${count} 待審`;
+            badge.classList.remove("hidden");
+          } else {
+            badge.classList.add("hidden");
+          }
+        }
+      } catch (e) {
+        console.warn("無法取得待審批數量:", e);
       }
     }
 
@@ -333,8 +356,9 @@
         const isOverflow = displayContent.length > 25;
         const truncatedContent = isOverflow ? displayContent.substring(0, 25) + "..." : displayContent || "-";
         
-        // 若內容過長，顯示「...」點擊按鈕供使用者展開檢視
-        const moreBtnHtml = isOverflow ? `<span class="text-blue-600 font-bold ml-1 hover:underline cursor-pointer inline-block" onclick="showDetailModal('${fieldName}', '${displayContent.replace(/'/g, "\\'")}')">...</span>` : '';
+        const moreBtnHtml = isOverflow 
+          ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(displayContent)}">[...]</button>` 
+          : '';
 
         return `
           <div class="sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom"
@@ -342,20 +366,26 @@
             <div class="flex justify-between font-semibold text-gray-600 mb-1">
               <span>${fieldName}</span>
             </div>
-            <div class="text-gray-800 font-medium">${truncatedContent}${moreBtnHtml}</div>
+            <div class="text-gray-800 font-medium truncate-text">${truncatedContent}${moreBtnHtml}</div>
           </div>
         `;
       }).join('');
     }
 
     function bindSubFieldEvents() {
+      document.querySelectorAll(".btn-more-detail").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const fullText = decodeURIComponent(btn.getAttribute("data-full-text"));
+          showDetailModal("詳細危害控制資訊", fullText);
+        });
+      });
+
       document.querySelectorAll(".sub-field-box").forEach(box => {
         let lastTapTime = 0;
 
         box.addEventListener("touchend", (e) => {
-          // 避免點擊內部的「...」按鈕時觸發雙擊編輯
-          if (e.target.tagName === 'SPAN' && e.target.textContent === '...') return;
-
+          if (e.target.closest('.btn-more-detail')) return;
           const currentTime = new Date().getTime();
           const tapLength = currentTime - lastTapTime;
           if (tapLength < 300 && tapLength > 0) {
@@ -366,7 +396,7 @@
         });
 
         box.addEventListener("dblclick", (e) => {
-          if (e.target.tagName === 'SPAN' && e.target.textContent === '...') return;
+          if (e.target.closest('.btn-more-detail')) return;
           triggerBoxEdit(box);
         });
       });
@@ -405,7 +435,7 @@
         if (result.status === "success") {
           alert("🎉 提交成功！資料已寫入雲端待審批矩陣。");
           fetchGASData();
-          fetchPendingCount(); // 提交後更新未審批數量
+          fetchPendingCount();
         } else {
           alert("❌ 提交失敗：" + result.message);
         }
@@ -415,14 +445,14 @@
     }
 
     function setupHeaderLongPress() {
-      const containerEl = document.getElementById("header-title-container");
+      const titleContainer = document.getElementById("header-title-container");
       let pressTimer = null;
 
-      containerEl.addEventListener("mousedown", startPress);
-      containerEl.addEventListener("touchstart", startPress, { passive: true });
-      containerEl.addEventListener("mouseup", cancelPress);
-      containerEl.addEventListener("touchend", cancelPress);
-      containerEl.addEventListener("mouseleave", cancelPress);
+      titleContainer.addEventListener("mousedown", startPress);
+      titleContainer.addEventListener("touchstart", startPress, { passive: true });
+      titleContainer.addEventListener("mouseup", cancelPress);
+      titleContainer.addEventListener("touchend", cancelPress);
+      titleContainer.addEventListener("mouseleave", cancelPress);
 
       function startPress() {
         pressTimer = setTimeout(() => { openApprovalModal(); }, 3000);
@@ -430,24 +460,6 @@
 
       function cancelPress() {
         if (pressTimer) clearTimeout(pressTimer);
-      }
-    }
-
-    // 獲取並更新未審批數量的函式
-    async function fetchPendingCount() {
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
-        const result = await res.json();
-        const badge = document.getElementById("pending-badge");
-
-        if (result.status === "success" && Array.isArray(result.data) && result.data.length > 0) {
-          badge.textContent = result.data.length;
-          badge.classList.remove("hidden");
-        } else {
-          badge.classList.add("hidden");
-        }
-      } catch (err) {
-        console.error("獲取待審數量失敗", err);
       }
     }
 
@@ -512,7 +524,7 @@
           alert(`✅ 已成功【${actionText}】該筆申請！`);
           openApprovalModal();
           fetchGASData();
-          fetchPendingCount(); // 審核完成後即時更新數量
+          fetchPendingCount();
         } else {
           alert("審核失敗：" + result.message);
         }
@@ -546,7 +558,7 @@
       document.getElementById("btn-search-confirm").addEventListener("click", () => {
         const query = document.getElementById("search-input").value.trim();
         document.getElementById("modal-search").classList.add("hidden");
-        if (query) {
+        if (query.length > 0) {
           activeSignId = query;
           currentViewMode = "SINGLE";
           renderCurrentView();
