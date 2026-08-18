@@ -15,7 +15,6 @@
   <style>
     .no-zoom { touch-action: manipulation; }
     .smooth-update { transition: all 0.3s ease-in-out; }
-    /* 讓相機影片能跟隨容器滿版呈現 */
     #reader video {
       width: 100% !important;
       height: 100% !important;
@@ -27,9 +26,13 @@
 
   <!-- Header -->
   <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
-    <h1 id="app-title" class="text-xl font-bold select-none cursor-pointer tracking-wide hover:text-blue-400 transition" title="長按3秒進入審批流程">
-      安全文化與意識
-    </h1>
+    <div class="flex items-center space-x-3 cursor-pointer select-none group" id="header-title-container" title="長按3秒進入審批流程">
+      <h1 id="app-title" class="text-xl font-bold tracking-wide group-hover:text-blue-400 transition">
+        安全文化與意識
+      </h1>
+      <!-- 尚未審批數量徽章 -->
+      <span id="pending-badge" class="hidden bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow animate-pulse">0</span>
+    </div>
 
     <div class="flex items-center space-x-2">
       <label for="lang-select" class="text-sm hidden sm:inline">語言 / Lang:</label>
@@ -43,8 +46,6 @@
 
   <!-- Main Content -->
   <main class="flex-grow container mx-auto px-4 py-6 max-w-4xl">
-    
-    <!-- Top Nav Buttons -->
     <div class="grid grid-cols-3 gap-4 mb-8">
       <button id="btn-text-search" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-blue-500 group">
         <span class="text-3xl font-extrabold text-blue-600 group-hover:scale-110 transition">T</span>
@@ -67,7 +68,6 @@
       </button>
     </div>
 
-    <!-- Content Area -->
     <div id="content-area" class="w-full">
       <div class="text-center py-12 text-gray-500 font-medium">資料庫同步載入中...</div>
     </div>
@@ -85,12 +85,11 @@
     </div>
   </div>
 
-  <!-- Camera Modal (調整相機 Modal 為彈性高度以利滿版展示) -->
+  <!-- Camera Modal -->
   <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
       <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold z-10">&times;</button>
       <h3 class="text-lg font-bold mb-3 text-gray-900" data-i18n="modal_camera_title">掃描 ISO 7010 QR-Code</h3>
-      <!-- 高度調大，讓全畫面視野更好 -->
       <div id="reader" class="w-full h-80 bg-black rounded-lg overflow-hidden relative"></div>
       <p id="camera-status" class="text-xs text-gray-500 mt-3" data-i18n="camera_status_hint">請對準標誌上的 QR-Code</p>
     </div>
@@ -103,9 +102,7 @@
         <h3 class="text-xl font-bold text-gray-900" data-i18n="admin_approval_title">後台審批矩陣 (管理員)</h3>
         <button id="btn-approval-close" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
       </div>
-      <div id="approval-list" class="flex-grow overflow-y-auto space-y-3 p-1">
-        <!-- 審批動態內容 -->
-      </div>
+      <div id="approval-list" class="flex-grow overflow-y-auto space-y-3 p-1"></div>
     </div>
   </div>
 
@@ -169,7 +166,7 @@
     let dynamicSubDirectories = {};
     let currentViewMode = "SINGLE";
     let activeSignId = "";
-    let html5QrCode = null; // 全局相機實例
+    let html5QrCode = null;
 
     document.addEventListener("DOMContentLoaded", async () => {
       initI18n();
@@ -177,9 +174,9 @@
       setupHeaderLongPress();
       
       await fetchSignsFromSheet();
-
       fetchGASData();
       setInterval(fetchGASData, 10000);
+      fetchPendingCount(); // 初始化時獲取未審批數量
     });
 
     async function fetchSignsFromSheet() {
@@ -335,6 +332,9 @@
         
         const isOverflow = displayContent.length > 25;
         const truncatedContent = isOverflow ? displayContent.substring(0, 25) + "..." : displayContent || "-";
+        
+        // 若內容過長，顯示「...」點擊按鈕供使用者展開檢視
+        const moreBtnHtml = isOverflow ? `<span class="text-blue-600 font-bold ml-1 hover:underline cursor-pointer inline-block" onclick="showDetailModal('${fieldName}', '${displayContent.replace(/'/g, "\\'")}')">...</span>` : '';
 
         return `
           <div class="sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom"
@@ -342,7 +342,7 @@
             <div class="flex justify-between font-semibold text-gray-600 mb-1">
               <span>${fieldName}</span>
             </div>
-            <div class="text-gray-800 font-medium truncate-text">${truncatedContent}</div>
+            <div class="text-gray-800 font-medium">${truncatedContent}${moreBtnHtml}</div>
           </div>
         `;
       }).join('');
@@ -350,27 +350,12 @@
 
     function bindSubFieldEvents() {
       document.querySelectorAll(".sub-field-box").forEach(box => {
-        let pressTimer = null;
         let lastTapTime = 0;
 
-        box.addEventListener("touchstart", startPress, { passive: true });
-        box.addEventListener("mousedown", startPress);
-        box.addEventListener("touchend", cancelPress);
-        box.addEventListener("mouseup", cancelPress);
-        box.addEventListener("mouseleave", cancelPress);
-
-        function startPress() {
-          pressTimer = setTimeout(() => {
-            const fullText = box.getAttribute("data-full-text");
-            if (fullText) showDetailModal("詳細危害控制資訊", fullText);
-          }, 3000);
-        }
-
-        function cancelPress() {
-          if (pressTimer) clearTimeout(pressTimer);
-        }
-
         box.addEventListener("touchend", (e) => {
+          // 避免點擊內部的「...」按鈕時觸發雙擊編輯
+          if (e.target.tagName === 'SPAN' && e.target.textContent === '...') return;
+
           const currentTime = new Date().getTime();
           const tapLength = currentTime - lastTapTime;
           if (tapLength < 300 && tapLength > 0) {
@@ -380,7 +365,8 @@
           lastTapTime = currentTime;
         });
 
-        box.addEventListener("dblclick", () => {
+        box.addEventListener("dblclick", (e) => {
+          if (e.target.tagName === 'SPAN' && e.target.textContent === '...') return;
           triggerBoxEdit(box);
         });
       });
@@ -419,6 +405,7 @@
         if (result.status === "success") {
           alert("🎉 提交成功！資料已寫入雲端待審批矩陣。");
           fetchGASData();
+          fetchPendingCount(); // 提交後更新未審批數量
         } else {
           alert("❌ 提交失敗：" + result.message);
         }
@@ -428,14 +415,14 @@
     }
 
     function setupHeaderLongPress() {
-      const titleEl = document.getElementById("app-title");
+      const containerEl = document.getElementById("header-title-container");
       let pressTimer = null;
 
-      titleEl.addEventListener("mousedown", startPress);
-      titleEl.addEventListener("touchstart", startPress, { passive: true });
-      titleEl.addEventListener("mouseup", cancelPress);
-      titleEl.addEventListener("touchend", cancelPress);
-      titleEl.addEventListener("mouseleave", cancelPress);
+      containerEl.addEventListener("mousedown", startPress);
+      containerEl.addEventListener("touchstart", startPress, { passive: true });
+      containerEl.addEventListener("mouseup", cancelPress);
+      containerEl.addEventListener("touchend", cancelPress);
+      containerEl.addEventListener("mouseleave", cancelPress);
 
       function startPress() {
         pressTimer = setTimeout(() => { openApprovalModal(); }, 3000);
@@ -443,6 +430,24 @@
 
       function cancelPress() {
         if (pressTimer) clearTimeout(pressTimer);
+      }
+    }
+
+    // 獲取並更新未審批數量的函式
+    async function fetchPendingCount() {
+      try {
+        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
+        const result = await res.json();
+        const badge = document.getElementById("pending-badge");
+
+        if (result.status === "success" && Array.isArray(result.data) && result.data.length > 0) {
+          badge.textContent = result.data.length;
+          badge.classList.remove("hidden");
+        } else {
+          badge.classList.add("hidden");
+        }
+      } catch (err) {
+        console.error("獲取待審數量失敗", err);
       }
     }
 
@@ -507,6 +512,7 @@
           alert(`✅ 已成功【${actionText}】該筆申請！`);
           openApprovalModal();
           fetchGASData();
+          fetchPendingCount(); // 審核完成後即時更新數量
         } else {
           alert("審核失敗：" + result.message);
         }
@@ -515,7 +521,6 @@
       }
     };
 
-    // 關閉相機及清理資源的輔助函式
     async function stopCamera() {
       if (html5QrCode) {
         try {
@@ -553,17 +558,14 @@
         renderCurrentView();
       });
 
-      // 相機開啟監聽（修改為全畫面掃描）
       document.getElementById("btn-camera").addEventListener("click", async () => {
         const modalCam = document.getElementById("modal-camera");
         modalCam.classList.remove("hidden");
 
-        // 若先前有殘留的相機實例先清理
         if (html5QrCode) await stopCamera();
 
         html5QrCode = new Html5Qrcode("reader");
 
-        // 設定：不傳入 qrbox 參數 -> 預設使用全相機畫面進行辨識
         const config = { 
           fps: 15, 
           aspectRatio: 1.0 
