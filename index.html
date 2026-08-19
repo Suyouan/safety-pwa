@@ -173,8 +173,7 @@
       }
     };
 
-    let dynamicSubDirectories = {};
-    let currentViewMode = "DATABASE"; // 預設進來顯示資料庫主分類
+    let currentViewMode = "DATABASE"; 
     let activeCategory = null;
     let activeSignId = "";
     let html5QrCode = null;
@@ -191,6 +190,17 @@
       setInterval(fetchPendingCount, 15000);
     });
 
+    // 統一解析 B 欄分類名稱
+    function normalizeCategory(rawCat) {
+      if (!rawCat) return "General sign";
+      const c = rawCat.toString().trim().toUpperCase();
+      if (c.startsWith("P") || c.includes("PROHIBITION") || c.includes("禁止")) return "Prohibition sign";
+      if (c.startsWith("W") || c.includes("WARNING") || c.includes("警告")) return "Warning sign";
+      if (c.startsWith("M") || c.includes("MANDATORY") || c.includes("強制")) return "Mandatory action sign";
+      if (c.startsWith("S") || c.includes("SAFE") || c.includes("安全")) return "Safe condition sign";
+      return rawCat; // 若有自定義名稱直接回傳
+    }
+
     async function fetchSignsFromSheet() {
       try {
         const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
@@ -201,8 +211,8 @@
           isoSignsData = [];
 
           rawData.forEach(item => {
-            const cat = item.category || "General";
-            const isWarning = (cat.toUpperCase() === "W" || cat.includes("W") || cat.includes("警告"));
+            const standardizedCat = normalizeCategory(item.category);
+            const isWarning = (standardizedCat === "Warning sign" || item.category?.toString().toUpperCase().startsWith("W"));
             
             if (isWarning) {
               // 警告標誌自動擴增 4 行 (頻率 1 ~ 4)
@@ -210,7 +220,7 @@
                 isoSignsData.push({
                   id: `${item.id}-(${f})`,
                   originalId: item.id,
-                  category: cat,
+                  category: standardizedCat,
                   meaning: item.meaning,
                   level: item.level || null,
                   freq: f.toString(),
@@ -223,11 +233,11 @@
                 });
               }
             } else {
-              // 其他分類維持單行
+              // 其他 4 個分類項目維持單行 (Category + name)
               isoSignsData.push({
                 id: item.id,
                 originalId: item.id,
-                category: cat,
+                category: standardizedCat,
                 meaning: item.meaning,
                 level: item.level || null,
                 freq: item.freq || "1",
@@ -318,34 +328,43 @@
       }
     }
 
-    // 第一層：以 B 欄 (Category) 分類群組
+    // 第一層：四大分類呈現
     function renderDatabaseCategories(container) {
       const groups = {};
+      
+      // 確保四大分類順序固定展示
+      const targetCategories = ["Prohibition sign", "Warning sign", "Mandatory action sign", "Safe condition sign"];
+      
+      targetCategories.forEach(cat => { groups[cat] = []; });
+
       isoSignsData.forEach(sign => {
-        const cat = sign.category || "未分類";
-        if (!groups[cat]) {
-          groups[cat] = [];
-        }
+        const cat = sign.category;
+        if (!groups[cat]) groups[cat] = [];
         groups[cat].push(sign);
       });
 
       const grid = document.createElement("div");
-      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
+      grid.className = "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4";
 
       Object.keys(groups).forEach(cat => {
-        const representative = groups[cat][0]; // 抓取該類別的第一筆作為代表
+        const items = groups[cat];
+        if (items.length === 0) return; // 若該分類沒資料則跳過
+
+        const representative = items[0]; // 各類別的第一個當作代表圖示與敘述
         const repName = representative.name[currentLang] || representative.name.zh;
         
         const item = document.createElement("div");
-        item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
+        item.className = "bg-white p-5 rounded-xl shadow border border-gray-100 flex items-center space-x-4 hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
         
         item.innerHTML = `
-          <div class="w-20 h-20 flex items-center justify-center mb-2 bg-gray-50 rounded-lg p-1 border">
+          <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-50 rounded-lg p-1 border">
             <img src="${representative.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${cat}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:folder-outline.svg';">
           </div>
-          <span class="font-bold text-gray-900 text-base">${cat}</span>
-          <span class="text-xs text-gray-500 mt-1 truncate max-w-full">代表: ${repName}</span>
-          <span class="text-[10px] text-purple-600 font-semibold mt-2 bg-purple-50 px-2 py-0.5 rounded-full">共 ${groups[cat].length} 項</span>
+          <div class="flex-grow">
+            <h4 class="font-bold text-gray-900 text-base">${cat}</h4>
+            <p class="text-xs text-gray-500 mt-1">代表: ${repName}</p>
+            <span class="inline-block mt-2 text-[10px] text-purple-600 font-semibold bg-purple-50 px-2 py-0.5 rounded-full">共 ${items.length} 項標誌</span>
+          </div>
         `;
 
         item.addEventListener("click", () => {
@@ -360,9 +379,9 @@
       container.appendChild(grid);
     }
 
-    // 第二層：該分類底下的標誌清單
+    // 第二層：該分類內的所有標誌與 name 清單
     function renderCategorySignsList(container, categoryName) {
-      const signsInCat = isoSignsData.filter(s => (s.category || "未分類") === categoryName);
+      const signsInCat = isoSignsData.filter(s => s.category === categoryName);
       const grid = document.createElement("div");
       grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
 
@@ -400,7 +419,7 @@
       }
 
       const signTitleName = sign.name[currentLang] || sign.name.zh;
-      const isWarning = (sign.category.toUpperCase() === "W" || sign.category.includes("W") || sign.category.includes("警告"));
+      const isWarning = (sign.category === "Warning sign");
 
       const levelHtml = (isWarning && sign.level) 
         ? `<div class="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-400 text-yellow-900 font-black text-sm rounded-full inline-block shadow-sm">等級 ${sign.level}</div>` 
@@ -564,7 +583,6 @@
       }
     }
 
-    // 優化後的長按事件 (無選取干擾)
     function setupHeaderLongPress() {
       const titleContainer = document.getElementById("header-title-container");
       let pressTimer = null;
@@ -699,10 +717,7 @@
 
         html5QrCode = new Html5Qrcode("reader");
 
-        const config = { 
-          fps: 15, 
-          aspectRatio: 1.0 
-        };
+        const config = { fps: 15, aspectRatio: 1.0 };
 
         html5QrCode.start(
           { facingMode: "environment" },
@@ -757,10 +772,11 @@
             try {
               const parsed = JSON.parse(item.content);
               if (parsed.id && parsed.field && parsed.value) {
-                if (!dynamicSubDirectories[parsed.id]) dynamicSubDirectories[parsed.id] = {};
-                if (!dynamicSubDirectories[parsed.id][parsed.field]) dynamicSubDirectories[parsed.id][parsed.field] = [];
+                if (!window.dynamicSubDirectories) window.dynamicSubDirectories = {};
+                if (!window.dynamicSubDirectories[parsed.id]) window.dynamicSubDirectories[parsed.id] = {};
+                if (!window.dynamicSubDirectories[parsed.id][parsed.field]) window.dynamicSubDirectories[parsed.id][parsed.field] = [];
                 
-                dynamicSubDirectories[parsed.id][parsed.field].push({
+                window.dynamicSubDirectories[parsed.id][parsed.field].push({
                   zh: parsed.value, en: parsed.value, de: parsed.value
                 });
               }
@@ -771,6 +787,8 @@
         }
       } catch (err) {}
     }
+
+    let dynamicSubDirectories = {};
   </script>
 </body>
 </html>
