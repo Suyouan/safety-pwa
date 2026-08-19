@@ -15,6 +15,11 @@
   <style>
     .no-zoom { touch-action: manipulation; }
     .smooth-update { transition: all 0.3s ease-in-out; }
+    .no-select {
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
     #reader video {
       width: 100% !important;
       height: 100% !important;
@@ -26,7 +31,7 @@
 
   <!-- Header -->
   <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
-    <div class="flex items-center space-x-3 cursor-pointer select-none" id="header-title-container" title="長按3秒進入審批流程">
+    <div class="flex items-center space-x-3 cursor-pointer select-none no-select" id="header-title-container" title="長按3秒進入審批流程">
       <h1 id="app-title" class="text-xl font-bold tracking-wide hover:text-blue-400 transition">
         安全文化與意識
       </h1>
@@ -69,6 +74,9 @@
         <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_database">資料庫</span>
       </button>
     </div>
+
+    <!-- Breadcrumb -->
+    <div id="breadcrumb-container" class="mb-4 text-sm text-gray-500 hidden"></div>
 
     <div id="content-area" class="w-full">
       <div class="text-center py-12 text-gray-500 font-medium">資料庫同步載入中...</div>
@@ -166,7 +174,8 @@
     };
 
     let dynamicSubDirectories = {};
-    let currentViewMode = "SINGLE";
+    let currentViewMode = "DATABASE"; // 預設進來顯示資料庫主分類
+    let activeCategory = null;
     let activeSignId = "";
     let html5QrCode = null;
 
@@ -177,9 +186,9 @@
       
       await fetchSignsFromSheet();
       fetchGASData();
-      fetchPendingCount(); // 初始化抓取待審批數量
+      fetchPendingCount();
       setInterval(fetchGASData, 10000);
-      setInterval(fetchPendingCount, 15000); // 定期輪詢待審批數量
+      setInterval(fetchPendingCount, 15000);
     });
 
     async function fetchSignsFromSheet() {
@@ -188,18 +197,49 @@
         const result = await res.json();
         
         if (result.status === "success" && result.data.length > 0) {
-          isoSignsData = result.data.map(item => ({
-            id: item.id,
-            category: item.category,
-            meaning: item.meaning,
-            level: item.level || null,
-            name: {
-              zh: item.name_zh || item.id,
-              en: item.name_en || item.id,
-              de: item.name_de || item.id
-            },
-            svgUrl: item.svg_url
-          }));
+          const rawData = result.data;
+          isoSignsData = [];
+
+          rawData.forEach(item => {
+            const cat = item.category || "General";
+            const isWarning = (cat.toUpperCase() === "W" || cat.includes("W") || cat.includes("警告"));
+            
+            if (isWarning) {
+              // 警告標誌自動擴增 4 行 (頻率 1 ~ 4)
+              for (let f = 1; f <= 4; f++) {
+                isoSignsData.push({
+                  id: `${item.id}-(${f})`,
+                  originalId: item.id,
+                  category: cat,
+                  meaning: item.meaning,
+                  level: item.level || null,
+                  freq: f.toString(),
+                  name: {
+                    zh: (item.name_zh || item.id) + ` (頻率 ${f})`,
+                    en: (item.name_en || item.id) + ` (Freq ${f})`,
+                    de: (item.name_de || item.id) + ` (Freq ${f})`
+                  },
+                  svgUrl: item.svg_url
+                });
+              }
+            } else {
+              // 其他分類維持單行
+              isoSignsData.push({
+                id: item.id,
+                originalId: item.id,
+                category: cat,
+                meaning: item.meaning,
+                level: item.level || null,
+                freq: item.freq || "1",
+                name: {
+                  zh: item.name_zh || item.id,
+                  en: item.name_en || item.id,
+                  de: item.name_de || item.id
+                },
+                svgUrl: item.svg_url
+              });
+            }
+          });
 
           if (!activeSignId && isoSignsData.length > 0) {
             activeSignId = isoSignsData[0].id;
@@ -211,7 +251,6 @@
       }
     }
 
-    // 取得待審批數量並即時更新 Header Badge
     async function fetchPendingCount() {
       try {
         const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
@@ -250,15 +289,109 @@
 
     function renderCurrentView() {
       const container = document.getElementById("content-area");
+      const breadcrumb = document.getElementById("breadcrumb-container");
       container.innerHTML = "";
 
-      if (currentViewMode === "SINGLE") {
+      if (currentViewMode === "DATABASE") {
+        breadcrumb.classList.add("hidden");
+        renderDatabaseCategories(container);
+      } else if (currentViewMode === "CATEGORY_LIST") {
+        breadcrumb.classList.remove("hidden");
+        breadcrumb.innerHTML = `<span class="cursor-pointer text-blue-600 hover:underline" id="bc-home">資料庫</span> &gt; <span class="font-bold text-gray-700">${activeCategory}</span>`;
+        document.getElementById("bc-home").addEventListener("click", () => {
+          currentViewMode = "DATABASE";
+          renderCurrentView();
+        });
+        renderCategorySignsList(container, activeCategory);
+      } else if (currentViewMode === "SINGLE") {
+        breadcrumb.classList.remove("hidden");
+        breadcrumb.innerHTML = `<span class="cursor-pointer text-blue-600 hover:underline" id="bc-home">資料庫</span> &gt; <span class="cursor-pointer text-blue-600 hover:underline" id="bc-cat">${activeCategory}</span> &gt; <span class="font-bold text-gray-700">${activeSignId}</span>`;
+        document.getElementById("bc-home").addEventListener("click", () => {
+          currentViewMode = "DATABASE";
+          renderCurrentView();
+        });
+        document.getElementById("bc-cat").addEventListener("click", () => {
+          currentViewMode = "CATEGORY_LIST";
+          renderCurrentView();
+        });
         renderSingleSignDetail(container, activeSignId);
-      } else if (currentViewMode === "DATABASE") {
-        renderDatabaseListView(container);
       }
     }
 
+    // 第一層：以 B 欄 (Category) 分類群組
+    function renderDatabaseCategories(container) {
+      const groups = {};
+      isoSignsData.forEach(sign => {
+        const cat = sign.category || "未分類";
+        if (!groups[cat]) {
+          groups[cat] = [];
+        }
+        groups[cat].push(sign);
+      });
+
+      const grid = document.createElement("div");
+      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
+
+      Object.keys(groups).forEach(cat => {
+        const representative = groups[cat][0]; // 抓取該類別的第一筆作為代表
+        const repName = representative.name[currentLang] || representative.name.zh;
+        
+        const item = document.createElement("div");
+        item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
+        
+        item.innerHTML = `
+          <div class="w-20 h-20 flex items-center justify-center mb-2 bg-gray-50 rounded-lg p-1 border">
+            <img src="${representative.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${cat}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:folder-outline.svg';">
+          </div>
+          <span class="font-bold text-gray-900 text-base">${cat}</span>
+          <span class="text-xs text-gray-500 mt-1 truncate max-w-full">代表: ${repName}</span>
+          <span class="text-[10px] text-purple-600 font-semibold mt-2 bg-purple-50 px-2 py-0.5 rounded-full">共 ${groups[cat].length} 項</span>
+        `;
+
+        item.addEventListener("click", () => {
+          activeCategory = cat;
+          currentViewMode = "CATEGORY_LIST";
+          renderCurrentView();
+        });
+
+        grid.appendChild(item);
+      });
+
+      container.appendChild(grid);
+    }
+
+    // 第二層：該分類底下的標誌清單
+    function renderCategorySignsList(container, categoryName) {
+      const signsInCat = isoSignsData.filter(s => (s.category || "未分類") === categoryName);
+      const grid = document.createElement("div");
+      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
+
+      signsInCat.forEach(sign => {
+        const signName = sign.name[currentLang] || sign.name.zh;
+        const item = document.createElement("div");
+        item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-blue-300 group";
+        
+        item.innerHTML = `
+          <div class="w-16 h-16 flex items-center justify-center mb-1">
+            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${signName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-circle-outline.svg';">
+          </div>
+          <span class="mt-2 font-bold text-gray-800 text-sm line-clamp-2">${signName}</span>
+          <span class="text-[10px] text-gray-400 font-mono mt-0.5">${sign.id}</span>
+        `;
+
+        item.addEventListener("click", () => {
+          activeSignId = sign.id;
+          currentViewMode = "SINGLE";
+          renderCurrentView();
+        });
+
+        grid.appendChild(item);
+      });
+
+      container.appendChild(grid);
+    }
+
+    // 第三層：單一標誌詳細檢視（警告標誌帶 1~4 頻率與危害控制矩陣）
     function renderSingleSignDetail(container, signId) {
       const sign = isoSignsData.find(s => s.id.toLowerCase() === signId.toLowerCase());
       if (!sign) {
@@ -267,18 +400,33 @@
       }
 
       const signTitleName = sign.name[currentLang] || sign.name.zh;
-      const levelHtml = (sign.category === "W" && sign.level) 
+      const isWarning = (sign.category.toUpperCase() === "W" || sign.category.includes("W") || sign.category.includes("警告"));
+
+      const levelHtml = (isWarning && sign.level) 
         ? `<div class="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-400 text-yellow-900 font-black text-sm rounded-full inline-block shadow-sm">等級 ${sign.level}</div>` 
         : '';
 
-      const subFieldsHtml = (sign.category === "W") ? `
+      const freqIndicatorHtml = isWarning ? `
+        <div class="mt-2 flex items-center justify-center space-x-1">
+          <span class="text-xs text-gray-500 font-medium mr-1">發生頻率:</span>
+          ${[1, 2, 3, 4].map(n => `
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${sign.freq === n.toString() ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600'}">${n}</span>
+          `).join('')}
+        </div>
+      ` : '';
+
+      const subFieldsHtml = isWarning ? `
         <div class="mt-6 border-t pt-4 space-y-2">
           <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
             ${renderSubFieldsHtml(sign.id)}
           </div>
         </div>
-      ` : '';
+      ` : `
+        <div class="mt-6 border-t pt-4 text-center text-sm text-gray-500">
+          此分類項目屬於非警告標誌，僅提供基本分類與名稱資訊。
+        </div>
+      `;
 
       const card = document.createElement("div");
       card.className = "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 max-w-2xl mx-auto smooth-update";
@@ -289,6 +437,7 @@
               <img src="${sign.svgUrl}" class="w-full h-full object-contain" alt="${signTitleName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-decagram-outline.svg';">
             </div>
             ${levelHtml}
+            ${freqIndicatorHtml}
             <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
           </div>
 
@@ -310,38 +459,9 @@
         }
       }, 50);
 
-      if (sign.category === "W") {
+      if (isWarning) {
         bindSubFieldEvents();
       }
-    }
-
-    function renderDatabaseListView(container) {
-      const grid = document.createElement("div");
-      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
-
-      isoSignsData.forEach(sign => {
-        const signName = sign.name[currentLang] || sign.name.zh;
-        const item = document.createElement("div");
-        item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
-        
-        item.innerHTML = `
-          <div class="w-16 h-16 flex items-center justify-center mb-1">
-            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${signName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-circle-outline.svg';">
-          </div>
-          <span class="mt-2 font-bold text-gray-800 text-sm">${signName}</span>
-          <span class="text-[10px] text-gray-400 font-mono mt-0.5">${sign.id}</span>
-        `;
-
-        item.addEventListener("click", () => {
-          activeSignId = sign.id;
-          currentViewMode = "SINGLE";
-          renderCurrentView();
-        });
-
-        grid.appendChild(item);
-      });
-
-      container.appendChild(grid);
     }
 
     function renderSubFieldsHtml(signId) {
@@ -444,6 +564,7 @@
       }
     }
 
+    // 優化後的長按事件 (無選取干擾)
     function setupHeaderLongPress() {
       const titleContainer = document.getElementById("header-title-container");
       let pressTimer = null;
