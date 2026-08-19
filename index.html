@@ -131,7 +131,7 @@
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
     let isoSignsData = []; 
-    let dynamicSubDirectories = {}; // 存放雲端回傳的動態危害控制細節
+    let dynamicSubDirectories = {};
     let currentLang = "zh";
 
     const i18nDict = {
@@ -183,14 +183,12 @@
       setupEventListeners();
       setupHeaderLongPress();
       
+      // 僅在網頁初次載入時取得資料（已移除 setInterval 自動更新）
       await fetchSignsFromSheet();
       fetchGASData();
       fetchPendingCount();
-      setInterval(fetchGASData, 10000);
-      setInterval(fetchPendingCount, 15000);
     });
 
-    // 統一解析 B 欄分類名稱
     function normalizeCategory(rawCat) {
       if (!rawCat) return "General sign";
       const c = rawCat.toString().trim().toUpperCase();
@@ -201,7 +199,6 @@
       return rawCat; 
     }
 
-    // 1. 重新開啟/重新整理後向後端請求資料，融合新舊資料
     async function fetchSignsFromSheet() {
       try {
         const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
@@ -216,7 +213,6 @@
             const isWarning = (standardizedCat === "Warning sign" || item.category?.toString().toUpperCase().startsWith("W"));
             
             if (isWarning) {
-              // 警告標誌自動擴增 4 行 (頻率 1 ~ 4)
               for (let f = 1; f <= 4; f++) {
                 isoSignsData.push({
                   id: `${item.id}-(${f})`,
@@ -263,7 +259,6 @@
       }
     }
 
-    // 同步取得後端額外資料 (若有其他動態紀錄)
     async function fetchGASData() {
       try {
         const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_DATA`);
@@ -344,7 +339,6 @@
       }
     }
 
-    // 第一層：四大分類呈現
     function renderDatabaseCategories(container) {
       const groups = {};
       const targetCategories = ["Prohibition sign", "Warning sign", "Mandatory action sign", "Safe condition sign"];
@@ -392,7 +386,6 @@
       container.appendChild(grid);
     }
 
-    // 第二層：該分類內的所有標誌清單
     function renderCategorySignsList(container, categoryName) {
       const signsInCat = isoSignsData.filter(s => s.category === categoryName);
       const grid = document.createElement("div");
@@ -423,7 +416,6 @@
       container.appendChild(grid);
     }
 
-    // 第三層：單一標誌詳細檢視（支援雙擊送審）
     function renderSingleSignDetail(container, signId) {
       const sign = isoSignsData.find(s => s.id.toLowerCase() === signId.toLowerCase());
       if (!sign) {
@@ -503,7 +495,6 @@
       return fieldKeys.map(key => {
         const fieldName = fieldsDict[key];
         
-        // 若欄位為 freq，直接顯示目前標誌帶有的 freq 值
         let displayContent = "";
         if (key === "freq") {
           displayContent = sign.freq;
@@ -511,7 +502,7 @@
           const approvedValues = (dynamicSubDirectories[sign.id] && dynamicSubDirectories[sign.id][key]) || [];
           displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(" | ");
           if (!displayContent && key === "eng" && sign.hazard_control) {
-            displayContent = sign.hazard_control; // 融合雲端直接寫回的 hazard_control
+            displayContent = sign.hazard_control;
           }
         }
         
@@ -522,7 +513,6 @@
           ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(displayContent)}">[...]</button>` 
           : '';
 
-        // 如果是 freq 欄位，設定為 readonly 樣式且不可點擊送審
         const isFreqField = (key === "freq");
         const boxClass = isFreqField 
           ? "border rounded-lg p-3 bg-gray-100 text-gray-500 cursor-not-voted" 
@@ -582,7 +572,6 @@
       }
     }
 
-    // 2. 雙擊送審邏輯：將 freq 與資料交由後端審批
     async function submitPendingData(signId, fieldKey, freqVal, val) {
       const payload = {
         action: "SUBMIT",
@@ -675,7 +664,6 @@
       }
     }
 
-    // 3. 審批拒絕或透過後執行：若 APPROVED，後端會自動將資訊寫回 ISO7010
     window.reviewItem = async function(rowId, status) {
       const actionText = status === "APPROVED" ? "核准並同步寫入資料庫" : "拒絕";
       if (!confirm(`確定要【${actionText}】此筆申請嗎？`)) return;
@@ -683,35 +671,43 @@
       const payload = { action: "REVIEW", rowId: rowId, reviewStatus: status, reviewer: "管理員" };
 
       try {
-        const res = await fetch(GAS_WEB_APP_URL, {
+        const res = styleFetch = await fetch(GAS_WEB_APP_URL, {
           method: "POST", mode: "cors", redirect: "follow",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload)
         });
         const result = await res.json();
-        
         if (result.status === "success") {
           alert(`✅ 已成功【${actionText}】！`);
           openApprovalModal();
-          fetchSignsFromSheet(); // 重新拉取資料以呈現最新融合結果
-          fetchGASData();
           fetchPendingCount();
+          fetchGASData();
         } else {
-          alert("審核失敗：" + result.message);
+          alert("❌ 審批處理失敗：" + result.message);
         }
       } catch (err) {
-        alert("審核請求傳送失敗，請檢查網路連線！");
+        alert("網路通訊失敗。");
       }
     };
 
     function showDetailModal(title, text) {
       document.getElementById("modal-detail-title").textContent = title;
       document.getElementById("modal-detail-content").textContent = text;
-      document.getElementById("modal-detail.class").classList?.remove("hidden"); // 安全防護
-      document.getElementById("modal-detail").classList.remove("hidden");
+      document.getElementById("modal-detail-modal" || "modal-detail").classList.remove("hidden");
     }
 
+    document.getElementById("btn-detail-close").addEventListener("click", () => {
+      document.getElementById("modal-detail").classList.add("hidden");
+    });
+    document.getElementById("btn-approval-close").addEventListener("click", () => {
+      document.getElementById("modal-approval").classList.add("hidden");
+    });
+
     function setupEventListeners() {
+      document.getElementById("btn-database").addEventListener("click", () => {
+        currentViewMode = "DATABASE";
+        renderCurrentView();
+      });
       document.getElementById("btn-text-search").addEventListener("click", () => {
         document.getElementById("modal-search").classList.remove("hidden");
       });
@@ -719,83 +715,60 @@
         document.getElementById("modal-search").classList.add("hidden");
       });
       document.getElementById("btn-search-confirm").addEventListener("click", () => {
-        const query = document.getElementById("search-input").value.trim();
-        document.getElementById("modal-search").classList.add("hidden");
-        const found = isoSignsData.find(s => s.id.toLowerCase() === query.toLowerCase() || s.originalId.toLowerCase() === query.toLowerCase());
-        if (found) {
-          activeCategory = found.category;
-          activeSignId = found.id;
-          currentViewMode = "SINGLE";
-          renderCurrentView();
-        } else {
-          alert(i18nDict[currentLang].not_found);
+        const val = document.getElementById("search-input").value.trim();
+        if (val) {
+          activeSignId = val;
+          const sign = isoSignsData.find(s => s.id.toLowerCase() === val.toLowerCase());
+          if (sign) {
+            activeCategory = sign.category;
+            currentViewMode = "SINGLE";
+            renderCurrentView();
+            document.getElementById("modal-search").classList.add("hidden");
+          } else {
+            alert("找不到該流水號標誌！");
+          }
         }
       });
-
-      document.getElementById("btn-database").addEventListener("click", () => {
-        currentViewMode = "DATABASE";
-        renderCurrentView();
-      });
-
       document.getElementById("btn-camera").addEventListener("click", () => {
         document.getElementById("modal-camera").classList.remove("hidden");
-        startCamera();
+        startCameraScanner();
       });
-
       document.getElementById("btn-camera-close").addEventListener("click", () => {
-        stopCamera();
-      });
-
-      document.getElementById("btn-approval-close").addEventListener("click", () => {
-        document.getElementById("modal-approval").classList.add("hidden");
-      });
-
-      document.getElementById("btn-detail-close").addEventListener("click", () => {
-        document.getElementById("modal-detail").classList.add("hidden");
+        stopCameraScanner();
+        document.getElementById("modal-camera").classList.add("hidden");
       });
     }
 
-    function startCamera() {
-      if (html5QrCode) return;
-      html5QrCode = new Html5Qrcode("reader");
+    function startCameraScanner() {
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
+      }
       html5QrCode.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
-          stopCamera();
-          const cleanId = decodedText.trim();
-          const found = isoSignsData.find(s => s.id.toLowerCase() === cleanId.toLowerCase() || s.originalId.toLowerCase() === cleanId.toLowerCase());
-          if (found) {
-            activeCategory = found.category;
-            activeSignId = found.id;
+          stopCameraScanner();
+          document.getElementById("modal-camera").classList.add("hidden");
+          const sign = isoSignsData.find(s => s.id.toLowerCase() === decodedText.toLowerCase());
+          if (sign) {
+            activeCategory = sign.category;
+            activeSignId = sign.id;
             currentViewMode = "SINGLE";
             renderCurrentView();
           } else {
-            alert(`掃描成功，但找不到對應標誌代號: ${cleanId}`);
+            alert(`掃描成功，但系統找不到此標誌 ID: ${decodedText}`);
           }
         },
-        (errorMessage) => {
-          // 忽略掃描中的頻繁未命中錯誤
-        }
+        (error) => {}
       ).catch(err => {
-        console.error("啟動相機失敗:", err);
-        document.getElementById("camera-status").textContent = "無法啟動相機，請檢查權限設定。";
+        console.warn("相機啟動失敗", err);
       });
     }
 
-    async function stopCamera() {
-      if (html5QrCode) {
-        try {
-          if (html5QrCode.isScanning) {
-            await html5QrCode.stop();
-          }
-          await html5QrCode.clear();
-        } catch (e) {
-          console.warn("停止相機時發生小錯誤:", e);
-        }
-        html5QrCode = null;
+    function stopCameraScanner() {
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(err => console.log(err));
       }
-      document.getElementById("modal-camera").classList.add("hidden");
     }
   </script>
 </body>
