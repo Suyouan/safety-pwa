@@ -131,7 +131,7 @@
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
     let isoSignsData = []; 
-    let lastDataSnapshot = "";
+    let dynamicSubDirectories = {}; // 存放雲端回傳的動態危害控制細節
     let currentLang = "zh";
 
     const i18nDict = {
@@ -198,9 +198,10 @@
       if (c.startsWith("W") || c.includes("WARNING") || c.includes("警告")) return "Warning sign";
       if (c.startsWith("M") || c.includes("MANDATORY") || c.includes("強制")) return "Mandatory action sign";
       if (c.startsWith("S") || c.includes("SAFE") || c.includes("安全")) return "Safe condition sign";
-      return rawCat; // 若有自定義名稱直接回傳
+      return rawCat; 
     }
 
+    // 1. 重新開啟/重新整理後向後端請求資料，融合新舊資料
     async function fetchSignsFromSheet() {
       try {
         const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
@@ -224,6 +225,7 @@
                   meaning: item.meaning,
                   level: item.level || null,
                   freq: f.toString(),
+                  hazard_control: item.hazard_control || "",
                   name: {
                     zh: (item.name_zh || item.id) + ` (頻率 ${f})`,
                     en: (item.name_en || item.id) + ` (Freq ${f})`,
@@ -233,7 +235,6 @@
                 });
               }
             } else {
-              // 其他 4 個分類項目維持單行 (Category + name)
               isoSignsData.push({
                 id: item.id,
                 originalId: item.id,
@@ -241,6 +242,7 @@
                 meaning: item.meaning,
                 level: item.level || null,
                 freq: item.freq || "1",
+                hazard_control: item.hazard_control || "",
                 name: {
                   zh: item.name_zh || item.id,
                   en: item.name_en || item.id,
@@ -258,6 +260,20 @@
         }
       } catch (err) {
         console.error("載入 Signs 清單失敗:", err);
+      }
+    }
+
+    // 同步取得後端額外資料 (若有其他動態紀錄)
+    async function fetchGASData() {
+      try {
+        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_DATA`);
+        const result = await res.json();
+        if (result.status === "success" && result.data) {
+          dynamicSubDirectories = result.data;
+          renderCurrentView();
+        }
+      } catch (e) {
+        console.warn("取得動態資料失敗:", e);
       }
     }
 
@@ -331,10 +347,7 @@
     // 第一層：四大分類呈現
     function renderDatabaseCategories(container) {
       const groups = {};
-      
-      // 確保四大分類順序固定展示
       const targetCategories = ["Prohibition sign", "Warning sign", "Mandatory action sign", "Safe condition sign"];
-      
       targetCategories.forEach(cat => { groups[cat] = []; });
 
       isoSignsData.forEach(sign => {
@@ -348,9 +361,9 @@
 
       Object.keys(groups).forEach(cat => {
         const items = groups[cat];
-        if (items.length === 0) return; // 若該分類沒資料則跳過
+        if (items.length === 0) return;
 
-        const representative = items[0]; // 各類別的第一個當作代表圖示與敘述
+        const representative = items[0];
         const repName = representative.name[currentLang] || representative.name.zh;
         
         const item = document.createElement("div");
@@ -379,7 +392,7 @@
       container.appendChild(grid);
     }
 
-    // 第二層：該分類內的所有標誌與 name 清單
+    // 第二層：該分類內的所有標誌清單
     function renderCategorySignsList(container, categoryName) {
       const signsInCat = isoSignsData.filter(s => s.category === categoryName);
       const grid = document.createElement("div");
@@ -410,7 +423,7 @@
       container.appendChild(grid);
     }
 
-    // 第三層：單一標誌詳細檢視（警告標誌帶 1~4 頻率與危害控制矩陣）
+    // 第三層：單一標誌詳細檢視（支援雙擊送審）
     function renderSingleSignDetail(container, signId) {
       const sign = isoSignsData.find(s => s.id.toLowerCase() === signId.toLowerCase());
       if (!sign) {
@@ -438,7 +451,7 @@
         <div class="mt-6 border-t pt-4 space-y-2">
           <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            ${renderSubFieldsHtml(sign.id)}
+            ${renderSubFieldsHtml(sign)}
           </div>
         </div>
       ` : `
@@ -483,14 +496,24 @@
       }
     }
 
-    function renderSubFieldsHtml(signId) {
+    function renderSubFieldsHtml(sign) {
       const fieldKeys = ["freq", "elim", "sub", "eng", "admin", "ppe", "risk"];
       const fieldsDict = i18nDict[currentLang].fields;
 
       return fieldKeys.map(key => {
         const fieldName = fieldsDict[key];
-        const approvedValues = (dynamicSubDirectories[signId] && dynamicSubDirectories[signId][key]) || [];
-        let displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(" | ");
+        
+        // 若欄位為 freq，直接顯示目前標誌帶有的 freq 值
+        let displayContent = "";
+        if (key === "freq") {
+          displayContent = sign.freq;
+        } else {
+          const approvedValues = (dynamicSubDirectories[sign.id] && dynamicSubDirectories[sign.id][key]) || [];
+          displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(" | ");
+          if (!displayContent && key === "eng" && sign.hazard_control) {
+            displayContent = sign.hazard_control; // 融合雲端直接寫回的 hazard_control
+          }
+        }
         
         const isOverflow = displayContent.length > 25;
         const truncatedContent = isOverflow ? displayContent.substring(0, 25) + "..." : displayContent || "-";
@@ -499,11 +522,17 @@
           ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(displayContent)}">[...]</button>` 
           : '';
 
+        // 如果是 freq 欄位，設定為 readonly 樣式且不可點擊送審
+        const isFreqField = (key === "freq");
+        const boxClass = isFreqField 
+          ? "border rounded-lg p-3 bg-gray-100 text-gray-500 cursor-not-voted" 
+          : "sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom";
+
         return `
-          <div class="sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom"
-               data-sign-id="${signId}" data-field-key="${key}" data-full-text="${displayContent}">
+          <div class="${boxClass}"
+               data-sign-id="${sign.id}" data-field-key="${key}" data-freq="${sign.freq}" data-full-text="${displayContent}">
             <div class="flex justify-between font-semibold text-gray-600 mb-1">
-              <span>${fieldName}</span>
+              <span>${fieldName} ${isFreqField ? '(唯讀)' : ''}</span>
             </div>
             <div class="text-gray-800 font-medium truncate-text">${truncatedContent}${moreBtnHtml}</div>
           </div>
@@ -544,23 +573,24 @@
     function triggerBoxEdit(box) {
       const signId = box.getAttribute("data-sign-id");
       const fieldKey = box.getAttribute("data-field-key");
+      const freqVal = box.getAttribute("data-freq");
       const fieldName = i18nDict[currentLang].fields[fieldKey];
-      promptSubmitInput(signId, fieldKey, fieldName);
-    }
-
-    function promptSubmitInput(signId, fieldKey, fieldName) {
-      const userInput = prompt(`【待審批提交】請輸入 ${signId} 之「${fieldName}」資訊：`);
+      
+      const userInput = prompt(`【雙擊送審】請輸入 ${signId}（發生頻率: ${freqVal}）之「${fieldName}」更新內容：`);
       if (userInput && userInput.trim() !== "") {
-        submitPendingData(signId, fieldKey, userInput.trim());
+        submitPendingData(signId, fieldKey, freqVal, userInput.trim());
       }
     }
 
-    async function submitPendingData(signId, fieldKey, val) {
+    // 2. 雙擊送審邏輯：將 freq 與資料交由後端審批
+    async function submitPendingData(signId, fieldKey, freqVal, val) {
       const payload = {
         action: "SUBMIT",
-        applicant: "使用者",
+        applicant: "現場使用者",
+        signId: signId,
+        freq: freqVal,
         content: JSON.stringify({
-          id: signId, field: fieldKey, value: val, path: `ISO7010 > ${signId} > ${fieldKey}`
+          id: signId, field: fieldKey, value: val, freq: freqVal, path: `ISO7010 > ${signId} (Freq ${freqVal}) > ${fieldKey}`
         })
       };
 
@@ -572,11 +602,11 @@
         });
         const result = await res.json();
         if (result.status === "success") {
-          alert("🎉 提交成功！資料已寫入雲端待審批矩陣。");
+          alert("🎉 雙擊送審成功！資料已送交後台審批。");
           fetchGASData();
           fetchPendingCount();
         } else {
-          alert("❌ 提交失敗：" + result.message);
+          alert("❌ 送審失敗：" + result.message);
         }
       } catch (err) {
         alert("網路通訊失敗，請檢查網路連線。");
@@ -645,8 +675,9 @@
       }
     }
 
+    // 3. 審批拒絕或透過後執行：若 APPROVED，後端會自動將資訊寫回 ISO7010
     window.reviewItem = async function(rowId, status) {
-      const actionText = status === "APPROVED" ? "核准" : "拒絕";
+      const actionText = status === "APPROVED" ? "核准並同步寫入資料庫" : "拒絕";
       if (!confirm(`確定要【${actionText}】此筆申請嗎？`)) return;
 
       const payload = { action: "REVIEW", rowId: rowId, reviewStatus: status, reviewer: "管理員" };
@@ -660,8 +691,9 @@
         const result = await res.json();
         
         if (result.status === "success") {
-          alert(`✅ 已成功【${actionText}】該筆申請！`);
+          alert(`✅ 已成功【${actionText}】！`);
           openApprovalModal();
+          fetchSignsFromSheet(); // 重新拉取資料以呈現最新融合結果
           fetchGASData();
           fetchPendingCount();
         } else {
@@ -672,19 +704,11 @@
       }
     };
 
-    async function stopCamera() {
-      if (html5QrCode) {
-        try {
-          if (html5QrCode.isScanning) {
-            await html5QrCode.stop();
-          }
-          await html5QrCode.clear();
-        } catch (e) {
-          console.warn("停止相機時發生小錯誤:", e);
-        }
-        html5QrCode = null;
-      }
-      document.getElementById("modal-camera").classList.add("hidden");
+    function showDetailModal(title, text) {
+      document.getElementById("modal-detail-title").textContent = title;
+      document.getElementById("modal-detail-content").textContent = text;
+      document.getElementById("modal-detail.class").classList?.remove("hidden"); // 安全防護
+      document.getElementById("modal-detail").classList.remove("hidden");
     }
 
     function setupEventListeners() {
@@ -697,10 +721,14 @@
       document.getElementById("btn-search-confirm").addEventListener("click", () => {
         const query = document.getElementById("search-input").value.trim();
         document.getElementById("modal-search").classList.add("hidden");
-        if (query.length > 0) {
-          activeSignId = query;
+        const found = isoSignsData.find(s => s.id.toLowerCase() === query.toLowerCase() || s.originalId.toLowerCase() === query.toLowerCase());
+        if (found) {
+          activeCategory = found.category;
+          activeSignId = found.id;
           currentViewMode = "SINGLE";
           renderCurrentView();
+        } else {
+          alert(i18nDict[currentLang].not_found);
         }
       });
 
@@ -709,30 +737,9 @@
         renderCurrentView();
       });
 
-      document.getElementById("btn-camera").addEventListener("click", async () => {
-        const modalCam = document.getElementById("modal-camera");
-        modalCam.classList.remove("hidden");
-
-        if (html5QrCode) await stopCamera();
-
-        html5QrCode = new Html5Qrcode("reader");
-
-        const config = { fps: 15, aspectRatio: 1.0 };
-
-        html5QrCode.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            stopCamera();
-            activeSignId = decodedText;
-            currentViewMode = "SINGLE";
-            renderCurrentView();
-          },
-          (err) => {}
-        ).catch(err => {
-          alert("無法取得相機權限，相機程式已關閉。");
-          stopCamera();
-        });
+      document.getElementById("btn-camera").addEventListener("click", () => {
+        document.getElementById("modal-camera").classList.remove("hidden");
+        startCamera();
       });
 
       document.getElementById("btn-camera-close").addEventListener("click", () => {
@@ -748,47 +755,48 @@
       });
     }
 
-    function showDetailModal(title, content) {
-      document.getElementById("modal-detail-title").textContent = title;
-      document.getElementById("modal-detail-content").textContent = content;
-      document.getElementById("modal-detail").classList.remove("hidden");
-    }
-
-    async function fetchGASData() {
-      if (!GAS_WEB_APP_URL) return;
-
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=APPROVED`, { method: "GET", redirect: "follow" });
-        const response = await res.json();
-
-        if (response.status === "success" && Array.isArray(response.data)) {
-          const currentSnapshot = JSON.stringify(response.data);
-          if (currentSnapshot === lastDataSnapshot) return;
-
-          lastDataSnapshot = currentSnapshot;
-          dynamicSubDirectories = {};
-
-          response.data.forEach(item => {
-            try {
-              const parsed = JSON.parse(item.content);
-              if (parsed.id && parsed.field && parsed.value) {
-                if (!window.dynamicSubDirectories) window.dynamicSubDirectories = {};
-                if (!window.dynamicSubDirectories[parsed.id]) window.dynamicSubDirectories[parsed.id] = {};
-                if (!window.dynamicSubDirectories[parsed.id][parsed.field]) window.dynamicSubDirectories[parsed.id][parsed.field] = [];
-                
-                window.dynamicSubDirectories[parsed.id][parsed.field].push({
-                  zh: parsed.value, en: parsed.value, de: parsed.value
-                });
-              }
-            } catch (e) {}
-          });
-
-          renderCurrentView();
+    function startCamera() {
+      if (html5QrCode) return;
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          stopCamera();
+          const cleanId = decodedText.trim();
+          const found = isoSignsData.find(s => s.id.toLowerCase() === cleanId.toLowerCase() || s.originalId.toLowerCase() === cleanId.toLowerCase());
+          if (found) {
+            activeCategory = found.category;
+            activeSignId = found.id;
+            currentViewMode = "SINGLE";
+            renderCurrentView();
+          } else {
+            alert(`掃描成功，但找不到對應標誌代號: ${cleanId}`);
+          }
+        },
+        (errorMessage) => {
+          // 忽略掃描中的頻繁未命中錯誤
         }
-      } catch (err) {}
+      ).catch(err => {
+        console.error("啟動相機失敗:", err);
+        document.getElementById("camera-status").textContent = "無法啟動相機，請檢查權限設定。";
+      });
     }
 
-    let dynamicSubDirectories = {};
+    async function stopCamera() {
+      if (html5QrCode) {
+        try {
+          if (html5QrCode.isScanning) {
+            await html5QrCode.stop();
+          }
+          await html5QrCode.clear();
+        } catch (e) {
+          console.warn("停止相機時發生小錯誤:", e);
+        }
+        html5QrCode = null;
+      }
+      document.getElementById("modal-camera").classList.add("hidden");
+    }
   </script>
 </body>
 </html>
