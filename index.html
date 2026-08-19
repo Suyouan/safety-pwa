@@ -37,15 +37,15 @@
     <div class="grid grid-cols-3 gap-4 mb-8">
       <button id="btn-text-search" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-blue-500 group">
         <span class="text-3xl font-extrabold text-blue-600 group-hover:scale-110 transition">T</span>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_text_search">文字搜尋</span>
+        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600">文字搜尋</span>
       </button>
       <button id="btn-camera" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-green-500 group">
         <svg class="w-8 h-8 text-green-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_camera">掃描 QR</span>
+        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600">掃描 QR</span>
       </button>
       <button id="btn-database" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-purple-500 group">
         <svg class="w-8 h-8 text-purple-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8-1.79-8-4"></path></svg>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_database">資料庫</span>
+        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600">資料庫</span>
       </button>
     </div>
     <div id="content-area" class="w-full">
@@ -53,23 +53,15 @@
     </div>
   </main>
 
-  <!-- Modals (Search, Camera, Approval, Detail) -->
+  <!-- Modals -->
   <div id="modal-search" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-      <h3 class="text-lg font-bold mb-4 text-gray-900">輸入標誌流水編號</h3>
+      <h3 class="text-lg font-bold mb-4 text-gray-900">輸入標誌編號</h3>
       <input type="text" id="search-input" placeholder="例: W-HighVoltage" class="w-full border rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
       <div class="flex justify-end space-x-3">
         <button id="btn-search-cancel" class="px-4 py-2 bg-gray-200 rounded-lg">取消</button>
         <button id="btn-search-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg">確認</button>
       </div>
-    </div>
-  </div>
-
-  <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-4 w-full max-w-md relative flex flex-col items-center">
-      <button id="btn-camera-close" class="absolute top-3 right-3 text-2xl font-bold">&times;</button>
-      <h3 class="text-lg font-bold mb-3">掃描 QR-Code</h3>
-      <div id="reader" class="w-full h-80 bg-black rounded-lg overflow-hidden relative"></div>
     </div>
   </div>
 
@@ -83,14 +75,6 @@
     </div>
   </div>
 
-  <div id="modal-detail" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-      <h3 id="modal-detail-title" class="text-lg font-bold mb-2">詳細資訊</h3>
-      <div id="modal-detail-content" class="text-sm bg-gray-50 p-3 rounded-lg border mb-4 whitespace-pre-wrap max-h-60 overflow-y-auto"></div>
-      <div class="flex justify-end"><button id="btn-detail-close" class="px-4 py-2 bg-gray-800 text-white rounded-lg">關閉</button></div>
-    </div>
-  </div>
-
   <script>
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
@@ -98,13 +82,10 @@
     let currentLang = "zh";
     let currentViewMode = "SINGLE";
     let activeSignId = "";
-    let selectedCategoryForExpand = null; // 用於資料庫第二階段展開
-    let html5QrCode = null;
+    let selectedCategoryForExpand = null;
 
     const i18nDict = {
-      zh: { app_title: "安全文化與意識", fields: { freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級" } },
-      en: { app_title: "Safety Culture & Awareness", fields: { freq: "Frequency", elim: "Elimination", sub: "Substitution", eng: "Engineering Controls", admin: "Administrative Controls", ppe: "PPE", risk: "Risk Level" } },
-      de: { app_title: "Sicherheitskultur", fields: { freq: "Häufigkeit", elim: "Beseitigung", sub: "Substitution", eng: "Technische Kontrollen", admin: "Organisatorisch", ppe: "PSA", risk: "Risikostufe" } }
+      zh: { fields: { freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級" } }
     };
 
     document.addEventListener("DOMContentLoaded", async () => {
@@ -120,7 +101,12 @@
         const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
         const result = await res.json();
         if (result.status === "success" && result.data.length > 0) {
-          isoSignsData = result.data;
+          isoSignsData = result.data.map(item => ({
+            ...item,
+            id: item.id || item.Code,
+            category: item.Category || item.category,
+            svgUrl: item.svg_url || item.Image || item.svgUrl
+          }));
           if (!activeSignId && isoSignsData.length > 0) {
             activeSignId = isoSignsData[0].id;
           }
@@ -166,8 +152,9 @@
       
       const categories = {};
       isoSignsData.forEach(item => {
-        if (!categories[item.category]) {
-          categories[item.category] = item; // 記錄該分類的第一筆代表
+        const cat = item.category || "未分類";
+        if (!categories[cat]) {
+          categories[cat] = item;
         }
       });
 
@@ -176,8 +163,8 @@
         const card = document.createElement("div");
         card.className = "bg-white p-4 rounded-xl shadow border hover:shadow-md transition cursor-pointer flex flex-col items-center text-center group";
         card.innerHTML = `
-          <div class="w-20 h-20 flex items-center justify-center mb-2">
-            <img src="${sign.svgUrl || sign.svg_url}" class="w-full h-full object-contain group-hover:scale-105 transition">
+          <div class="w-20 h-20 flex items-center justify-center mb-2 bg-gray-50 rounded-lg p-1">
+            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/80?text=No+Image'">
           </div>
           <span class="font-bold text-gray-800 text-sm">分類: ${cat}</span>
           <span class="text-xs text-gray-400 mt-1">點擊展開清單</span>
@@ -206,9 +193,8 @@
       });
 
       const subGrid = document.getElementById("sub-grid");
-      const filtered = isoSignsData.filter(s => s.category === category);
+      const filtered = isoSignsData.filter(s => (s.category || "未分類") === category);
       
-      // 若為 Warning sign，需過濾掉重複的 id（只抓 level 1 當封面代表）
       const uniqueSigns = [];
       const seenIds = new Set();
       filtered.forEach(s => {
@@ -222,8 +208,8 @@
         const item = document.createElement("div");
         item.className = "bg-white p-4 rounded-xl shadow border flex flex-col items-center text-center cursor-pointer hover:border-purple-300 group";
         item.innerHTML = `
-          <div class="w-16 h-16 flex items-center justify-center mb-1">
-            <img src="${sign.svgUrl || sign.svg_url}" class="w-full h-full object-contain group-hover:scale-105 transition">
+          <div class="w-16 h-16 flex items-center justify-center mb-1 bg-gray-50 rounded-lg p-1">
+            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/64?text=No+Image'">
           </div>
           <span class="font-bold text-gray-800 text-sm">${sign.name_zh || sign.id}</span>
           <span class="text-[10px] text-gray-400 font-mono">${sign.id}</span>
@@ -239,7 +225,7 @@
 
     // 渲染單一標誌（若為 Warning sign 則展開 4 個等級）
     function renderSingleSignDetail(container, signId) {
-      const matchedSigns = isoSignsData.filter(s => s.id.toLowerCase() === signId.toLowerCase());
+      const matchedSigns = isoSignsData.filter(s => String(s.id).toLowerCase() === String(signId).toLowerCase());
       if (matchedSigns.length === 0) {
         container.innerHTML = `<div class="text-center py-12 text-gray-500 font-medium">找不到符合該標誌的資訊！</div>`;
         return;
@@ -249,7 +235,6 @@
       const wrapper = document.createElement("div");
       wrapper.className = "space-y-6 max-w-2xl mx-auto";
 
-      // 若非 Warning sign 或只有單筆，直接渲染；若為 Warning sign 則依 level 1~4 展開
       const levelsToRender = isWarning ? matchedSigns : [matchedSigns[0]];
 
       levelsToRender.forEach((sign, idx) => {
@@ -260,7 +245,7 @@
           <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
             <div class="flex flex-col items-center text-center">
               <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border relative">
-                <img src="${sign.svgUrl || sign.svg_url}" class="w-full h-full object-contain">
+                <img src="${sign.svgUrl}" class="w-full h-full object-contain" onerror="this.src='https://via.placeholder.com/112?text=No+Image'">
                 ${isWarning ? `<span class="absolute bottom-1 bg-yellow-400 text-black font-black text-xs px-2 py-0.5 rounded-full shadow">機率 ${levelNum}</span>` : ''}
               </div>
               <h3 class="mt-3 font-bold text-gray-900 text-lg">${sign.name_zh || sign.id}</h3>
@@ -417,7 +402,7 @@
     };
 
     function setupEventListeners() {
-      document.getElementById("btn-text-search").addEventListener("click", () => document.getElementById("modal-search").classList.remove("hidden"));
+      document.getElementById("btn-text-search").addEventListener("click", () => document.getElementById("modal-search").classList.add("flex").remove("hidden") || document.getElementById("modal-search").classList.remove("hidden"));
       document.getElementById("btn-search-cancel").addEventListener("click", () => document.getElementById("modal-search").classList.add("hidden"));
       document.getElementById("btn-search-confirm").addEventListener("click", () => {
         const query = document.getElementById("search-input").value.trim();
@@ -430,7 +415,6 @@
         renderCurrentView();
       });
       document.getElementById("btn-approval-close").addEventListener("click", () => document.getElementById("modal-approval").classList.add("hidden"));
-      document.getElementById("btn-detail-close").addEventListener("click", () => document.getElementById("modal-detail").classList.add("hidden"));
     }
   </script>
 </body>
