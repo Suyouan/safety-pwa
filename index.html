@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>安全文化與意識</title>
   
-  <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22%E5%AE%89%E5%85%A8%E6%96%87%E5%8C%96%E8%88%87%E6%84%8F%E8%AD%98%22%2C%22short_name%22%3A%22%E5%AE%89%E5%85%A8%E6%A8%99%E8%AA%8C%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f3f4f6%22%2C%22theme_color%22%3A%22%231f2937%22%7D">
-  <meta name="theme-color" content="#1f2937">
-  
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
@@ -15,11 +12,7 @@
   <style>
     .no-zoom { touch-action: manipulation; }
     .smooth-update { transition: all 0.3s ease-in-out; }
-    #reader video {
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
-    }
+    #reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
@@ -27,18 +20,11 @@
   <!-- Header -->
   <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
     <div class="flex items-center space-x-3 cursor-pointer select-none" id="header-title-container" title="長按3秒進入審批流程">
-      <h1 id="app-title" class="text-xl font-bold tracking-wide hover:text-blue-400 transition">
-        安全文化與意識
-      </h1>
-      <!-- 待審批數量 Badge -->
-      <span id="pending-badge" class="hidden bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse shadow-sm">
-        0 待審
-      </span>
+      <h1 id="app-title" class="text-xl font-bold tracking-wide hover:text-blue-400 transition">安全文化與意識</h1>
+      <span id="pending-badge" class="hidden bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse shadow-sm">0 待審</span>
     </div>
-
     <div class="flex items-center space-x-2">
-      <label for="lang-select" class="text-sm hidden sm:inline">語言 / Lang:</label>
-      <select id="lang-select" class="bg-gray-800 text-white text-sm border border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <select id="lang-select" class="bg-gray-800 text-white text-sm border border-gray-700 rounded px-2 py-1 focus:outline-none">
         <option value="zh" selected>繁體中文</option>
         <option value="en">English</option>
         <option value="de">Deutsch</option>
@@ -53,69 +39,55 @@
         <span class="text-3xl font-extrabold text-blue-600 group-hover:scale-110 transition">T</span>
         <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_text_search">文字搜尋</span>
       </button>
-
       <button id="btn-camera" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-green-500 group">
-        <svg class="w-8 h-8 text-green-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
+        <svg class="w-8 h-8 text-green-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
         <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_camera">掃描 QR</span>
       </button>
-
       <button id="btn-database" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-purple-500 group">
-        <svg class="w-8 h-8 text-purple-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8-1.79-8-4"></path>
-        </svg>
+        <svg class="w-8 h-8 text-purple-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8-1.79-8-4"></path></svg>
         <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_database">資料庫</span>
       </button>
     </div>
-
     <div id="content-area" class="w-full">
       <div class="text-center py-12 text-gray-500 font-medium">資料庫同步載入中...</div>
     </div>
   </main>
 
-  <!-- Search Modal -->
+  <!-- Modals (Search, Camera, Approval, Detail) -->
   <div id="modal-search" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-      <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_search_title">輸入標誌流水編號</h3>
-      <input type="text" id="search-input" placeholder="例: W-HighVoltage-(2)" class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      <h3 class="text-lg font-bold mb-4 text-gray-900">輸入標誌流水編號</h3>
+      <input type="text" id="search-input" placeholder="例: W-HighVoltage" class="w-full border rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
       <div class="flex justify-end space-x-3">
-        <button id="btn-search-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" data-i18n="cancel">取消</button>
-        <button id="btn-search-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" data-i18n="confirm">確認</button>
+        <button id="btn-search-cancel" class="px-4 py-2 bg-gray-200 rounded-lg">取消</button>
+        <button id="btn-search-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg">確認</button>
       </div>
     </div>
   </div>
 
-  <!-- Camera Modal -->
   <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
-      <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold z-10">&times;</button>
-      <h3 class="text-lg font-bold mb-3 text-gray-900" data-i18n="modal_camera_title">掃描 ISO 7010 QR-Code</h3>
+    <div class="bg-white rounded-2xl p-4 w-full max-w-md relative flex flex-col items-center">
+      <button id="btn-camera-close" class="absolute top-3 right-3 text-2xl font-bold">&times;</button>
+      <h3 class="text-lg font-bold mb-3">掃描 QR-Code</h3>
       <div id="reader" class="w-full h-80 bg-black rounded-lg overflow-hidden relative"></div>
-      <p id="camera-status" class="text-xs text-gray-500 mt-3" data-i18n="camera_status_hint">請對準標誌上的 QR-Code</p>
     </div>
   </div>
 
-  <!-- Approval Modal -->
   <div id="modal-approval" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center mb-4 border-b pb-3">
-        <h3 class="text-xl font-bold text-gray-900" data-i18n="admin_approval_title">後台審批矩陣 (管理員)</h3>
-        <button id="btn-approval-close" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+        <h3 class="text-xl font-bold text-gray-900">後台審批矩陣 (管理員)</h3>
+        <button id="btn-approval-close" class="text-2xl font-bold">&times;</button>
       </div>
       <div id="approval-list" class="flex-grow overflow-y-auto space-y-3 p-1"></div>
     </div>
   </div>
 
-  <!-- Detail Modal -->
   <div id="modal-detail" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-      <h3 id="modal-detail-title" class="text-lg font-bold mb-2 text-gray-900">詳細資訊</h3>
-      <div id="modal-detail-content" class="text-sm text-gray-700 whitespace-pre-wrap max-h-60 overflow-y-auto bg-gray-50 p-3 rounded-lg border mb-4"></div>
-      <div class="flex justify-end">
-        <button id="btn-detail-close" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition" data-i18n="close">關閉</button>
-      </div>
+      <h3 id="modal-detail-title" class="text-lg font-bold mb-2">詳細資訊</h3>
+      <div id="modal-detail-content" class="text-sm bg-gray-50 p-3 rounded-lg border mb-4 whitespace-pre-wrap max-h-60 overflow-y-auto"></div>
+      <div class="flex justify-end"><button id="btn-detail-close" class="px-4 py-2 bg-gray-800 text-white rounded-lg">關閉</button></div>
     </div>
   </div>
 
@@ -123,532 +95,342 @@
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
     let isoSignsData = []; 
-    let lastDataSnapshot = "";
     let currentLang = "zh";
-
-    const i18nDict = {
-      zh: {
-        app_title: "安全文化與意識",
-        nav_text_search: "文字搜尋",
-        nav_camera: "掃描 QR",
-        nav_database: "資料庫",
-        modal_search_title: "輸入標誌流水編號",
-        modal_camera_title: "掃描 ISO 7010 QR-Code",
-        admin_approval_title: "後台審批矩陣 (管理員)",
-        cancel: "取消", confirm: "確認", close: "關閉", approve: "通過", reject: "拒絕",
-        camera_status_hint: "請對準標誌上的 QR-Code",
-        not_found: "找不到符合該流水號的標誌資訊！",
-        double_click_hint: "雙擊框格編輯提交",
-        fields: {
-          freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級"
-        }
-      },
-      en: {
-        app_title: "Safety Culture & Awareness",
-        nav_text_search: "Search ID", nav_camera: "Scan QR", nav_database: "Database",
-        modal_search_title: "Enter Sign Serial ID", modal_camera_title: "Scan ISO 7010 QR-Code", admin_approval_title: "Approval Workflow (Admin)",
-        cancel: "Cancel", confirm: "Confirm", close: "Close", approve: "Approve", reject: "Reject",
-        camera_status_hint: "Align QR-Code within frame", not_found: "No matching sign found for this Serial ID!", double_click_hint: "Double click to edit & submit",
-        fields: {
-          freq: "Frequency", elim: "Elimination", sub: "Substitution", eng: "Engineering Controls", admin: "Administrative Controls", ppe: "PPE", risk: "Risk Level"
-        }
-      },
-      de: {
-        app_title: "Sicherheitskultur & Bewusstsein",
-        nav_text_search: "ID Suchen", nav_camera: "QR Scannen", nav_database: "Datenbank",
-        modal_search_title: "Sicherheits-ID Eingeben", modal_camera_title: "ISO 7010 QR-Code Scannen", admin_approval_title: "Genehmigungsmatrix (Admin)",
-        cancel: "Cancel", confirm: "Bestätigen", close: "Schließen", approve: "Genehmigen", reject: "Ablehnen",
-        camera_status_hint: "Richten Sie den QR-Code aus", not_found: "Kein Übereinstimmendes Schild Gefunden!", double_click_hint: "Doppelklick zum Bearbeiten",
-        fields: {
-          freq: "Häufigkeit", elim: "Beseitigung", sub: "Substitution", eng: "Technische Kontrollen", admin: "Organisatorische Maßnahmen", ppe: "PSA", risk: "Risikostufe"
-        }
-      }
-    };
-
-    let dynamicSubDirectories = {};
     let currentViewMode = "SINGLE";
     let activeSignId = "";
+    let selectedCategoryForExpand = null; // 用於資料庫第二階段展開
     let html5QrCode = null;
 
+    const i18nDict = {
+      zh: { app_title: "安全文化與意識", fields: { freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級" } },
+      en: { app_title: "Safety Culture & Awareness", fields: { freq: "Frequency", elim: "Elimination", sub: "Substitution", eng: "Engineering Controls", admin: "Administrative Controls", ppe: "PPE", risk: "Risk Level" } },
+      de: { app_title: "Sicherheitskultur", fields: { freq: "Häufigkeit", elim: "Beseitigung", sub: "Substitution", eng: "Technische Kontrollen", admin: "Organisatorisch", ppe: "PSA", risk: "Risikostufe" } }
+    };
+
     document.addEventListener("DOMContentLoaded", async () => {
-      initI18n();
       setupEventListeners();
       setupHeaderLongPress();
-      
       await fetchSignsFromSheet();
-      fetchGASData();
-      fetchPendingCount(); // 初始化抓取待審批數量
-      setInterval(fetchGASData, 10000);
-      setInterval(fetchPendingCount, 15000); // 定期輪詢待審批數量
+      fetchPendingCount();
+      setInterval(fetchPendingCount, 15000);
     });
 
     async function fetchSignsFromSheet() {
       try {
         const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
         const result = await res.json();
-        
         if (result.status === "success" && result.data.length > 0) {
-          isoSignsData = result.data.map(item => ({
-            id: item.id,
-            category: item.category,
-            meaning: item.meaning,
-            level: item.level || null,
-            name: {
-              zh: item.name_zh || item.id,
-              en: item.name_en || item.id,
-              de: item.name_de || item.id
-            },
-            svgUrl: item.svg_url
-          }));
-
+          isoSignsData = result.data;
           if (!activeSignId && isoSignsData.length > 0) {
             activeSignId = isoSignsData[0].id;
           }
           renderCurrentView();
         }
       } catch (err) {
-        console.error("載入 Signs 清單失敗:", err);
+        console.error("載入資料失敗:", err);
       }
     }
 
-    // 取得待審批數量並即時更新 Header Badge
     async function fetchPendingCount() {
       try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
+        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`);
         const result = await res.json();
         const badge = document.getElementById("pending-badge");
-        if (result.status === "success" && Array.isArray(result.data)) {
-          const count = result.data.length;
-          if (count > 0) {
-            badge.textContent = `${count} 待審`;
-            badge.classList.remove("hidden");
-          } else {
-            badge.classList.add("hidden");
-          }
+        if (result.status === "success" && Array.isArray(result.data) && result.data.length > 0) {
+          badge.textContent = `${result.data.length} 待審`;
+          badge.classList.remove("hidden");
+        } else {
+          badge.classList.add("hidden");
         }
-      } catch (e) {
-        console.warn("無法取得待審批數量:", e);
-      }
-    }
-
-    function initI18n() {
-      document.getElementById("lang-select").addEventListener("change", (e) => {
-        currentLang = e.target.value;
-        updatePageLanguage();
-      });
-    }
-
-    function updatePageLanguage() {
-      const dict = i18nDict[currentLang];
-      document.getElementById("app-title").textContent = dict.app_title;
-      document.querySelectorAll("[data-i18n]").forEach(el => {
-        const key = el.getAttribute("data-i18n");
-        if (dict[key]) el.textContent = dict[key];
-      });
-      renderCurrentView();
+      } catch (e) {}
     }
 
     function renderCurrentView() {
       const container = document.getElementById("content-area");
       container.innerHTML = "";
-
       if (currentViewMode === "SINGLE") {
         renderSingleSignDetail(container, activeSignId);
       } else if (currentViewMode === "DATABASE") {
-        renderDatabaseListView(container);
-      }
-    }
-
-    function renderSingleSignDetail(container, signId) {
-      const sign = isoSignsData.find(s => s.id.toLowerCase() === signId.toLowerCase());
-      if (!sign) {
-        container.innerHTML = `<div class="text-center py-12 text-gray-500 font-medium">${i18nDict[currentLang].not_found}</div>`;
-        return;
-      }
-
-      const signTitleName = sign.name[currentLang] || sign.name.zh;
-      const levelHtml = (sign.category === "W" && sign.level) 
-        ? `<div class="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-400 text-yellow-900 font-black text-sm rounded-full inline-block shadow-sm">等級 ${sign.level}</div>` 
-        : '';
-
-      const subFieldsHtml = (sign.category === "W") ? `
-        <div class="mt-6 border-t pt-4 space-y-2">
-          <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            ${renderSubFieldsHtml(sign.id)}
-          </div>
-        </div>
-      ` : '';
-
-      const card = document.createElement("div");
-      card.className = "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 max-w-2xl mx-auto smooth-update";
-      card.innerHTML = `
-        <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
-          <div class="flex flex-col items-center text-center">
-            <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border">
-              <img src="${sign.svgUrl}" class="w-full h-full object-contain" alt="${signTitleName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-decagram-outline.svg';">
-            </div>
-            ${levelHtml}
-            <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
-          </div>
-
-          <div class="flex flex-col items-center sm:items-end">
-            <div id="qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}" class="p-2 bg-white border rounded-xl shadow-inner"></div>
-            <span class="mt-3 text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-md border">${sign.id}</span>
-          </div>
-        </div>
-        ${subFieldsHtml}
-      `;
-
-      container.appendChild(card);
-
-      setTimeout(() => {
-        const qrContainer = document.getElementById(`qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}`);
-        if (qrContainer) {
-          qrContainer.innerHTML = "";
-          new QRCode(qrContainer, { text: sign.id, width: 90, height: 90 });
+        if (!selectedCategoryForExpand) {
+          renderDatabaseCategoryOverview(container);
+        } else {
+          renderDatabaseCategoryDetail(container, selectedCategoryForExpand);
         }
-      }, 50);
-
-      if (sign.category === "W") {
-        bindSubFieldEvents();
       }
     }
 
-    function renderDatabaseListView(container) {
+    // 階段一：資料庫總覽（只顯示各 Category 的第一個代表圖案）
+    function renderDatabaseCategoryOverview(container) {
       const grid = document.createElement("div");
       grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
+      
+      const categories = {};
+      isoSignsData.forEach(item => {
+        if (!categories[item.category]) {
+          categories[item.category] = item; // 記錄該分類的第一筆代表
+        }
+      });
 
-      isoSignsData.forEach(sign => {
-        const signName = sign.name[currentLang] || sign.name.zh;
+      Object.keys(categories).forEach(cat => {
+        const sign = categories[cat];
+        const card = document.createElement("div");
+        card.className = "bg-white p-4 rounded-xl shadow border hover:shadow-md transition cursor-pointer flex flex-col items-center text-center group";
+        card.innerHTML = `
+          <div class="w-20 h-20 flex items-center justify-center mb-2">
+            <img src="${sign.svgUrl || sign.svg_url}" class="w-full h-full object-contain group-hover:scale-105 transition">
+          </div>
+          <span class="font-bold text-gray-800 text-sm">分類: ${cat}</span>
+          <span class="text-xs text-gray-400 mt-1">點擊展開清單</span>
+        `;
+        card.addEventListener("click", () => {
+          selectedCategoryForExpand = cat;
+          renderCurrentView();
+        });
+        grid.appendChild(card);
+      });
+      container.appendChild(grid);
+    }
+
+    // 階段二：點擊分類後，展開該分類下的全部清單
+    function renderDatabaseCategoryDetail(container, category) {
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = `
+        <button id="back-to-categories" class="mb-4 px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition">← 返回分類總覽</button>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4" id="sub-grid"></div>
+      `;
+      container.appendChild(wrapper);
+
+      document.getElementById("back-to-categories").addEventListener("click", () => {
+        selectedCategoryForExpand = null;
+        renderCurrentView();
+      });
+
+      const subGrid = document.getElementById("sub-grid");
+      const filtered = isoSignsData.filter(s => s.category === category);
+      
+      // 若為 Warning sign，需過濾掉重複的 id（只抓 level 1 當封面代表）
+      const uniqueSigns = [];
+      const seenIds = new Set();
+      filtered.forEach(s => {
+        if (!seenIds.has(s.id)) {
+          seenIds.add(s.id);
+          uniqueSigns.push(s);
+        }
+      });
+
+      uniqueSigns.forEach(sign => {
         const item = document.createElement("div");
-        item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
-        
+        item.className = "bg-white p-4 rounded-xl shadow border flex flex-col items-center text-center cursor-pointer hover:border-purple-300 group";
         item.innerHTML = `
           <div class="w-16 h-16 flex items-center justify-center mb-1">
-            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${signName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-circle-outline.svg';">
+            <img src="${sign.svgUrl || sign.svg_url}" class="w-full h-full object-contain group-hover:scale-105 transition">
           </div>
-          <span class="mt-2 font-bold text-gray-800 text-sm">${signName}</span>
-          <span class="text-[10px] text-gray-400 font-mono mt-0.5">${sign.id}</span>
+          <span class="font-bold text-gray-800 text-sm">${sign.name_zh || sign.id}</span>
+          <span class="text-[10px] text-gray-400 font-mono">${sign.id}</span>
         `;
-
         item.addEventListener("click", () => {
           activeSignId = sign.id;
           currentViewMode = "SINGLE";
           renderCurrentView();
         });
-
-        grid.appendChild(item);
+        subGrid.appendChild(item);
       });
-
-      container.appendChild(grid);
     }
 
-    function renderSubFieldsHtml(signId) {
+    // 渲染單一標誌（若為 Warning sign 則展開 4 個等級）
+    function renderSingleSignDetail(container, signId) {
+      const matchedSigns = isoSignsData.filter(s => s.id.toLowerCase() === signId.toLowerCase());
+      if (matchedSigns.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 text-gray-500 font-medium">找不到符合該標誌的資訊！</div>`;
+        return;
+      }
+
+      const isWarning = matchedSigns[0].category === "W";
+      const wrapper = document.createElement("div");
+      wrapper.className = "space-y-6 max-w-2xl mx-auto";
+
+      // 若非 Warning sign 或只有單筆，直接渲染；若為 Warning sign 則依 level 1~4 展開
+      const levelsToRender = isWarning ? matchedSigns : [matchedSigns[0]];
+
+      levelsToRender.forEach((sign, idx) => {
+        const levelNum = sign.level || (idx + 1);
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 smooth-update";
+        card.innerHTML = `
+          <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
+            <div class="flex flex-col items-center text-center">
+              <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border relative">
+                <img src="${sign.svgUrl || sign.svg_url}" class="w-full h-full object-contain">
+                ${isWarning ? `<span class="absolute bottom-1 bg-yellow-400 text-black font-black text-xs px-2 py-0.5 rounded-full shadow">機率 ${levelNum}</span>` : ''}
+              </div>
+              <h3 class="mt-3 font-bold text-gray-900 text-lg">${sign.name_zh || sign.id}</h3>
+            </div>
+            <div class="flex flex-col items-center sm:items-end">
+              <div id="qrcode-${sign.id}-${levelNum}" class="p-2 bg-white border rounded-xl shadow-inner"></div>
+              <span class="mt-3 text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-md border">${sign.id} ${isWarning ? '(Level ' + levelNum + ')' : ''}</span>
+            </div>
+          </div>
+          <div class="mt-6 border-t pt-4 space-y-2">
+            <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">雙擊框格編輯提交</h5>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              ${renderSubFieldsHtml(sign, levelNum)}
+            </div>
+          </div>
+        `;
+        wrapper.appendChild(card);
+
+        setTimeout(() => {
+          const qrContainer = document.getElementById(`qrcode-${sign.id}-${levelNum}`);
+          if (qrContainer) {
+            qrContainer.innerHTML = "";
+            new QRCode(qrContainer, { text: sign.id, width: 80, height: 80 });
+          }
+        }, 50);
+      });
+
+      container.appendChild(wrapper);
+      bindSubFieldEvents();
+    }
+
+    function renderSubFieldsHtml(sign, levelNum) {
       const fieldKeys = ["freq", "elim", "sub", "eng", "admin", "ppe", "risk"];
       const fieldsDict = i18nDict[currentLang].fields;
 
       return fieldKeys.map(key => {
         const fieldName = fieldsDict[key];
-        const approvedValues = (dynamicSubDirectories[signId] && dynamicSubDirectories[signId][key]) || [];
-        let displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(" | ");
-        
-        const isOverflow = displayContent.length > 25;
-        const truncatedContent = isOverflow ? displayContent.substring(0, 25) + "..." : displayContent || "-";
-        
-        const moreBtnHtml = isOverflow 
-          ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(displayContent)}">[...]</button>` 
-          : '';
-
+        const val = sign[key] || "-";
         return `
           <div class="sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom"
-               data-sign-id="${signId}" data-field-key="${key}" data-full-text="${displayContent}">
-            <div class="flex justify-between font-semibold text-gray-600 mb-1">
-              <span>${fieldName}</span>
-            </div>
-            <div class="text-gray-800 font-medium truncate-text">${truncatedContent}${moreBtnHtml}</div>
+               data-sign-id="${sign.id}" data-level="${levelNum}" data-field-key="${key}">
+            <div class="flex justify-between font-semibold text-gray-600 mb-1"><span>${fieldName}</span></div>
+            <div class="text-gray-800 font-medium">${val}</div>
           </div>
         `;
       }).join('');
     }
 
     function bindSubFieldEvents() {
-      document.querySelectorAll(".btn-more-detail").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const fullText = decodeURIComponent(btn.getAttribute("data-full-text"));
-          showDetailModal("詳細危害控制資訊", fullText);
-        });
-      });
-
       document.querySelectorAll(".sub-field-box").forEach(box => {
-        let lastTapTime = 0;
-
-        box.addEventListener("touchend", (e) => {
-          if (e.target.closest('.btn-more-detail')) return;
-          const currentTime = new Date().getTime();
-          const tapLength = currentTime - lastTapTime;
-          if (tapLength < 300 && tapLength > 0) {
-            e.preventDefault();
-            triggerBoxEdit(box);
+        box.addEventListener("dblclick", () => {
+          const signId = box.getAttribute("data-sign-id");
+          const level = box.getAttribute("data-level");
+          const fieldKey = box.getAttribute("data-field-key");
+          const fieldName = i18nDict[currentLang].fields[fieldKey];
+          
+          const userInput = prompt(`【提交修改】請輸入 ${signId} (等級 ${level}) 之「${fieldName}」新內容：`);
+          if (userInput && userInput.trim() !== "") {
+            submitPendingData(signId, level, fieldKey, userInput.trim());
           }
-          lastTapTime = currentTime;
-        });
-
-        box.addEventListener("dblclick", (e) => {
-          if (e.target.closest('.btn-more-detail')) return;
-          triggerBoxEdit(box);
         });
       });
     }
 
-    function triggerBoxEdit(box) {
-      const signId = box.getAttribute("data-sign-id");
-      const fieldKey = box.getAttribute("data-field-key");
-      const fieldName = i18nDict[currentLang].fields[fieldKey];
-      promptSubmitInput(signId, fieldKey, fieldName);
-    }
-
-    function promptSubmitInput(signId, fieldKey, fieldName) {
-      const userInput = prompt(`【待審批提交】請輸入 ${signId} 之「${fieldName}」資訊：`);
-      if (userInput && userInput.trim() !== "") {
-        submitPendingData(signId, fieldKey, userInput.trim());
-      }
-    }
-
-    async function submitPendingData(signId, fieldKey, val) {
+    async function submitPendingData(signId, level, fieldKey, val) {
       const payload = {
         action: "SUBMIT",
         applicant: "使用者",
-        content: JSON.stringify({
-          id: signId, field: fieldKey, value: val, path: `ISO7010 > ${signId} > ${fieldKey}`
-        })
+        content: JSON.stringify({ id: signId, level: level, field: fieldKey, value: val, path: `ISO7010 > ${signId} (L${level}) > ${fieldKey}` })
       };
 
       try {
         const res = await fetch(GAS_WEB_APP_URL, {
-          method: "POST", mode: "cors", redirect: "follow",
+          method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify(payload)
         });
         const result = await res.json();
         if (result.status === "success") {
-          alert("🎉 提交成功！資料已寫入雲端待審批矩陣。");
-          fetchGASData();
+          alert("🎉 提交成功！等待管理員審批後將自動更新至資料庫。");
           fetchPendingCount();
         } else {
           alert("❌ 提交失敗：" + result.message);
         }
       } catch (err) {
-        alert("網路通訊失敗，請檢查網路連線。");
+        alert("網路通訊失敗！");
       }
     }
 
     function setupHeaderLongPress() {
-      const titleContainer = document.getElementById("header-title-container");
-      let pressTimer = null;
-
-      titleContainer.addEventListener("mousedown", startPress);
-      titleContainer.addEventListener("touchstart", startPress, { passive: true });
-      titleContainer.addEventListener("mouseup", cancelPress);
-      titleContainer.addEventListener("touchend", cancelPress);
-      titleContainer.addEventListener("mouseleave", cancelPress);
-
-      function startPress() {
-        pressTimer = setTimeout(() => { openApprovalModal(); }, 3000);
-      }
-
-      function cancelPress() {
-        if (pressTimer) clearTimeout(pressTimer);
-      }
+      const container = document.getElementById("header-title-container");
+      let timer = null;
+      container.addEventListener("mousedown", () => timer = setTimeout(openApprovalModal, 3000));
+      container.addEventListener("mouseup", () => clearTimeout(timer));
+      container.addEventListener("touchstart", () => timer = setTimeout(openApprovalModal, 3000), { passive: true });
+      container.addEventListener("touchend", () => clearTimeout(timer));
     }
 
     async function openApprovalModal() {
       const modal = document.getElementById("modal-approval");
       const listContainer = document.getElementById("approval-list");
-      listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">雲端資料加載中...</div>`;
+      listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">加載中...</div>`;
       modal.classList.remove("hidden");
 
       try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
+        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`);
         const result = await res.json();
-
         if (result.status === "success" && result.data.length > 0) {
           listContainer.innerHTML = "";
-          result.data.forEach((item) => {
-            let parsedContent = {};
-            try { parsedContent = JSON.parse(item.content); } catch (e) { parsedContent = { path: "未定義路徑", value: item.content }; }
-
-            const itemDiv = document.createElement("div");
-            itemDiv.className = "p-4 bg-gray-50 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-gray-100 transition mb-2 gap-3";
-            itemDiv.innerHTML = `
+          result.data.forEach(item => {
+            let parsed = {};
+            try { parsed = JSON.parse(item.content); } catch (e) {}
+            const div = document.createElement("div");
+            div.className = "p-4 bg-gray-50 rounded-xl border flex justify-between items-center mb-2";
+            div.innerHTML = `
               <div>
-                <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${parsedContent.path || '資料區塊'}</span>
-                <p class="text-sm font-semibold text-gray-800 mt-1">${parsedContent.value}</p>
-                <span class="text-[10px] text-gray-400">申請者: ${item.applicant} | 時間: ${new Date(item.timestamp).toLocaleTimeString()}</span>
+                <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">${parsed.path || '資料區塊'}</span>
+                <p class="text-sm font-semibold text-gray-800 mt-1">${parsed.value}</p>
+                <span class="text-[10px] text-gray-400">申請者: ${item.applicant}</span>
               </div>
-              <div class="flex space-x-2 self-end sm:self-center">
-                <button onclick="reviewItem('${item.rowId}', 'APPROVED')" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
-                  ${i18nDict[currentLang].approve || '通過'}
-                </button>
-                <button onclick="reviewItem('${item.rowId}', 'REJECTED')" class="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition">
-                  ${i18nDict[currentLang].reject || '拒絕'}
-                </button>
+              <div class="flex space-x-2">
+                <button onclick="reviewItem('${item.rowId}', 'APPROVED')" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg">通過</button>
+                <button onclick="reviewItem('${item.rowId}', 'REJECTED')" class="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg">拒絕</button>
               </div>
             `;
-            listContainer.appendChild(itemDiv);
+            listContainer.appendChild(div);
           });
         } else {
-          listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">目前雲端無待審批的訊息。</div>`;
+          listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">目前無待審批訊息。</div>`;
         }
-      } catch (err) {
-        listContainer.innerHTML = `<div class="text-center py-8 text-red-500">加載待審資料失敗，請確認網路！</div>`;
+      } catch (e) {
+        listContainer.innerHTML = `<div class="text-center py-8 text-red-500">加載失敗！</div>`;
       }
     }
 
     window.reviewItem = async function(rowId, status) {
-      const actionText = status === "APPROVED" ? "核准" : "拒絕";
-      if (!confirm(`確定要【${actionText}】此筆申請嗎？`)) return;
-
-      const payload = { action: "REVIEW", rowId: rowId, reviewStatus: status, reviewer: "管理員" };
-
+      if (!confirm(`確定要${status === 'APPROVED' ? '核准' : '拒絕'}嗎？`)) return;
       try {
         const res = await fetch(GAS_WEB_APP_URL, {
-          method: "POST", mode: "cors", redirect: "follow",
+          method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ action: "REVIEW", rowId: rowId, reviewStatus: status, reviewer: "管理員" })
         });
         const result = await res.json();
-        
         if (result.status === "success") {
-          alert(`✅ 已成功【${actionText}】該筆申請！`);
+          alert("處理成功！資料已直接寫入 ISO7010 分頁。");
           openApprovalModal();
-          fetchGASData();
+          fetchSignsFromSheet();
           fetchPendingCount();
-        } else {
-          alert("審核失敗：" + result.message);
         }
-      } catch (err) {
-        alert("審核請求傳送失敗，請檢查網路連線！");
+      } catch (e) {
+        alert("操作失敗！");
       }
     };
 
-    async function stopCamera() {
-      if (html5QrCode) {
-        try {
-          if (html5QrCode.isScanning) {
-            await html5QrCode.stop();
-          }
-          await html5QrCode.clear();
-        } catch (e) {
-          console.warn("停止相機時發生小錯誤:", e);
-        }
-        html5QrCode = null;
-      }
-      document.getElementById("modal-camera").classList.add("hidden");
-    }
-
     function setupEventListeners() {
-      document.getElementById("btn-text-search").addEventListener("click", () => {
-        document.getElementById("modal-search").classList.remove("hidden");
-      });
-      document.getElementById("btn-search-cancel").addEventListener("click", () => {
-        document.getElementById("modal-search").classList.add("hidden");
-      });
+      document.getElementById("btn-text-search").addEventListener("click", () => document.getElementById("modal-search").classList.remove("hidden"));
+      document.getElementById("btn-search-cancel").addEventListener("click", () => document.getElementById("modal-search").classList.add("hidden"));
       document.getElementById("btn-search-confirm").addEventListener("click", () => {
         const query = document.getElementById("search-input").value.trim();
         document.getElementById("modal-search").classList.add("hidden");
-        if (query.length > 0) {
-          activeSignId = query;
-          currentViewMode = "SINGLE";
-          renderCurrentView();
-        }
+        if (query) { activeSignId = query; currentViewMode = "SINGLE"; renderCurrentView(); }
       });
-
       document.getElementById("btn-database").addEventListener("click", () => {
         currentViewMode = "DATABASE";
+        selectedCategoryForExpand = null;
         renderCurrentView();
       });
-
-      document.getElementById("btn-camera").addEventListener("click", async () => {
-        const modalCam = document.getElementById("modal-camera");
-        modalCam.classList.remove("hidden");
-
-        if (html5QrCode) await stopCamera();
-
-        html5QrCode = new Html5Qrcode("reader");
-
-        const config = { 
-          fps: 15, 
-          aspectRatio: 1.0 
-        };
-
-        html5QrCode.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            stopCamera();
-            activeSignId = decodedText;
-            currentViewMode = "SINGLE";
-            renderCurrentView();
-          },
-          (err) => {}
-        ).catch(err => {
-          alert("無法取得相機權限，相機程式已關閉。");
-          stopCamera();
-        });
-      });
-
-      document.getElementById("btn-camera-close").addEventListener("click", () => {
-        stopCamera();
-      });
-
-      document.getElementById("btn-approval-close").addEventListener("click", () => {
-        document.getElementById("modal-approval").classList.add("hidden");
-      });
-
-      document.getElementById("btn-detail-close").addEventListener("click", () => {
-        document.getElementById("modal-detail").classList.add("hidden");
-      });
-    }
-
-    function showDetailModal(title, content) {
-      document.getElementById("modal-detail-title").textContent = title;
-      document.getElementById("modal-detail-content").textContent = content;
-      document.getElementById("modal-detail").classList.remove("hidden");
-    }
-
-    async function fetchGASData() {
-      if (!GAS_WEB_APP_URL) return;
-
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=APPROVED`, { method: "GET", redirect: "follow" });
-        const response = await res.json();
-
-        if (response.status === "success" && Array.isArray(response.data)) {
-          const currentSnapshot = JSON.stringify(response.data);
-          if (currentSnapshot === lastDataSnapshot) return;
-
-          lastDataSnapshot = currentSnapshot;
-          dynamicSubDirectories = {};
-
-          response.data.forEach(item => {
-            try {
-              const parsed = JSON.parse(item.content);
-              if (parsed.id && parsed.field && parsed.value) {
-                if (!dynamicSubDirectories[parsed.id]) dynamicSubDirectories[parsed.id] = {};
-                if (!dynamicSubDirectories[parsed.id][parsed.field]) dynamicSubDirectories[parsed.id][parsed.field] = [];
-                
-                dynamicSubDirectories[parsed.id][parsed.field].push({
-                  zh: parsed.value, en: parsed.value, de: parsed.value
-                });
-              }
-            } catch (e) {}
-          });
-
-          renderCurrentView();
-        }
-      } catch (err) {}
+      document.getElementById("btn-approval-close").addEventListener("click", () => document.getElementById("modal-approval").classList.add("hidden"));
+      document.getElementById("btn-detail-close").addEventListener("click", () => document.getElementById("modal-detail").classList.add("hidden"));
     }
   </script>
 </body>
