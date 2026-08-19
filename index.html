@@ -65,6 +65,16 @@
     </div>
   </div>
 
+  <div id="modal-camera" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-4 w-full max-w-md shadow-2xl relative">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-lg font-bold text-gray-900">掃描 QR Code</h3>
+        <button id="btn-camera-close" class="text-2xl font-bold px-2">&times;</button>
+      </div>
+      <div id="reader" class="w-full rounded-lg overflow-hidden border"></div>
+    </div>
+  </div>
+
   <div id="modal-approval" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
       <div class="flex justify-between items-center mb-4 border-b pb-3">
@@ -82,7 +92,8 @@
     let currentLang = "zh";
     let currentViewMode = "SINGLE";
     let activeSignId = "";
-    let selectedCategoryForExpand = null; // 用於控制第二階段展開
+    let selectedCategoryForExpand = null;
+    let html5QrCode = null;
 
     const i18nDict = {
       zh: { fields: { freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級" } }
@@ -103,9 +114,9 @@
         if (result.status === "success" && result.data.length > 0) {
           isoSignsData = result.data.map(item => ({
             ...item,
-            id: item.id || item.Code,
-            category: item.Category || item.category,
-            // 優先使用 A 欄的 Image 欄位作為圖片顯示來源
+            id: item.id || item.Code || item.svg_url,
+            category: item.Categoryid || item.Category || item.category,
+            // 嚴格對應 A 欄 Image 作為圖片顯示來源
             displayImg: item.Image || item.svg_url || item.svgUrl
           }));
           if (!activeSignId && isoSignsData.length > 0) {
@@ -146,7 +157,7 @@
       }
     }
 
-    // 階段一：資料庫點擊進入，顯示各分類 (Category) 的代表封面
+    // 資料庫階層 1：顯示各 Categoryid 分類
     function renderDatabaseCategoryOverview(container) {
       const grid = document.createElement("div");
       grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
@@ -168,7 +179,7 @@
             <img src="${sign.displayImg}" class="w-full h-full object-contain group-hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/80?text=No+Image'">
           </div>
           <span class="font-bold text-gray-800 text-sm">分類: ${cat}</span>
-          <span class="text-xs text-gray-400 mt-1">點擊檢視標誌清單</span>
+          <span class="text-xs text-gray-400 mt-1">點擊檢視標誌與說明</span>
         `;
         card.addEventListener("click", () => {
           selectedCategoryForExpand = cat;
@@ -179,7 +190,7 @@
       container.appendChild(grid);
     }
 
-    // 階段二：點擊分類後，顯示該分類下的「每一個標誌與說明」清單
+    // 資料庫階層 2：顯示該分類下每一個標誌與說明
     function renderDatabaseCategoryDetail(container, category) {
       const wrapper = document.createElement("div");
       wrapper.innerHTML = `
@@ -196,7 +207,6 @@
       const subGrid = document.getElementById("sub-grid");
       const filtered = isoSignsData.filter(s => (s.category || "未分類") === category);
       
-      // 確保每個 id 只出現一次（抓取 level 1 作為代表）
       const uniqueSigns = [];
       const seenIds = new Set();
       filtered.forEach(s => {
@@ -208,7 +218,7 @@
 
       uniqueSigns.forEach(sign => {
         const item = document.createElement("div");
-        item.className = "bg-white p-4 rounded-xl shadow border flex items-center space-x-4 cursor-pointer hover:border-blue-400 transition group";
+        item.className = "bg-white p-4 rounded-xl shadow border flex items-center space-x-4 cursor-pointer hover:border-purple-300 transition group";
         item.innerHTML = `
           <div class="w-16 h-16 flex-shrink-0 flex items-center justify-center bg-gray-50 rounded-lg p-1">
             <img src="${sign.displayImg}" class="w-full h-full object-contain group-hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/64?text=No+Image'">
@@ -216,10 +226,10 @@
           <div class="overflow-hidden">
             <h4 class="font-bold text-gray-800 text-sm truncate">${sign.name_zh || sign.id}</h4>
             <p class="text-xs text-gray-500 truncate mt-0.5">編號: ${sign.id}</p>
-            <span class="inline-block text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded mt-1">點擊檢視詳細資訊</span>
+            <span class="inline-block text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded mt-1">點擊檢視詳細資訊</span>
           </div>
         `;
-        // 第三階段：點擊該標誌後，進入該標誌的相關詳細訊息與 7 大控制欄位
+        // 點擊後進入該標誌的詳細相關訊息
         item.addEventListener("click", () => {
           activeSignId = sign.id;
           currentViewMode = "SINGLE";
@@ -229,7 +239,7 @@
       });
     }
 
-    // 階段三：渲染單一標誌的詳細資訊（若為 Warning sign 則展開 4 個等級）
+    // 資料庫階層 3：詳細訊息與 7 大因素條列
     function renderSingleSignDetail(container, signId) {
       const matchedSigns = isoSignsData.filter(s => String(s.id).toLowerCase() === String(signId).toLowerCase());
       if (matchedSigns.length === 0) {
@@ -237,11 +247,12 @@
         return;
       }
 
-      const isWarning = matchedSigns[0].category === "W";
+      // 檢查是否為 Warning sign (Categoryid === "W")
+      const isWarning = String(matchedSigns[0].category).toUpperCase() === "W";
+      
       const wrapper = document.createElement("div");
       wrapper.className = "space-y-6 max-w-2xl mx-auto";
 
-      // 附加返回資料庫按鈕
       const backBar = document.createElement("div");
       backBar.innerHTML = `<button id="back-to-db" class="mb-2 px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition">← 返回標誌清單</button>`;
       container.appendChild(backBar);
@@ -256,12 +267,17 @@
         const levelNum = sign.level || (idx + 1);
         const card = document.createElement("div");
         card.className = "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 smooth-update";
+        
+        // 檢查後 7 項因素是否有填寫內容
+        const fieldKeys = ["freq", "elim", "sub", "eng", "admin", "ppe", "risk"];
+        const hasExtraFields = fieldKeys.some(key => sign[key] && String(sign[key]).trim() !== "" && String(sign[key]) !== "-");
+
         card.innerHTML = `
           <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
             <div class="flex flex-col items-center text-center">
               <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border relative">
                 <img src="${sign.displayImg}" class="w-full h-full object-contain" onerror="this.src='https://via.placeholder.com/112?text=No+Image'">
-                ${isWarning ? `<span class="absolute bottom-1 bg-yellow-400 text-black font-black text-xs px-2 py-0.5 rounded-full shadow">機率 ${levelNum}</span>` : ''}
+                ${isWarning ? `<span class="absolute bottom-1 bg-yellow-400 text-black font-black text-xs px-2 py-0.5 rounded-full shadow">頻率機率 ${levelNum}</span>` : ''}
               </div>
               <h3 class="mt-3 font-bold text-gray-900 text-lg">${sign.name_zh || sign.id}</h3>
             </div>
@@ -270,12 +286,14 @@
               <span class="mt-3 text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-md border">${sign.id} ${isWarning ? '(Level ' + levelNum + ')' : ''}</span>
             </div>
           </div>
+          ${hasExtraFields ? `
           <div class="mt-6 border-t pt-4 space-y-2">
-            <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">雙擊框格編輯提交</h5>
+            <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">雙擊框格可編輯提交修改</h5>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
               ${renderSubFieldsHtml(sign, levelNum)}
             </div>
-          </div>
+          </div>` : `
+          <div class="mt-4 text-center text-xs text-gray-400 font-medium">目前僅記錄名稱與圖形資訊</div>`}
         `;
         wrapper.appendChild(card);
 
@@ -311,18 +329,31 @@
 
     function bindSubFieldEvents() {
       document.querySelectorAll(".sub-field-box").forEach(box => {
-        box.addEventListener("dblclick", () => {
-          const signId = box.getAttribute("data-sign-id");
-          const level = box.getAttribute("data-level");
-          const fieldKey = box.getAttribute("data-field-key");
-          const fieldName = i18nDict[currentLang].fields[fieldKey];
-          
-          const userInput = prompt(`【提交修改】請輸入 ${signId} (等級 ${level}) 之「${fieldName}」新內容：`);
-          if (userInput && userInput.trim() !== "") {
-            submitPendingData(signId, level, fieldKey, userInput.trim());
+        // 同時支援雙擊 (dblclick) 與手機觸控雙擊防呆
+        let lastTouchTime = 0;
+        box.addEventListener("touchend", (e) => {
+          const currentTime = new Date().getTime();
+          if (currentTime - lastTouchTime < 300) {
+            triggerEditPrompt(box);
           }
+          lastTouchTime = currentTime;
+        });
+        box.addEventListener("dblclick", () => {
+          triggerEditPrompt(box);
         });
       });
+    }
+
+    function triggerEditPrompt(box) {
+      const signId = box.getAttribute("data-sign-id");
+      const level = box.getAttribute("data-level");
+      const fieldKey = box.getAttribute("data-field-key");
+      const fieldName = i18nDict[currentLang].fields[fieldKey];
+      
+      const userInput = prompt(`【提交修改】請輸入 ${signId} (等級 ${level}) 之「${fieldName}」新內容：`);
+      if (userInput && userInput.trim() !== "") {
+        submitPendingData(signId, level, fieldKey, userInput.trim());
+      }
     }
 
     async function submitPendingData(signId, level, fieldKey, val) {
@@ -348,6 +379,33 @@
       } catch (err) {
         alert("網路通訊失敗！");
       }
+    }
+
+    // 相機功能設定
+    function setupCameraModal() {
+      const modal = document.getElementById("modal-camera");
+      modal.classList.remove("hidden");
+      
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
+      }
+      
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          html5QrCode.stop().then(() => {
+            modal.classList.add("hidden");
+            activeSignId = decodedText.trim();
+            currentViewMode = "SINGLE";
+            renderCurrentView();
+          }).catch(err => console.error(err));
+        },
+        (errorMessage) => {}
+      ).catch(err => {
+        alert("無法啟動相機權限：" + err);
+        modal.classList.add("hidden");
+      });
     }
 
     function setupHeaderLongPress() {
@@ -417,6 +475,7 @@
     };
 
     function setupEventListeners() {
+      // 文字搜尋按鈕
       document.getElementById("btn-text-search").addEventListener("click", () => document.getElementById("modal-search").classList.remove("hidden"));
       document.getElementById("btn-search-cancel").addEventListener("click", () => document.getElementById("modal-search").classList.add("hidden"));
       document.getElementById("btn-search-confirm").addEventListener("click", () => {
@@ -424,11 +483,23 @@
         document.getElementById("modal-search").classList.add("hidden");
         if (query) { activeSignId = query; currentViewMode = "SINGLE"; renderCurrentView(); }
       });
+
+      // 相機按鈕
+      document.getElementById("btn-camera").addEventListener("click", setupCameraModal);
+      document.getElementById("btn-camera-close").addEventListener("click", () => {
+        if (html5QrCode) {
+          html5QrCode.stop().catch(e => {});
+        }
+        document.getElementById("modal-camera").classList.add("hidden");
+      });
+
+      // 資料庫按鈕
       document.getElementById("btn-database").addEventListener("click", () => {
         currentViewMode = "DATABASE";
         selectedCategoryForExpand = null;
         renderCurrentView();
       });
+
       document.getElementById("btn-approval-close").addEventListener("click", () => document.getElementById("modal-approval").classList.add("hidden"));
     }
   </script>
