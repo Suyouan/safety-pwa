@@ -82,7 +82,7 @@
     let currentLang = "zh";
     let currentViewMode = "SINGLE";
     let activeSignId = "";
-    let selectedCategoryForExpand = null;
+    let selectedCategoryForExpand = null; // 用於控制第二階段展開
 
     const i18nDict = {
       zh: { fields: { freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級" } }
@@ -105,7 +105,8 @@
             ...item,
             id: item.id || item.Code,
             category: item.Category || item.category,
-            svgUrl: item.svg_url || item.Image || item.svgUrl
+            // 優先使用 A 欄的 Image 欄位作為圖片顯示來源
+            displayImg: item.Image || item.svg_url || item.svgUrl
           }));
           if (!activeSignId && isoSignsData.length > 0) {
             activeSignId = isoSignsData[0].id;
@@ -145,7 +146,7 @@
       }
     }
 
-    // 階段一：資料庫總覽（只顯示各 Category 的第一個代表圖案）
+    // 階段一：資料庫點擊進入，顯示各分類 (Category) 的代表封面
     function renderDatabaseCategoryOverview(container) {
       const grid = document.createElement("div");
       grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
@@ -164,10 +165,10 @@
         card.className = "bg-white p-4 rounded-xl shadow border hover:shadow-md transition cursor-pointer flex flex-col items-center text-center group";
         card.innerHTML = `
           <div class="w-20 h-20 flex items-center justify-center mb-2 bg-gray-50 rounded-lg p-1">
-            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/80?text=No+Image'">
+            <img src="${sign.displayImg}" class="w-full h-full object-contain group-hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/80?text=No+Image'">
           </div>
           <span class="font-bold text-gray-800 text-sm">分類: ${cat}</span>
-          <span class="text-xs text-gray-400 mt-1">點擊展開清單</span>
+          <span class="text-xs text-gray-400 mt-1">點擊檢視標誌清單</span>
         `;
         card.addEventListener("click", () => {
           selectedCategoryForExpand = cat;
@@ -178,12 +179,12 @@
       container.appendChild(grid);
     }
 
-    // 階段二：點擊分類後，展開該分類下的全部清單
+    // 階段二：點擊分類後，顯示該分類下的「每一個標誌與說明」清單
     function renderDatabaseCategoryDetail(container, category) {
       const wrapper = document.createElement("div");
       wrapper.innerHTML = `
         <button id="back-to-categories" class="mb-4 px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition">← 返回分類總覽</button>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4" id="sub-grid"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" id="sub-grid"></div>
       `;
       container.appendChild(wrapper);
 
@@ -195,6 +196,7 @@
       const subGrid = document.getElementById("sub-grid");
       const filtered = isoSignsData.filter(s => (s.category || "未分類") === category);
       
+      // 確保每個 id 只出現一次（抓取 level 1 作為代表）
       const uniqueSigns = [];
       const seenIds = new Set();
       filtered.forEach(s => {
@@ -206,14 +208,18 @@
 
       uniqueSigns.forEach(sign => {
         const item = document.createElement("div");
-        item.className = "bg-white p-4 rounded-xl shadow border flex flex-col items-center text-center cursor-pointer hover:border-purple-300 group";
+        item.className = "bg-white p-4 rounded-xl shadow border flex items-center space-x-4 cursor-pointer hover:border-blue-400 transition group";
         item.innerHTML = `
-          <div class="w-16 h-16 flex items-center justify-center mb-1 bg-gray-50 rounded-lg p-1">
-            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/64?text=No+Image'">
+          <div class="w-16 h-16 flex-shrink-0 flex items-center justify-center bg-gray-50 rounded-lg p-1">
+            <img src="${sign.displayImg}" class="w-full h-full object-contain group-hover:scale-105 transition" onerror="this.src='https://via.placeholder.com/64?text=No+Image'">
           </div>
-          <span class="font-bold text-gray-800 text-sm">${sign.name_zh || sign.id}</span>
-          <span class="text-[10px] text-gray-400 font-mono">${sign.id}</span>
+          <div class="overflow-hidden">
+            <h4 class="font-bold text-gray-800 text-sm truncate">${sign.name_zh || sign.id}</h4>
+            <p class="text-xs text-gray-500 truncate mt-0.5">編號: ${sign.id}</p>
+            <span class="inline-block text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded mt-1">點擊檢視詳細資訊</span>
+          </div>
         `;
+        // 第三階段：點擊該標誌後，進入該標誌的相關詳細訊息與 7 大控制欄位
         item.addEventListener("click", () => {
           activeSignId = sign.id;
           currentViewMode = "SINGLE";
@@ -223,7 +229,7 @@
       });
     }
 
-    // 渲染單一標誌（若為 Warning sign 則展開 4 個等級）
+    // 階段三：渲染單一標誌的詳細資訊（若為 Warning sign 則展開 4 個等級）
     function renderSingleSignDetail(container, signId) {
       const matchedSigns = isoSignsData.filter(s => String(s.id).toLowerCase() === String(signId).toLowerCase());
       if (matchedSigns.length === 0) {
@@ -235,6 +241,15 @@
       const wrapper = document.createElement("div");
       wrapper.className = "space-y-6 max-w-2xl mx-auto";
 
+      // 附加返回資料庫按鈕
+      const backBar = document.createElement("div");
+      backBar.innerHTML = `<button id="back-to-db" class="mb-2 px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition">← 返回標誌清單</button>`;
+      container.appendChild(backBar);
+      document.getElementById("back-to-db").addEventListener("click", () => {
+        currentViewMode = "DATABASE";
+        renderCurrentView();
+      });
+
       const levelsToRender = isWarning ? matchedSigns : [matchedSigns[0]];
 
       levelsToRender.forEach((sign, idx) => {
@@ -245,7 +260,7 @@
           <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
             <div class="flex flex-col items-center text-center">
               <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border relative">
-                <img src="${sign.svgUrl}" class="w-full h-full object-contain" onerror="this.src='https://via.placeholder.com/112?text=No+Image'">
+                <img src="${sign.displayImg}" class="w-full h-full object-contain" onerror="this.src='https://via.placeholder.com/112?text=No+Image'">
                 ${isWarning ? `<span class="absolute bottom-1 bg-yellow-400 text-black font-black text-xs px-2 py-0.5 rounded-full shadow">機率 ${levelNum}</span>` : ''}
               </div>
               <h3 class="mt-3 font-bold text-gray-900 text-lg">${sign.name_zh || sign.id}</h3>
@@ -402,7 +417,7 @@
     };
 
     function setupEventListeners() {
-      document.getElementById("btn-text-search").addEventListener("click", () => document.getElementById("modal-search").classList.add("flex").remove("hidden") || document.getElementById("modal-search").classList.remove("hidden"));
+      document.getElementById("btn-text-search").addEventListener("click", () => document.getElementById("modal-search").classList.remove("hidden"));
       document.getElementById("btn-search-cancel").addEventListener("click", () => document.getElementById("modal-search").classList.add("hidden"));
       document.getElementById("btn-search-confirm").addEventListener("click", () => {
         const query = document.getElementById("search-input").value.trim();
