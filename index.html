@@ -659,23 +659,23 @@ if (key === "freq") {
     function triggerBoxEdit(box) {
       const signId = box.getAttribute("data-sign-id");
       const fieldKey = box.getAttribute("data-field-key");
-      const freqVal = box.getAttribute("data-freq");
+      const riskVal = box.getAttribute("data-risk");
       const fieldName = i18nDict[currentLang].fields[fieldKey];
       
-      const userInput = prompt(`【雙擊送審】請輸入 ${signId}（發生頻率: ${freqVal}）之「${fieldName}」更新內容：`);
+      const userInput = prompt(`【雙擊送審】請輸入 ${signId}（風險等級: ${riskVal}）之「${fieldName}」更新內容：`);
       if (userInput && userInput.trim() !== "") {
-        submitPendingData(signId, fieldKey, freqVal, userInput.trim());
+        submitPendingData(signId, fieldKey, riskVal, userInput.trim());
       }
     }
 
-    async function submitPendingData(signId, fieldKey, freqVal, val, isSilent = false) {
+    async function submitPendingData(signId, fieldKey, riskVal, val, isSilent = false) {
       const payload = {
         action: "SUBMIT",
         applicant: "現場使用者",
         signId: signId,
-        freq: freqVal,
+        freq: riskVal,
         content: JSON.stringify({
-          id: signId, field: fieldKey, value: val, freq: freqVal, path: `ISO7010 > ${signId} (Freq ${freqVal}) > ${fieldKey}`
+          id: signId, field: fieldKey, value: val, freq: riskVal, path: `ISO7010 > ${signId} (Freq ${riskVal}) > ${fieldKey}`
         })
       };
 
