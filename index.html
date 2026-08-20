@@ -265,36 +265,36 @@
     }
 
     async function fetchHistoryData() {
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_HISTORY`);
-        const result = await res.json();
-        if (result.status === "success" && result.data) {
-          dynamicSubDirectories = result.data;
-          renderCurrentView();
-        }
-      } catch (e) {
-        console.warn("取得歷史核准資料失敗:", e);
-      }
+  try {
+    const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_HISTORY&_t=${new Date().getTime()}`);
+    const result = await res.json();
+    if (result.status === "success" && result.data) {
+      dynamicSubDirectories = result.data;
+      renderCurrentView();
     }
+  } catch (e) {
+    console.warn("取得歷史核准資料失敗:", e);
+  }
+}
 
-    async function fetchPendingCount() {
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
-        const result = await res.json();
-        const badge = document.getElementById("pending-badge");
-        if (result.status === "success" && Array.isArray(result.data)) {
-          const count = result.data.length;
-          if (count > 0) {
-            badge.textContent = `${count} 待審`;
-            badge.classList.remove("hidden");
-          } else {
-            badge.classList.add("hidden");
-          }
-        }
-      } catch (e) {
-        console.warn("無法取得待審批數量:", e);
+   async function fetchPendingCount() {
+  try {
+    const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING&_t=${new Date().getTime()}`, { method: "GET", redirect: "follow" });
+    const result = await res.json();
+    const badge = document.getElementById("pending-badge");
+    if (result.status === "success" && Array.isArray(result.data)) {
+      const count = result.data.length;
+      if (count > 0) {
+        badge.textContent = `${count} 待審`;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
       }
     }
+  } catch (e) {
+    console.warn("無法取得待審批數量:", e);
+  }
+}
 
     function initI18n() {
       document.getElementById("lang-select").addEventListener("change", (e) => {
