@@ -141,7 +141,8 @@
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
     let isoSignsData = []; 
-    let dynamicSubDirectories = {};
+    let totalDatabaseMap = {}; // 總資料庫映射 (對應 GAS GET_TOTAL_DATA)
+    let lastSignature = "";    // 防閃頻簽章
     let currentLang = "zh";
 
     const i18nDict = {
@@ -193,9 +194,9 @@
       setupEventListeners();
       setupHeaderLongPress();
       
-      // 1. 使用者剛開啟頁面的時候載入資料
+      // 初始化載入
       await fetchSignsFromSheet();
-      await fetchHistoryData();
+      await syncTotalData();
       fetchPendingCount();
     });
 
@@ -269,23 +270,59 @@
       }
     }
 
-    async function fetchHistoryData() {
+    // 防閃頻資料同步函數 (串接 GAS GET_TOTAL_DATA)
+    async function syncTotalData() {
       try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_HISTORY&_t=${new Date().getTime()}`);
+        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_TOTAL_DATA&_t=${new Date().getTime()}`);
         const result = await res.json();
         if (result.status === "success" && result.data) {
-          // 防閃頻機制：只有當資料變更時才更新並重新渲染
-          const currentHash = JSON.stringify(dynamicSubDirectories);
-          const newHash = JSON.stringify(result.data);
+          const newSignature = JSON.stringify(result.data);
           
-          if (currentHash !== newHash) {
-            dynamicSubDirectories = result.data;
-            renderCurrentView();
+          if (lastSignature !== newSignature) {
+            totalDatabaseMap = result.data;
+            lastSignature = newSignature;
+            
+            // 如果目前在單一檢視畫面，使用局部無感更新；否則重新渲染
+            if (currentViewMode === "SINGLE") {
+              updateActiveFieldsSilently();
+            } else {
+              renderCurrentView();
+            }
           }
         }
       } catch (e) {
-        console.warn("取得歷史核准資料失敗:", e);
+        console.warn("取得總資料庫失敗:", e);
       }
+    }
+
+    // 區域無感更新 (避免畫面閃頻)
+    function updateActiveFieldsSilently() {
+      const activeCard = document.querySelector(`[data-sign-id="${activeSignId}"]`);
+      if (!activeCard) {
+        renderCurrentView();
+        return;
+      }
+      
+      const rowData = totalDatabaseMap[activeSignId] || {};
+      document.querySelectorAll(`[data-sign-id="${activeSignId}"]`).forEach(el => {
+        const key = el.getAttribute("data-field-key");
+        if (!key) return;
+        
+        let newVal = rowData[key] || "";
+        if (!newVal && key === "risk") {
+          const match = activeSignId.match(/\((\d)\)/);
+          newVal = match ? match[1] : "N/A";
+        }
+        
+        const textContainer = el.querySelector(".truncate-text");
+        if (textContainer) {
+          const isOverflow = newVal.length > 25;
+          const truncated = isOverflow ? newVal.substring(0, 25) + "..." : newVal || "-";
+          textContainer.innerHTML = `${truncated}${isOverflow ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(newVal)}">[...]</button>` : ''}`;
+        }
+        el.setAttribute("data-full-text", encodeURIComponent(newVal));
+      });
+      bindSubFieldEvents();
     }
 
     async function fetchPendingCount() {
@@ -521,6 +558,7 @@
     function renderSubFieldsHtml(sign) {
       const fieldKeys = ["freq", "elim", "sub", "eng", "admin", "ppe", "risk"];
       const fieldsDict = i18nDict[currentLang].fields;
+      const rowData = totalDatabaseMap[sign.id] || {};
 
       return fieldKeys.map(key => {
         const fieldName = fieldsDict[key];
@@ -528,15 +566,12 @@
         let displayContent = "";
         if (key === "freq") {
           displayContent = sign.freq;
+        } else if (key === "risk") {
+          displayContent = rowData[key] || (sign.id.match(/\((\d)\)/) ? sign.id.match(/\((\d)\)/)[1] : "N/A");
         } else {
-          const approvedValues = (dynamicSubDirectories[sign.id] && dynamicSubDirectories[sign.id][key]) || [];
-          displayContent = approvedValues.map(v => v[currentLang] || v.zh || v.value).join(" | ");
-          
+          displayContent = rowData[key] || "";
           if (!displayContent && key === "eng" && sign.hazard_control) {
             displayContent = sign.hazard_control;
-          }
-          if (!displayContent && key === "risk") {
-            displayContent = "N/A"; // 風險預設值，若 GAS 有回傳則會覆蓋
           }
         }
         
@@ -547,8 +582,8 @@
           ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(displayContent)}">[...]</button>` 
           : '';
 
-        // 控制 frequency 與 risk 為唯讀
-        const isReadOnly = (key === "freq" || key === "risk");
+        // Risk 欄位設為唯讀，其餘（包含 freq）可雙擊送審編輯
+        const isReadOnly = (key === "risk");
         const boxClass = isReadOnly 
           ? "border rounded-lg p-3 bg-gray-100 text-gray-500 cursor-not-allowed" 
           : "sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom";
@@ -575,7 +610,6 @@
       });
 
       document.querySelectorAll(".sub-field-box").forEach(box => {
-        // 唯讀欄位 (含 risk 與 freq) 跳過事件綁定
         if (box.classList.contains('cursor-not-allowed')) return;
 
         let lastTapTime = 0;
@@ -630,7 +664,7 @@
         const result = await res.json();
         if (result.status === "success") {
           alert("🎉 雙擊送審成功！資料已送交後台審批。");
-          fetchHistoryData();
+          syncTotalData();
           fetchPendingCount();
         } else {
           alert("❌ 送審失敗：" + result.message);
@@ -719,7 +753,7 @@
           alert(`✅ 已成功【${actionText}】！`);
           openApprovalModal();
           fetchPendingCount();
-          fetchHistoryData();
+          syncTotalData();
         } else {
           alert("❌ 審批處理失敗：" + result.message);
         }
@@ -807,9 +841,9 @@
       });
     }
 
-    // 每 15 秒背景輪詢 (已修復尾部語法錯誤)
+    // 每 15 秒背景輪詢同步總資料庫與待審狀態
     setInterval(() => {
-      fetchHistoryData();
+      syncTotalData();
       fetchPendingCount();
     }, 15000);
     
