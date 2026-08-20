@@ -792,6 +792,12 @@
       });
     }
 
+// 例如在網頁載入完成後 (DOMContentLoaded)，加入自動輪詢 (每 15 秒更新一次資料)
+setInterval(() => {
+  fetchHistoryData();
+  fetchPendingCount();
+}, 15000);S
+    
     function stopCameraScanner() {
       if (html5QrCode && html5QrCode.isScanning) {
         html5QrCode.stop().catch(err => console.log(err));
