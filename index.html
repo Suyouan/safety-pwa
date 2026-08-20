@@ -499,9 +499,9 @@
 
       const freqIndicatorHtml = isWarning ? `
         <div class="mt-2 flex items-center justify-center space-x-1">
-          <span class="text-xs text-gray-500 font-medium mr-1">發生頻率:</span>
+          <span class="text-xs text-gray-500 font-medium mr-1">風險等級:</span>
           ${[1, 2, 3, 4].map(n => `
-            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${sign.freq === n.toString() ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600'}">${n}</span>
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${sign.risk === n.toString() ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600'}">${n}</span>
           `).join('')}
         </div>
       ` : '';
