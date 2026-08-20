@@ -183,9 +183,8 @@
       setupEventListeners();
       setupHeaderLongPress();
       
-      // 僅在網頁初次載入時取得資料（已移除 setInterval 自動更新）
       await fetchSignsFromSheet();
-      fetchGASData();
+      fetchHistoryData(); // 已對應 GAS 的 GET_HISTORY
       fetchPendingCount();
     });
 
@@ -259,16 +258,16 @@
       }
     }
 
-    async function fetchGASData() {
+    async function fetchHistoryData() {
       try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_DATA`);
+        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_HISTORY`);
         const result = await res.json();
         if (result.status === "success" && result.data) {
           dynamicSubDirectories = result.data;
           renderCurrentView();
         }
       } catch (e) {
-        console.warn("取得動態資料失敗:", e);
+        console.warn("取得歷史核准資料失敗:", e);
       }
     }
 
@@ -500,7 +499,7 @@
           displayContent = sign.freq;
         } else {
           const approvedValues = (dynamicSubDirectories[sign.id] && dynamicSubDirectories[sign.id][key]) || [];
-          displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(" | ");
+          displayContent = approvedValues.map(v => v[currentLang] || v.zh || v.value).join(" | ");
           if (!displayContent && key === "eng" && sign.hazard_control) {
             displayContent = sign.hazard_control;
           }
@@ -592,7 +591,7 @@
         const result = await res.json();
         if (result.status === "success") {
           alert("🎉 雙擊送審成功！資料已送交後台審批。");
-          fetchGASData();
+          fetchHistoryData();
           fetchPendingCount();
         } else {
           alert("❌ 送審失敗：" + result.message);
@@ -672,16 +671,16 @@
 
       try {
         const res = await fetch(GAS_WEB_APP_URL, {
-  method: "POST", mode: "cors", redirect: "follow",
-  headers: { "Content-Type": "text/plain;charset=utf-8" },
-  body: JSON.stringify(payload)
-});
+          method: "POST", mode: "cors", redirect: "follow",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
         const result = await res.json();
         if (result.status === "success") {
           alert(`✅ 已成功【${actionText}】！`);
           openApprovalModal();
           fetchPendingCount();
-          fetchGASData();
+          fetchHistoryData();
         } else {
           alert("❌ 審批處理失敗：" + result.message);
         }
@@ -693,7 +692,7 @@
     function showDetailModal(title, text) {
       document.getElementById("modal-detail-title").textContent = title;
       document.getElementById("modal-detail-content").textContent = text;
-      document.getElementById("modal-detail-modal" || "modal-detail").classList.remove("hidden");
+      document.getElementById("modal-detail").classList.remove("hidden");
     }
 
     document.getElementById("btn-detail-close").addEventListener("click", () => {
