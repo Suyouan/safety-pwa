@@ -25,6 +25,11 @@
       height: 100% !important;
       object-fit: cover !important;
     }
+    .truncate-text {
+      white-space: nowrap; 
+      overflow: hidden; 
+      text-overflow: ellipsis; 
+    }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
@@ -265,36 +270,42 @@
     }
 
     async function fetchHistoryData() {
-  try {
-    const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_HISTORY&_t=${new Date().getTime()}`);
-    const result = await res.json();
-    if (result.status === "success" && result.data) {
-      dynamicSubDirectories = result.data;
-      renderCurrentView();
-    }
-  } catch (e) {
-    console.warn("取得歷史核准資料失敗:", e);
-  }
-}
-
-   async function fetchPendingCount() {
-  try {
-    const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING&_t=${new Date().getTime()}`, { method: "GET", redirect: "follow" });
-    const result = await res.json();
-    const badge = document.getElementById("pending-badge");
-    if (result.status === "success" && Array.isArray(result.data)) {
-      const count = result.data.length;
-      if (count > 0) {
-        badge.textContent = `${count} 待審`;
-        badge.classList.remove("hidden");
-      } else {
-        badge.classList.add("hidden");
+      try {
+        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_HISTORY&_t=${new Date().getTime()}`);
+        const result = await res.json();
+        if (result.status === "success" && result.data) {
+          // 防閃頻機制：只有當資料變更時才更新並重新渲染
+          const currentHash = JSON.stringify(dynamicSubDirectories);
+          const newHash = JSON.stringify(result.data);
+          
+          if (currentHash !== newHash) {
+            dynamicSubDirectories = result.data;
+            renderCurrentView();
+          }
+        }
+      } catch (e) {
+        console.warn("取得歷史核准資料失敗:", e);
       }
     }
-  } catch (e) {
-    console.warn("無法取得待審批數量:", e);
-  }
-}
+
+    async function fetchPendingCount() {
+      try {
+        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING&_t=${new Date().getTime()}`, { method: "GET", redirect: "follow" });
+        const result = await res.json();
+        const badge = document.getElementById("pending-badge");
+        if (result.status === "success" && Array.isArray(result.data)) {
+          const count = result.data.length;
+          if (count > 0) {
+            badge.textContent = `${count} 待審`;
+            badge.classList.remove("hidden");
+          } else {
+            badge.classList.add("hidden");
+          }
+        }
+      } catch (e) {
+        console.warn("無法取得待審批數量:", e);
+      }
+    }
 
     function initI18n() {
       document.getElementById("lang-select").addEventListener("change", (e) => {
@@ -345,7 +356,6 @@
       }
     }
 
-    // 返回上一步功能實作
     function handleBackStep() {
       if (currentViewMode === "SINGLE") {
         currentViewMode = "CATEGORY_LIST";
@@ -521,8 +531,12 @@
         } else {
           const approvedValues = (dynamicSubDirectories[sign.id] && dynamicSubDirectories[sign.id][key]) || [];
           displayContent = approvedValues.map(v => v[currentLang] || v.zh || v.value).join(" | ");
+          
           if (!displayContent && key === "eng" && sign.hazard_control) {
             displayContent = sign.hazard_control;
+          }
+          if (!displayContent && key === "risk") {
+            displayContent = "N/A"; // 風險預設值，若 GAS 有回傳則會覆蓋
           }
         }
         
@@ -533,16 +547,17 @@
           ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(displayContent)}">[...]</button>` 
           : '';
 
-        const isFreqField = (key === "freq");
-        const boxClass = isFreqField 
+        // 控制 frequency 與 risk 為唯讀
+        const isReadOnly = (key === "freq" || key === "risk");
+        const boxClass = isReadOnly 
           ? "border rounded-lg p-3 bg-gray-100 text-gray-500 cursor-not-allowed" 
           : "sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom";
 
         return `
           <div class="${boxClass}"
-               data-sign-id="${sign.id}" data-field-key="${key}" data-freq="${sign.freq}" data-full-text="${displayContent}">
+               data-sign-id="${sign.id}" data-field-key="${key}" data-freq="${sign.freq}" data-full-text="${encodeURIComponent(displayContent)}">
             <div class="flex justify-between font-semibold text-gray-600 mb-1">
-              <span>${fieldName} ${isFreqField ? '(唯讀)' : ''}</span>
+              <span>${fieldName} ${isReadOnly ? '(唯讀)' : ''}</span>
             </div>
             <div class="text-gray-800 font-medium truncate-text">${truncatedContent}${moreBtnHtml}</div>
           </div>
@@ -560,6 +575,9 @@
       });
 
       document.querySelectorAll(".sub-field-box").forEach(box => {
+        // 唯讀欄位 (含 risk 與 freq) 跳過事件綁定
+        if (box.classList.contains('cursor-not-allowed')) return;
+
         let lastTapTime = 0;
 
         box.addEventListener("touchend", (e) => {
@@ -612,7 +630,6 @@
         const result = await res.json();
         if (result.status === "success") {
           alert("🎉 雙擊送審成功！資料已送交後台審批。");
-          // 2. 有人雙擊框格完成遞交資料後更新
           fetchHistoryData();
           fetchPendingCount();
         } else {
@@ -702,7 +719,6 @@
           alert(`✅ 已成功【${actionText}】！`);
           openApprovalModal();
           fetchPendingCount();
-          // 3. 審批通過或者審批拒絕後更新
           fetchHistoryData();
         } else {
           alert("❌ 審批處理失敗：" + result.message);
@@ -726,7 +742,6 @@
     });
 
     function setupEventListeners() {
-      // 綁定「返回上一步」按鈕事件
       document.getElementById("btn-back-step").addEventListener("click", () => {
         handleBackStep();
       });
@@ -792,11 +807,11 @@
       });
     }
 
-// 例如在網頁載入完成後 (DOMContentLoaded)，加入自動輪詢 (每 15 秒更新一次資料)
-setInterval(() => {
-  fetchHistoryData();
-  fetchPendingCount();
-}, 15000);S
+    // 每 15 秒背景輪詢 (已修復尾部語法錯誤)
+    setInterval(() => {
+      fetchHistoryData();
+      fetchPendingCount();
+    }, 15000);
     
     function stopCameraScanner() {
       if (html5QrCode && html5QrCode.isScanning) {
