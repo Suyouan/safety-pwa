@@ -490,35 +490,32 @@
         return;
       }
 
-      const signTitleName = sign.name[currentLang] || sign.name.zh;
       const isWarning = (sign.category === "Warning sign");
 
-      const levelHtml = (isWarning && sign.level) 
-        ? `<div class="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-400 text-yellow-900 font-black text-sm rounded-full inline-block shadow-sm">等級 ${sign.level}</div>` 
-        : '';
+      // 1. 決定該標誌的風險等級 (優先從資料庫拿，若無則從 ID 的括號或 sign.level 取得)
+      const rowData = totalDatabaseMap[sign.id] || {};
+      const autoRisk = sign.level || (sign.id.match(/\((\d)\)/) ? sign.id.match(/\((\d)\)/)[1] : "1");
+      const currentRiskVal = rowData["risk"] || autoRisk;
 
+      // 2. 標誌名稱的最後方加上「(風險等級: X)」
+      let baseSignName = sign.name[currentLang] || sign.name.zh;
+      // 避免重複加上去，先清掉舊的後綴再組合
+      baseSignName = baseSignName.replace(/\s*\(風險等級：\d\)/g, ""); 
+      const signTitleName = isWarning ? `${baseSignName} (風險等級：${currentRiskVal})` : baseSignName;
+
+      // 3. 三角形下方的風險等級 1~4 顯示區塊 (此區塊為對應顯示與唯讀效果)
       const freqIndicatorHtml = isWarning ? `
-        <div class="mt-2 flex items-center justify-center space-x-1">
-          <span class="text-xs text-gray-500 font-medium mr-1">風險等級:</span>
-          ${[1, 2, 3, 4].map(n => `
-            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${sign.risk === n.toString() ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600'}">${n}</span>
-          `).join('')}
+        <div class="mt-2 flex flex-col items-center">
+          <span class="text-xs text-gray-500 font-medium mb-1">風險等級</span>
+          <div class="flex items-center space-x-1">
+            ${[1, 2, 3, 4].map(n => `
+              <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${currentRiskVal === n.toString() ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600'}">${n}</span>
+            `).join('')}
+          </div>
         </div>
       ` : '';
 
-      const subFieldsHtml = isWarning ? `
-        <div class="mt-6 border-t pt-4 space-y-2">
-          <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            ${renderSubFieldsHtml(sign)}
-          </div>
-        </div>
-      ` : `
-        <div class="mt-6 border-t pt-4 text-center text-sm text-gray-500">
-          此分類項目屬於非警告標誌，僅提供基本分類與名稱資訊。
-        </div>
-      `;
-
+      // 4. 組合成卡片 HTML
       const card = document.createElement("div");
       card.className = "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 max-w-2xl mx-auto smooth-update";
       card.innerHTML = `
@@ -527,7 +524,6 @@
             <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border">
               <img src="${sign.svgUrl}" class="w-full h-full object-contain" alt="${signTitleName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-decagram-outline.svg';">
             </div>
-            ${levelHtml}
             ${freqIndicatorHtml}
             <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
           </div>
@@ -537,7 +533,12 @@
             <span class="mt-3 text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-md border">${sign.id}</span>
           </div>
         </div>
-        ${subFieldsHtml}
+        <div class="mt-6 border-t pt-4 space-y-2">
+          <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+            ${renderSubFieldsHtml(sign)}
+          </div>
+        </div>
       `;
 
       container.appendChild(card);
@@ -553,6 +554,11 @@
       if (isWarning) {
         bindSubFieldEvents();
       }
+
+      // 如果資料庫中的 risk 欄位目前是空的，自動觸發將這個等級填入 ISO7010總資料
+      if (isWarning && !rowData["risk"] && currentRiskVal) {
+        submitPendingData(sign.id, "risk", sign.freq || "1", currentRiskVal);
+      }
     }
 
     function renderSubFieldsHtml(sign) {
@@ -564,11 +570,13 @@
         const fieldName = fieldsDict[key];
         
         let displayContent = "";
-        if (key === "freq") {
-          displayContent = sign.freq;
-        } else if (key === "risk") {
-          displayContent = rowData[key] || (sign.id.match(/\((\d)\)/) ? sign.id.match(/\((\d)\)/)[1] : "N/A");
-        } else {
+if (key === "freq") {
+  displayContent = sign.freq;
+} else if (key === "risk") {
+  // 核心修改：如果資料庫目前是空的，優先顯示該標誌定義好的風險等級 (sign.level 或 ID中的括號數字)
+  const autoRisk = sign.level || (sign.id.match(/\((\d)\)/) ? sign.id.match(/\((\d)\)/)[1] : "1");
+  displayContent = rowData[key] || autoRisk; 
+} else {
           displayContent = rowData[key] || "";
           if (!displayContent && key === "eng" && sign.hazard_control) {
             displayContent = sign.hazard_control;
