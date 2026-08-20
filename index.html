@@ -497,11 +497,14 @@
       const autoRisk = sign.level || (sign.id.match(/\((\d)\)/) ? sign.id.match(/\((\d)\)/)[1] : "1");
       const currentRiskVal = rowData["risk"] || autoRisk;
 
-      // 2. 標誌名稱的最後方加上「(風險等級: X)」
-      let baseSignName = sign.name[currentLang] || sign.name.zh;
-      // 避免重複加上去，先清掉舊的後綴再組合
-      baseSignName = baseSignName.replace(/\s*\(風險等級：\d\)/g, ""); 
-      const signTitleName = isWarning ? `${baseSignName} (風險等級：${currentRiskVal})` : baseSignName;
+      // 2. [核心修改] 處理標題：移除 "(頻率X)" 並加上 "(風險等級：X)"
+      let rawName = sign.name[currentLang] || sign.name.zh;
+      
+      // 使用正規表達式移除 "(頻率 X)" 或 "(頻率X)" 字樣 (不區分大小寫，處理全形半形括號)
+      let cleanName = rawName.replace(/\s*[\(\（]頻率\s*\d+[\)\）]/gi, "");
+      
+      // 加上新的風險等級後綴
+      const signTitleName = isWarning ? `${cleanName} (風險等級：${currentRiskVal})` : cleanName;
 
       // 3. 三角形下方的風險等級 1~4 顯示區塊 (此區塊為對應顯示與唯讀效果)
       const freqIndicatorHtml = isWarning ? `
