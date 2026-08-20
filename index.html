@@ -75,8 +75,13 @@
       </button>
     </div>
 
-    <!-- Breadcrumb -->
-    <div id="breadcrumb-container" class="mb-4 text-sm text-gray-500 hidden"></div>
+    <!-- Navigation Bar (Breadcrumb & Back Button) -->
+    <div id="nav-bar-container" class="mb-4 flex items-center justify-between bg-white px-4 py-2 rounded-xl shadow-sm border hidden">
+      <div id="breadcrumb-container" class="text-sm text-gray-500"></div>
+      <button id="btn-back-step" class="text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition flex items-center space-x-1">
+        <span>← 返回上一步</span>
+      </button>
+    </div>
 
     <div id="content-area" class="w-full">
       <div class="text-center py-12 text-gray-500 font-medium">資料庫同步載入中...</div>
@@ -183,8 +188,9 @@
       setupEventListeners();
       setupHeaderLongPress();
       
+      // 1. 使用者剛開啟頁面的時候載入資料
       await fetchSignsFromSheet();
-      fetchHistoryData(); // 已對應 GAS 的 GET_HISTORY
+      await fetchHistoryData();
       fetchPendingCount();
     });
 
@@ -309,14 +315,15 @@
 
     function renderCurrentView() {
       const container = document.getElementById("content-area");
+      const navBarContainer = document.getElementById("nav-bar-container");
       const breadcrumb = document.getElementById("breadcrumb-container");
       container.innerHTML = "";
 
       if (currentViewMode === "DATABASE") {
-        breadcrumb.classList.add("hidden");
+        navBarContainer.classList.add("hidden");
         renderDatabaseCategories(container);
       } else if (currentViewMode === "CATEGORY_LIST") {
-        breadcrumb.classList.remove("hidden");
+        navBarContainer.classList.remove("hidden");
         breadcrumb.innerHTML = `<span class="cursor-pointer text-blue-600 hover:underline" id="bc-home">資料庫</span> &gt; <span class="font-bold text-gray-700">${activeCategory}</span>`;
         document.getElementById("bc-home").addEventListener("click", () => {
           currentViewMode = "DATABASE";
@@ -324,7 +331,7 @@
         });
         renderCategorySignsList(container, activeCategory);
       } else if (currentViewMode === "SINGLE") {
-        breadcrumb.classList.remove("hidden");
+        navBarContainer.classList.remove("hidden");
         breadcrumb.innerHTML = `<span class="cursor-pointer text-blue-600 hover:underline" id="bc-home">資料庫</span> &gt; <span class="cursor-pointer text-blue-600 hover:underline" id="bc-cat">${activeCategory}</span> &gt; <span class="font-bold text-gray-700">${activeSignId}</span>`;
         document.getElementById("bc-home").addEventListener("click", () => {
           currentViewMode = "DATABASE";
@@ -335,6 +342,20 @@
           renderCurrentView();
         });
         renderSingleSignDetail(container, activeSignId);
+      }
+    }
+
+    // 返回上一步功能實作
+    function handleBackStep() {
+      if (currentViewMode === "SINGLE") {
+        currentViewMode = "CATEGORY_LIST";
+        renderCurrentView();
+      } else if (currentViewMode === "CATEGORY_LIST") {
+        currentViewMode = "DATABASE";
+        renderCurrentView();
+      } else {
+        currentViewMode = "DATABASE";
+        renderCurrentView();
       }
     }
 
@@ -514,7 +535,7 @@
 
         const isFreqField = (key === "freq");
         const boxClass = isFreqField 
-          ? "border rounded-lg p-3 bg-gray-100 text-gray-500 cursor-not-voted" 
+          ? "border rounded-lg p-3 bg-gray-100 text-gray-500 cursor-not-allowed" 
           : "sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom";
 
         return `
@@ -591,6 +612,7 @@
         const result = await res.json();
         if (result.status === "success") {
           alert("🎉 雙擊送審成功！資料已送交後台審批。");
+          // 2. 有人雙擊框格完成遞交資料後更新
           fetchHistoryData();
           fetchPendingCount();
         } else {
@@ -680,6 +702,7 @@
           alert(`✅ 已成功【${actionText}】！`);
           openApprovalModal();
           fetchPendingCount();
+          // 3. 審批通過或者審批拒絕後更新
           fetchHistoryData();
         } else {
           alert("❌ 審批處理失敗：" + result.message);
@@ -703,6 +726,11 @@
     });
 
     function setupEventListeners() {
+      // 綁定「返回上一步」按鈕事件
+      document.getElementById("btn-back-step").addEventListener("click", () => {
+        handleBackStep();
+      });
+
       document.getElementById("btn-database").addEventListener("click", () => {
         currentViewMode = "DATABASE";
         renderCurrentView();
