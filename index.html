@@ -425,7 +425,20 @@
         if (items.length === 0) return;
 
         const representative = items[0];
-        const repName = representative.name[currentLang] || representative.name.zh;
+        // --- [核心修改開始] 清洗代表名稱並加上正確的風險等級 ---
+        let rawRepName = representative.name[currentLang] || representative.name.zh;
+        let cleanRepName = rawRepName
+          .replace(/\s*[\(\（]頻率\s*\d+[\)\）]/gi, "")
+          .replace(/\s*[\(\（]風險等級[：:]\s*\d+[\)\）]/gi, "");
+
+        // 如果是 Warning sign，取得它的對應風險等級
+        const isWarningCat = (cat === "Warning sign");
+        const rowData = totalDatabaseMap[representative.id] || {};
+        const autoRisk = representative.level || (representative.id.match(/\((\d)\)/) ? representative.id.match(/\((\d)\)/)[1] : "1");
+        const repRiskVal = rowData["risk"] || autoRisk;
+
+        const repName = isWarningCat ? `${cleanRepName} (風險等級：${repRiskVal})` : cleanRepName;
+        // --- [核心修改結束] ---
         
         const item = document.createElement("div");
         item.className = "bg-white p-5 rounded-xl shadow border border-gray-100 flex items-center space-x-4 hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
@@ -560,7 +573,7 @@
 
       // 如果資料庫中的 risk 欄位目前是空的，自動觸發將這個等級填入 ISO7010總資料
       if (isWarning && !rowData["risk"] && currentRiskVal) {
-        submitPendingData(sign.id, "risk", sign.freq || "1", currentRiskVal);
+        submitPendingData(sign.id, "risk", sign.freq || "1", currentRiskVal,true);
       }
     }
 
@@ -655,7 +668,7 @@ if (key === "freq") {
       }
     }
 
-    async function submitPendingData(signId, fieldKey, freqVal, val) {
+    async function submitPendingData(signId, fieldKey, freqVal, val, isSilent = false) {
       const payload = {
         action: "SUBMIT",
         applicant: "現場使用者",
@@ -674,7 +687,10 @@ if (key === "freq") {
         });
         const result = await res.json();
         if (result.status === "success") {
-          alert("🎉 雙擊送審成功！資料已送交後台審批。");
+      // 只有在非靜默模式下才跳出提示
+      if (!isSilent) {
+        alert("🎉 雙擊送審成功！資料已送交後台審批。");
+      }
           syncTotalData();
           fetchPendingCount();
         } else {
