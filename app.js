@@ -257,7 +257,7 @@ async function submitApproval(signId, risk, field, value) {
         let res = await fetch(GAS_URL, {
             method: 'POST',
             body: JSON.stringify({
-                action: 'submit',
+                action: 'submitApproval', // 對應你原本 GAS 的 submitApproval
                 signId: signId,
                 risk: risk,
                 field: field,
@@ -266,12 +266,11 @@ async function submitApproval(signId, risk, field, value) {
             })
         });
         let result = await res.json();
-        if (result.status === 'success') {
+        if (result.success) {
             alert('已成功送交審批！');
         }
     } catch (e) {
         console.error("送審失敗", e);
-        alert('送審失敗，請檢查網路連線');
     }
 }
 
