@@ -1,0 +1,9 @@
+{
+  "name": "ISO7010 Safety PWA",
+  "short_name": "ISO7010",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e293b",
+  "icons": []
+}

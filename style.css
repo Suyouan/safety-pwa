@@ -1,0 +1,21 @@
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+body { background-color: #f4f6f9; color: #333; }
+header { background: #1e293b; color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.header-controls { display: flex; gap: 10px; align-items: center; }
+.badge { background: #ef4444; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold; }
+main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+.control-section { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+#search-input { padding: 10px; font-size: 1rem; border: 1px solid #cbd5e1; border-radius: 6px; }
+.mode-buttons { display: flex; gap: 10px; }
+.mode-buttons button { padding: 8px 16px; border: none; background: #e2e8f0; border-radius: 4px; cursor: pointer; }
+.mode-buttons button.active { background: #3b82f6; color: white; }
+.signs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+.sign-card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
+.sign-card img { width: 100px; height: 100px; object-fit: contain; margin-bottom: 10px; }
+.risk-badge { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-top: 5px; font-weight: bold; }
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; position: relative; }
+.modal-content.wide { max-width: 800px; }
+.close-btn { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; }
+.form-group { margin-bottom: 12px; display: flex; flex-direction: column; }
+.form-group input { padding: 6px; margin-top: 4px; border: 1px solid #cbd5e1; border-radius: 4px; }
