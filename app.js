@@ -5,15 +5,30 @@ let processedSigns = [];
 let approvedDataMap = {};   
 let currentLang = 'zh';
 
-// 導覽狀態變數
-let currentView = 'categories'; // 'categories' | 'signs_in_category' | 'sign_detail'
+let currentView = 'categories'; 
 let selectedCategory = null;
 let selectedSignDetail = null;
 
+// 多語系字典定義（包含控制欄位與標題的多語系支援）
 const i18nText = {
-    zh: { app_title: "ISO7010 安全標誌系統", export_excel: "匯出 Excel", search_placeholder: "輸入關鍵字搜尋標誌...", mode_db: "資料庫模式", mode_qr: "QR 掃描模式", submit_approval: "提交審批", approval_title: "待審批清單", back_categories: "返回分類" },
-    en: { app_title: "ISO7010 Safety PWA", export_excel: "Export Excel", search_placeholder: "Search signs...", mode_db: "Database", mode_qr: "QR Scanner", submit_approval: "Submit Approval", approval_title: "Pending Approvals", back_categories: "Back to Categories" },
-    de: { app_title: "ISO7010 Sicherheitszeichen", export_excel: "Excel exportieren", search_placeholder: "Zeichen suchen...", mode_db: "Datenbank", mode_qr: "QR-Scanner", submit_approval: "Genehmigung einreichen", approval_title: "Ausstehende Genehmigungen", back_categories: "Zurück zu Kategorien" }
+    zh: { 
+        app_title: "ISO7010 安全標誌系統", export_excel: "匯出 Excel", search_placeholder: "輸入關鍵字搜尋標誌...", mode_db: "資料庫模式", mode_qr: "QR 掃描模式", submit_approval: "提交審批", approval_title: "待審批清單", back_categories: "返回分類",
+        edit_title: "編輯危害控制", risk_level: "風險等級 (唯讀):", applicant: "申請人 (Applicant):",
+        freq: "頻率 (Freq):", elim: "消除 (Elim):", sub: "替代 (Sub):", eng: "工程控制 (Eng):", admin: "管理控制 (Admin):", ppe: "個人防護具 (PPE):",
+        no_control: "此標誌無七大危害控制項目", edit_hint: "(提示：長按項目或點擊下方按鈕可編輯)", click_to_edit: "編輯此標誌控制項"
+    },
+    en: { 
+        app_title: "ISO7010 Safety PWA", export_excel: "Export Excel", search_placeholder: "Search signs...", mode_db: "Database", mode_qr: "QR Scanner", submit_approval: "Submit Approval", approval_title: "Pending Approvals", back_categories: "Back to Categories",
+        edit_title: "Edit Hazard Control", risk_level: "Risk Level (Read-only):", applicant: "Applicant:",
+        freq: "Freq:", elim: "Elim:", sub: "Sub:", eng: "Eng:", admin: "Admin:", ppe: "PPE:",
+        no_control: "This sign has no hazard control items.", edit_hint: "(Hint: Long press item or click button below to edit)", click_to_edit: "Edit Control"
+    },
+    de: { 
+        app_title: "ISO7010 Sicherheitszeichen", export_excel: "Excel exportieren", search_placeholder: "Zeichen suchen...", mode_db: "Datenbank", mode_qr: "QR-Scanner", submit_approval: "Genehmigung einreichen", approval_title: "Ausstehende Genehmigungen", back_categories: "Zurück zu Kategorien",
+        edit_title: "Gefahrenkontrolle bearbeiten", risk_level: "Risikostufe (Schreibgeschützt):", applicant: "Antragsteller:",
+        freq: "Freq:", elim: "Elim:", sub: "Sub:", eng: "Eng:", admin: "Admin:", ppe: "PPE:",
+        no_control: "Dieses Zeichen hat keine Gefahrenkontrolle.", edit_hint: "(Hinweis: Halten Sie gedrückt oder klicken Sie unten)", click_to_edit: "Kontrolle bearbeiten"
+    }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -40,6 +55,9 @@ function initI18n() {
     select.addEventListener('change', (e) => {
         currentLang = e.target.value;
         updateUIText();
+        if (currentView === 'sign_detail' && selectedSignDetail) {
+            renderSignDetailView(selectedSignDetail, document.getElementById('signs-container'));
+        }
     });
 }
 
@@ -88,7 +106,6 @@ function setupEventListeners() {
 function setupHeaderLongPress() {
     let timer = null;
     const header = document.getElementById('main-header');
-
     const startPress = () => { timer = setTimeout(openApprovalModal, 3000); };
     const cancelPress = () => clearTimeout(timer);
 
@@ -141,6 +158,7 @@ function processAndRender() {
     processedSigns = [];
     rawSignsData.forEach(sign => {
         const cat = sign.category || 'Uncategorized';
+        // 只有 Warning sign (注意標誌) 才展開為 Risk 1~4 並具有七大控制項
         if (cat === 'Warning sign') {
             for (let i = 1; i <= 4; i++) {
                 const riskLevel = `Risk${i}`;
@@ -151,6 +169,7 @@ function processAndRender() {
                     ...sign,
                     category: cat,
                     risk: riskLevel,
+                    hasControl: true,
                     freq: approvedInfo.Field === 'freq' ? approvedInfo.Value : (sign.freq || ''),
                     elim: approvedInfo.Field === 'elim' ? approvedInfo.Value : (sign.elim || ''),
                     sub: approvedInfo.Field === 'sub' ? approvedInfo.Value : (sign.sub || ''),
@@ -160,19 +179,15 @@ function processAndRender() {
                 });
             }
         } else {
-            const riskLevel = sign.risk || 'Risk1';
-            const uniqueKey = `${sign.id}_${riskLevel}`;
+            // 其他分類僅維持基本說明，不具備七大危害控制與風險展開
+            const uniqueKey = `${sign.id}_Risk1`;
             const approvedInfo = approvedDataMap[uniqueKey] || {};
             processedSigns.push({
                 ...sign,
                 category: cat,
-                risk: riskLevel,
-                freq: approvedInfo.Field === 'freq' ? approvedInfo.Value : (sign.freq || ''),
-                elim: approvedInfo.Field === 'elim' ? approvedInfo.Value : (sign.elim || ''),
-                sub: approvedInfo.Field === 'sub' ? approvedInfo.Value : (sign.sub || ''),
-                eng: approvedInfo.Field === 'eng' ? approvedInfo.Value : (sign.eng || ''),
-                admin: approvedInfo.Field === 'admin' ? approvedInfo.Value : (sign.admin || ''),
-                ppe: approvedInfo.Field === 'ppe' ? approvedInfo.Value : (sign.ppe || '')
+                risk: '',
+                hasControl: false,
+                freq: '', elim: '', sub: '', eng: '', admin: '', ppe: ''
             });
         }
     });
@@ -246,8 +261,7 @@ function renderSignCards(signs, container) {
         card.innerHTML = `
             <img src="${sign.svg_url}" alt="${sign.name}" onerror="this.src='https://via.placeholder.com/100'">
             <h3>${sign.id}: ${sign.name || ''}</h3>
-            <span class="risk-badge">${sign.risk}</span>
-            <p>Freq: ${sign.freq} | Elim: ${sign.elim}</p>
+            ${sign.risk ? `<span class="risk-badge">${sign.risk}</span>` : ''}
         `;
         card.onclick = () => {
             selectedSignDetail = sign;
@@ -259,36 +273,76 @@ function renderSignCards(signs, container) {
 }
 
 function renderSignDetailView(sign, container) {
+    const t = i18nText[currentLang];
+    
+    let controlContentHtml = '';
+    if (sign.hasControl) {
+        controlContentHtml = `
+            <h3>${t.edit_title}</h3>
+            <p style="font-size:0.85rem; color:#64748b; margin-bottom:10px;">${t.edit_hint}</p>
+            <div class="detail-list">
+                <div class="detail-item" data-field="freq"><b>${t.freq}</b> ${sign.freq || '無'}</div>
+                <div class="detail-item" data-field="elim"><b>${t.elim}</b> ${sign.elim || '無'}</div>
+                <div class="detail-item" data-field="sub"><b>${t.sub}</b> ${sign.sub || '無'}</div>
+                <div class="detail-item" data-field="eng"><b>${t.eng}</b> ${sign.eng || '無'}</div>
+                <div class="detail-item" data-field="admin"><b>${t.admin}</b> ${sign.admin || '無'}</div>
+                <div class="detail-item" data-field="ppe"><b>${t.ppe}</b> ${sign.ppe || '無'}</div>
+            </div>
+            <button onclick="openEditModal('${sign.id}', '${sign.risk}')" style="margin-top:20px; padding:10px 20px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer;">${t.click_to_edit}</button>
+        `;
+    } else {
+        controlContentHtml = `<p style="margin-top:20px; color:#64748b; font-style:italic;">${t.no_control}</p>`;
+    }
+
     container.innerHTML = `
         <div class="detail-card" style="grid-column: 1 / -1;">
             <div style="display:flex; gap:20px; align-items:center; width:100%; margin-bottom:20px;">
                 <img src="${sign.svg_url}" alt="${sign.name}" style="width:120px;height:120px;object-fit:contain;">
                 <div>
                     <h2>${sign.id}: ${sign.name || ''}</h2>
-                    <p><b>分類 (Category):</b> ${sign.category}</p>
-                    <p><b>風險等級 (Risk):</b> <span class="risk-badge">${sign.risk}</span></p>
+                    <p><b>Category:</b> ${sign.category}</p>
+                    ${sign.risk ? `<p><b>Risk:</b> <span class="risk-badge">${sign.risk}</span></p>` : ''}
                 </div>
             </div>
-            <h3>詳細危害控制資訊</h3>
-            <div class="detail-list" style="margin-top:15px;">
-                <div class="detail-item"><b>Freq:</b> ${sign.freq || '無'}</div>
-                <div class="detail-item"><b>Elim:</b> ${sign.elim || '無'}</div>
-                <div class="detail-item"><b>Sub:</b> ${sign.sub || '無'}</div>
-                <div class="detail-item"><b>Eng:</b> ${sign.eng || '無'}</div>
-                <div class="detail-item"><b>Admin:</b> ${sign.admin || '無'}</div>
-                <div class="detail-item"><b>PPE:</b> ${sign.ppe || '無'}</div>
-            </div>
-            <button onclick="openEditModal('${sign.id}', '${sign.risk}')" style="margin-top:20px; padding:10px 20px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer;">編輯此標誌控制項</button>
+            ${controlContentHtml}
         </div>
     `;
+
+    // 支援手機友善的雙擊或長按編輯觸發
+    if (sign.hasControl) {
+        const detailItems = container.querySelectorAll('.detail-item');
+        detailItems.forEach(item => {
+            let pressTimer = null;
+            // 雙擊事件 (滑鼠/電腦)
+            item.addEventListener('dblclick', () => openEditModal(sign.id, sign.risk));
+            // 長按事件 (手機友善，按住 0.8 秒觸發編輯)
+            item.addEventListener('touchstart', () => {
+                pressTimer = setTimeout(() => openEditModal(sign.id, sign.risk), 800);
+            });
+            item.addEventListener('touchend', () => clearTimeout(pressTimer));
+            item.addEventListener('touchmove', () => clearTimeout(pressTimer));
+        });
+    }
 }
 
 function openEditModal(signId, riskLevel) {
     const sign = processedSigns.find(s => s.id === signId && s.risk === riskLevel);
-    if (!sign) return;
+    if (!sign || !sign.hasControl) return;
+
+    // 動態更新 Modal 內的語系文字
+    const t = i18nText[currentLang];
+    document.getElementById('edit-modal-title').textContent = t.edit_title;
+    document.getElementById('lbl-risk-level').childNodes[0].nodeValue = t.risk_level + " ";
+    document.getElementById('lbl-freq').childNodes[0].nodeValue = t.freq + " ";
+    document.getElementById('lbl-elim').childNodes[0].nodeValue = t.elim + " ";
+    document.getElementById('lbl-sub').childNodes[0].nodeValue = t.sub + " ";
+    document.getElementById('lbl-eng').childNodes[0].nodeValue = t.eng + " ";
+    document.getElementById('lbl-admin').childNodes[0].nodeValue = t.admin + " ";
+    document.getElementById('lbl-ppe').childNodes[0].nodeValue = t.ppe + " ";
+    document.getElementById('lbl-applicant').childNodes[0].nodeValue = t.applicant + " ";
 
     document.getElementById('edit-sign-id').value = sign.id;
-    document.getElementById('edit-risk-level').value = sign.risk; // 確保與畫面三角形下方一致且唯讀
+    document.getElementById('edit-risk-level').value = sign.risk; 
     document.getElementById('val-freq').value = sign.freq;
     document.getElementById('val-elim').value = sign.elim;
     document.getElementById('val-sub').value = sign.sub;
