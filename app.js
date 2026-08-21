@@ -2,7 +2,9 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOF
 
 let rawSigns = [];
 let approvedData = {};
-let currentViewPath = { level: 'categories', category: null, name: null, id: null };
+let isExpanded = false; // 防重複展開旗標
+let isAdmin = false;    // 管理員狀態（透過長按啟用）
+let currentViewPath = { level: 'categories', category: null, name: null, id: null, risk: null };
 
 document.addEventListener("DOMContentLoaded", () => {
     initI18n();
@@ -10,34 +12,46 @@ document.addEventListener("DOMContentLoaded", () => {
     fetchSignsFromSheet();
     setupHeaderLongPress();
     
-    // 定期同步
+    // 背景定時同步
     setInterval(fetchGASData, 10000);
     setInterval(fetchPendingCount, 15000);
 });
 
-function initI18n() {
-    // 預留多語系初始化
-}
+function initI18n() {}
 
 function setupEventListeners() {
-    // QR Code 支援
+    // 網址參數帶 ?id=P001 偵測
     const urlParams = new URLSearchParams(window.location.search);
     const qid = urlParams.get('id');
     if (qid) {
-        // 若帶有 id 則直接導向該標誌詳細頁
         setTimeout(() => {
             let target = rawSigns.find(s => s.id === qid);
-            if (target) showDetailView(target);
+            if (target) {
+                currentViewPath = { level: 'detail', id: target.id, risk: '1' };
+                renderCurrentView();
+            }
         }, 1000);
     }
+
+    // 掃描 QR 按鈕事件
+    document.getElementById('scan-qr-btn').addEventListener('click', startQRCodeScanner);
 }
 
+// 取得主表與已核准資料
 async function fetchSignsFromSheet() {
     try {
         let res = await fetch(`${GAS_URL}?action=getData`);
         let json = await res.json();
-        rawSigns = json.signs || [];
+        let fetchedSigns = json.signs || [];
         approvedData = json.approved || {};
+
+        // W類防重複展開機制：僅初次執行一次
+        if (!isExpanded) {
+            rawSigns = expandWSigns(fetchedSigns);
+            isExpanded = true;
+        } else {
+            rawSigns = updateExistingSigns(fetchedSigns);
+        }
         
         renderCurrentView();
     } catch (e) {
@@ -45,14 +59,43 @@ async function fetchSignsFromSheet() {
     }
 }
 
+// W類前端動態展開 (Category='Warning sign' 1 變 4，唯一鍵 = ID + Risk)
+function expandWSigns(signs) {
+    let expandedList = [];
+    signs.forEach(sign => {
+        if (sign.category === 'Warning sign') {
+            for (let i = 1; i <= 4; i++) {
+                expandedList.push({
+                    ...sign,
+                    risk: i,
+                    uniqueKey: `${sign.id}_Risk${i}`
+                });
+            }
+        } else {
+            expandedList.push({
+                ...sign,
+                risk: sign.risk || 1,
+                uniqueKey: `${sign.id}_Normal`
+            });
+        }
+    });
+    return expandedList;
+}
+
+function updateExistingSigns(fetchedSigns) {
+    return rawSigns.map(existing => {
+        let match = fetchedSigns.find(s => s.id === existing.id);
+        return match ? { ...match, risk: existing.risk, uniqueKey: existing.uniqueKey } : existing;
+    });
+}
+
 async function fetchGASData() {
     try {
         let res = await fetch(`${GAS_URL}?action=getData`);
         let json = await res.json();
         approvedData = json.approved || {};
-    } catch (e) {
-        console.error("背景同步失敗", e);
-    }
+        if (currentViewPath.level === 'detail') renderCurrentView();
+    } catch (e) { console.error(e); }
 }
 
 async function fetchPendingCount() {
@@ -66,57 +109,44 @@ async function fetchPendingCount() {
         } else {
             badge.style.display = 'none';
         }
-    } catch (e) {
-        console.error("取得待審批數量失敗", e);
-    }
+    } catch (e) { console.error(e); }
 }
 
-// 檢視層級切換核心
+// 檢視層級切換
 function renderCurrentView() {
     const container = document.getElementById('app-container');
     container.innerHTML = '';
 
-    if (currentViewPath.level === 'categories') {
-        renderCategoryView(container);
-    } else if (currentViewPath.level === 'signs') {
-        renderSignsView(container, currentViewPath.category);
-    } else if (currentViewPath.level === 'names') {
-        renderNamesView(container, currentViewPath.category);
-    } else if (currentViewPath.level === 'risks') {
-        renderRisksView(container, currentViewPath.name);
-    } else if (currentViewPath.level === 'detail') {
-        renderDetailView(container, currentViewPath.id);
-    }
+    if (currentViewPath.level === 'categories') renderCategoryView(container);
+    else if (currentViewPath.level === 'signs') renderSignsView(container, currentViewPath.category);
+    else if (currentViewPath.level === 'names') renderNamesView(container, currentViewPath.category);
+    else if (currentViewPath.level === 'risks') renderRisksView(container, currentViewPath.name);
+    else if (currentViewPath.level === 'detail') renderDetailView(container, currentViewPath.id, currentViewPath.risk);
 }
 
-// 第一層：顯示 Category 代表圖示
 function renderCategoryView(container) {
     let categories = [...new Set(rawSigns.map(s => s.category))];
     let html = `<div class="grid-container">`;
-    
     categories.forEach(cat => {
         let firstSign = rawSigns.find(s => s.category === cat);
         html += `
             <div class="card" onclick="navigateToCategory('${cat}')">
-                <img src="${firstSign.svg_url || firstSign.image}" alt="${cat}">
+                <img src="${firstSign?.svg_url || firstSign?.image || ''}" alt="${cat}">
                 <h3>${cat}</h3>
             </div>
         `;
     });
-    html += `</div>`;
-    container.innerHTML = html;
+    container.innerHTML = html + `</div>`;
 }
 
-window.navigateToCategory = function(cat) {
+window.navigateToCategory = (cat) => {
     currentViewPath = { level: 'signs', category: cat };
     renderCurrentView();
 };
 
-// 第二層：顯示該 Category 的所有標誌
 function renderSignsView(container, cat) {
     let signs = rawSigns.filter(s => s.category === cat);
     let html = `<button onclick="backToCategories()">⬅ 返回分類</button><h2>${cat} 標誌列表</h2><div class="grid-container">`;
-    
     signs.forEach(s => {
         html += `
             <div class="card" onclick="handleSignClick('${s.id}', '${s.category}', '${s.name}')">
@@ -125,33 +155,27 @@ function renderSignsView(container, cat) {
             </div>
         `;
     });
-    html += `</div>`;
-    container.innerHTML = html;
+    container.innerHTML = html + `</div>`;
 }
 
-window.backToCategories = function() {
+window.backToCategories = () => {
     currentViewPath = { level: 'categories', category: null };
     renderCurrentView();
 };
 
-window.handleSignClick = function(id, category, name) {
+window.handleSignClick = (id, category, name) => {
     if (category === 'Warning sign') {
-        // W 類進入 Name 檢視
         currentViewPath = { level: 'names', category: category, name: name };
         renderCurrentView();
     } else {
-        // 非 W 類直接進詳細頁
-        currentViewPath = { level: 'detail', id: id };
+        currentViewPath = { level: 'detail', id: id, risk: '1' };
         renderCurrentView();
     }
 };
 
-// 第三層：Warning sign 的 Name 檢視
 function renderNamesView(container, cat) {
-    // 找出該 category 下不重複的 name
     let wSigns = rawSigns.filter(s => s.category === cat);
     let uniqueNames = [...new Set(wSigns.map(s => s.name))];
-    
     let html = `<button onclick="navigateToCategory('${cat}')">⬅ 返回 ${cat}</button><h2>注意標誌群組</h2><div class="grid-container">`;
     uniqueNames.forEach(name => {
         let sample = wSigns.find(s => s.name === name);
@@ -162,131 +186,146 @@ function renderNamesView(container, cat) {
             </div>
         `;
     });
-    html += `</div>`;
-    container.innerHTML = html;
+    container.innerHTML = html + `</div>`;
 }
 
-window.navigateToRisks = function(name) {
+window.navigateToRisks = (name) => {
     currentViewPath = { level: 'risks', name: name };
     renderCurrentView();
 };
 
-// 第四層：Warning sign 的 4 個 Risk 等級檢視
 function renderRisksView(container, name) {
-    let variants = rawSigns.filter(s => s.name === name); // 應展開為 4 個風險等級
+    let variants = rawSigns.filter(s => s.name === name);
+    let sample = variants[0];
     let html = `<button onclick="currentViewPath.level='names'; renderCurrentView();">⬅ 返回群組</button><h2>${name} - 風險等級選擇</h2><div class="grid-container">`;
     
-    // 動態產生 1~4 風險等級呈現
-    for(let i=1; i<=4; i++) {
-        let variant = variants.find(v => String(v.risk) === String(i)) || variants[0];
+    for (let i = 1; i <= 4; i++) {
+        let variant = variants.find(v => Number(v.risk) === i) || sample;
         html += `
-            <div class="card" onclick="navigateToDetail('${variant.id}_Risk${i}')">
+            <div class="card" onclick="navigateToDetail('${variant.id}', '${i}')">
                 <img src="${variant.svg_url || variant.image}" alt="Risk ${i}">
-                <p>風險等級 (Risk Level): ${i}</p>
+                <p>Risk Level: ${i}</p>
             </div>
         `;
     }
-    html += `</div>`;
-    container.innerHTML = html;
+    container.innerHTML = html + `</div>`;
 }
 
-window.navigateToDetail = function(compoundId) {
-    // compoundId 格式為 id_RiskX
-    let realId = compoundId.split('_')[0];
-    let riskLv = compoundId.split('_Risk')[1];
-    currentViewPath = { level: 'detail', id: realId, risk: riskLv };
+window.navigateToDetail = (id, risk) => {
+    currentViewPath = { level: 'detail', id: id, risk: risk };
     renderCurrentView();
 };
 
-// 第五層：詳細頁與 7 大危害控制表單 (支援雙擊編輯)
-function renderDetailView(container, id) {
+function renderDetailView(container, id, risk) {
     let sign = rawSigns.find(s => s.id === id);
-    let riskLevel = currentViewPath.risk || sign.risk || '1';
-    let uniqueKey = `${sign.id}_${riskLevel}`;
-    
-    // 套用已審批資料
-    let currentData = approvedData[uniqueKey] || sign;
+    let uniqueKey = `${sign.id}_Risk${risk}`;
+    let currentData = approvedData[uniqueKey] || approvedData[`${sign.id}_Normal`] || sign;
 
     let html = `
         <button onclick="window.history.back()">⬅ 返回</button>
-        <div class="table-container">
-            <h2>標誌詳情: ${sign.name} (ID: ${sign.id})</h2>
+        <div class="table-container" style="margin-top:15px;">
+            <h2>${sign.name} (ID: ${sign.id})</h2>
             <img src="${sign.svg_url || sign.image}" style="max-width:150px; display:block; margin: 0 auto 1rem auto;">
-            <p><strong>風險等級 (Risk Level):</strong> ${riskLevel}</p>
-            <p style="color: #64748b; font-size: 0.9rem;">提示：雙擊表格右側 6 個控制欄位即可輸入新資訊並送審（支援手機與電腦雙擊）。</p>
+            <p><strong>風險等級 (Risk Level):</strong> ${risk} <span style="font-size:0.8rem; color:gray;">(唯讀不可編輯)</span></p>
+            <p style="color: #64748b; font-size: 0.9rem;">提示：一般雙擊送審；管理員模式下雙擊可直接修改或清空刪除資料。</p>
             
             <table class="control-table">
                 <tr><th>控制項欄位</th><th>內容值</th></tr>
-                <tr><td class="readonly-cell">頻率 (freq)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'freq')">${currentData.freq || ''}</td></tr>
-                <tr><td class="readonly-cell">排除 (elim)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'elim')">${currentData.elim || ''}</td></tr>
-                <tr><td class="readonly-cell">替代 (sub)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'sub')">${currentData.sub || ''}</td></tr>
-                <tr><td class="readonly-cell">工程控制 (eng)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'eng')">${currentData.eng || ''}</td></tr>
-                <tr><td class="readonly-cell">管理控制 (admin)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'admin')">${currentData.admin || ''}</td></tr>
-                <tr><td class="readonly-cell">個人防護具 (ppe)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'ppe')">${currentData.ppe || ''}</td></tr>
+                <tr><td>頻率 (freq)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'freq', this)">${currentData.freq || ''}</td></tr>
+                <tr><td>排除 (elim)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'elim', this)">${currentData.elim || ''}</td></tr>
+                <tr><td>替代 (sub)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'sub', this)">${currentData.sub || ''}</td></tr>
+                <tr><td>工程 (eng)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'eng', this)">${currentData.eng || ''}</td></tr>
+                <tr><td>管理 (admin)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'admin', this)">${currentData.admin || ''}</td></tr>
+                <tr><td>防護具 (ppe)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'ppe', this)">${currentData.ppe || ''}</td></tr>
             </table>
         </div>
     `;
     container.innerHTML = html;
 }
 
-// 雙擊編輯並提交送審
-window.makeEditable = function(cell, signId, risk, field) {
+// 雙擊互動：支援一般送審與管理員修改／刪除
+window.handleCellEdit = function(signId, risk, field, cell) {
     if (cell.querySelector('input')) return;
-    let oldVal = cell.innerText;
-    cell.innerHTML = `<input type="text" value="${oldVal}" style="width:90%; padding:4px;" />`;
-    let input = cell.querySelector('input');
-    input.focus();
-
-    input.onblur = async function() {
-        let newVal = input.value;
-        cell.innerText = newVal;
-        if (newVal !== oldVal) {
-            await submitApproval(signId, risk, field, newVal);
+    let oldText = cell.innerText;
+    
+    if (isAdmin) {
+        let actionChoice = prompt("【管理員模式】請選擇動作：\n1. 輸入新內容\n2. 輸入 delete 或留空以刪除此欄位資料", "");
+        if (actionChoice === null) return;
+        
+        if (actionChoice.toLowerCase() === 'delete' || actionChoice.trim() === '') {
+            cell.innerText = '';
+            sendDirectDelete(signId, risk, field);
+        } else {
+            let newVal = oldText ? `${oldText}, ${actionChoice}` : actionChoice;
+            cell.innerText = newVal;
+            sendDirectUpdate(signId, risk, field, newVal);
         }
-    };
+    } else {
+        cell.innerHTML = `<input type="text" value="" placeholder="輸入新值..." style="width:90%; padding:4px;" />`;
+        let input = cell.querySelector('input');
+        input.focus();
 
-    input.onkeydown = function(e) {
-        if (e.key === 'Enter') {
-            input.blur();
-        }
-    };
+        input.onblur = async function() {
+            let val = input.value.trim();
+            cell.innerText = oldText;
+            if (val) await submitApproval(signId, risk, field, val);
+        };
+        input.onkeydown = function(e) { if (e.key === 'Enter') input.blur(); };
+    }
 };
 
 async function submitApproval(signId, risk, field, value) {
     try {
-        let res = await fetch(GAS_URL, {
+        await fetch(GAS_URL, {
             method: 'POST',
-            body: JSON.stringify({
-                action: 'submitApproval', // 對應你原本 GAS 的 submitApproval
-                signId: signId,
-                risk: risk,
-                field: field,
-                value: value,
-                applicant: 'User'
-            })
+            body: JSON.stringify({ action: 'submitApproval', signId, risk, field, value, applicant: 'User' })
         });
-        let result = await res.json();
-        if (result.success) {
-            alert('已成功送交審批！');
-        }
-    } catch (e) {
-        console.error("送審失敗", e);
-    }
+        alert('已成功送交審批 (PENDING)');
+    } catch (e) { console.error(e); }
 }
 
-// 長按 Header 3 秒開啟管理員審批後台
+async function sendDirectUpdate(signId, risk, field, value) {
+    try {
+        await fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'directUpdate', signId, risk, field, value, reviewer: 'Admin' })
+        });
+        alert('管理員修改成功並已同步！');
+        fetchGASData();
+    } catch (e) { console.error(e); }
+}
+
+async function sendDirectDelete(signId, risk, field) {
+    try {
+        await fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'directUpdate', signId, risk, field, value: '', reviewer: 'Admin' })
+        });
+        alert('管理員已成功清除該欄位資料！');
+        fetchGASData();
+    } catch (e) { console.error(e); }
+}
+
+// Header 長按 3 秒啟用管理員與開啟 Modal 審批
 function setupHeaderLongPress() {
     let header = document.getElementById('main-header');
     let timer = null;
 
-    header.addEventListener('mousedown', () => {
-        timer = setTimeout(openApprovalModal, 3000);
-    });
+    const triggerAdmin = () => {
+        isAdmin = true;
+        alert("【系統提示】管理員權限已啟動！");
+        openApprovalModal();
+    };
+
+    header.addEventListener('mousedown', () => { timer = setTimeout(triggerAdmin, 3000); });
     header.addEventListener('mouseup', () => clearTimeout(timer));
-    header.addEventListener('touchstart', () => {
-        timer = setTimeout(openApprovalModal, 3000);
-    });
+    header.addEventListener('touchstart', () => { timer = setTimeout(triggerAdmin, 3000); });
     header.addEventListener('touchend', () => clearTimeout(timer));
+
+    document.getElementById('pending-badge').addEventListener('click', () => {
+        if (isAdmin) openApprovalModal();
+        else alert("請先透過 Header 長按 3 秒啟動管理員權限！");
+    });
 }
 
 async function openApprovalModal() {
@@ -296,41 +335,76 @@ async function openApprovalModal() {
     listDiv.innerHTML = '載入中...';
 
     try {
-        let res = await fetch(`${GAS_URL}?action=getPending`);
-        let pendingItems = await res.json();
+        let res = await fetch(`${GAS_URL}?action=getPendingApprovals`);
+        let json = await res.json();
+        let items = json.data || [];
 
-        if (pendingItems.length === 0) {
+        if (items.length === 0) {
             listDiv.innerHTML = '<p>目前沒有待審批項目。</p>';
             return;
         }
 
         let html = '';
-        pendingItems.forEach((item, idx) => {
+        items.forEach((item) => {
             html += `
                 <div style="border-bottom: 1px solid #ccc; padding: 10px 0;">
-                    <p><strong>標誌 ID:</strong> ${item.signId} | <strong>風險:</strong> ${item.risk} | <strong>欄位:</strong> ${item.field}</p>
+                    <p><strong>ID:</strong> ${item.signId} | <strong>Risk:</strong> ${item.risk} | <strong>欄位:</strong> ${item.field}</p>
                     <p><strong>新內容:</strong> ${item.value}</p>
-                    <button onclick="reviewItem(${idx}, 'APPROVED', '${item.signId}', '${item.risk}', '${item.field}', '${item.value}')" style="background:green; color:white;">通過</button>
-                    <button onclick="reviewItem(${idx}, 'REJECTED', '${item.signId}', '${item.risk}', '${item.field}', '${item.value}')" style="background:red; color:white;">拒絕</button>
+                    <button onclick="reviewItem('${item.signId}', '${item.risk}', '${item.field}', '${item.value}', 'APPROVED')" style="background:green; color:white; padding:4px 8px;">通過</button>
+                    <button onclick="reviewItem('${item.signId}', '${item.risk}', '${item.field}', '${item.value}', 'REJECTED')" style="background:red; color:white; padding:4px 8px;">拒絕</button>
                 </div>
             `;
         });
         listDiv.innerHTML = html;
-    } catch (e) {
-        listDiv.innerHTML = '載入失敗';
-    }
+    } catch (e) { listDiv.innerHTML = '載入失敗'; }
 }
 
-window.reviewItem = async function(index, status, signId, risk, field, value) {
+window.reviewItem = async function(signId, risk, field, value, status) {
     await fetch(GAS_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'review', signId, risk, field, value, status, reviewer: 'Admin' })
+        body: JSON.stringify({ action: 'processApproval', signId, risk, field, value, status, reviewer: 'Admin' })
     });
-    alert(`審批結果已儲存: ${status}`);
-    openApprovalModal(); // 重新整理列表
-    fetchSignsFromSheet(); // 更新前端
+    alert(`已完成審批: ${status}`);
+    openApprovalModal();
+    fetchSignsFromSheet();
 };
 
 document.getElementById('close-modal-btn').onclick = () => {
     document.getElementById('approval-modal').style.display = 'none';
 };
+
+// QR 碼相機掃描與權限防呆實作
+async function startQRCodeScanner() {
+    let container = document.getElementById('qr-scanner-modal');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'qr-scanner-modal';
+        container.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:9999;";
+        container.innerHTML = `
+            <div style="background:white; padding:20px; border-radius:8px; text-align:center; max-width:90%;">
+                <h3>請對準 QR Code 進行掃描</h3>
+                <video id="preview-video" style="width:100%; max-width:300px; height:auto; background:#000;"></video>
+                <br><br>
+                <button id="close-scanner-btn" style="padding:8px 16px; background:red; color:white; border:none; border-radius:4px;">關閉相機</button>
+            </div>
+        `;
+        document.body.appendChild(container);
+    }
+    container.style.display = 'flex';
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const videoElement = document.getElementById('preview-video');
+        videoElement.srcObject = stream;
+        videoElement.play();
+
+        document.getElementById('close-scanner-btn').onclick = () => {
+            stream.getTracks().forEach(track => track.stop());
+            container.style.display = 'none';
+        };
+    } catch (error) {
+        // 嚴格落實：若使用者不允許權限，則關閉相機模組與視窗
+        alert("已拒絕相機權限或不支援相機，將關閉相機模組。");
+        container.style.display = 'none';
+    }
+}
