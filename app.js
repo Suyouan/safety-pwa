@@ -1,17 +1,21 @@
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec";
 
-let rawSignsData = [];      // 原始 ISO7010 資料
-let processedSigns = [];    // 經 W 類展開與 APPROVED 套用後的資料
-let approvedDataMap = {};   // 以 ID+Risk 為鍵的已審批資料
+let rawSignsData = [];      
+let processedSigns = [];    
+let approvedDataMap = {};   
 let currentLang = 'zh';
 
+// 導覽狀態變數
+let currentView = 'categories'; // 'categories' | 'signs_in_category' | 'sign_detail'
+let selectedCategory = null;
+let selectedSignDetail = null;
+
 const i18nText = {
-    zh: { app_title: "ISO7010 安全標誌系統", export_excel: "匯出 Excel", search_placeholder: "輸入關鍵字搜尋標誌...", mode_db: "資料庫模式", mode_qr: "QR 掃描模式", submit_approval: "提交審批", approval_title: "待審批清單" },
-    en: { app_title: "ISO7010 Safety PWA", export_excel: "Export Excel", search_placeholder: "Search signs...", mode_db: "Database", mode_qr: "QR Scanner", submit_approval: "Submit Approval", approval_title: "Pending Approvals" },
-    de: { app_title: "ISO7010 Sicherheitszeichen", export_excel: "Excel exportieren", search_placeholder: "Zeichen suchen...", mode_db: "Datenbank", mode_qr: "QR-Scanner", submit_approval: "Genehmigung einreichen", approval_title: "Ausstehende Genehmigungen" }
+    zh: { app_title: "ISO7010 安全標誌系統", export_excel: "匯出 Excel", search_placeholder: "輸入關鍵字搜尋標誌...", mode_db: "資料庫模式", mode_qr: "QR 掃描模式", submit_approval: "提交審批", approval_title: "待審批清單", back_categories: "返回分類" },
+    en: { app_title: "ISO7010 Safety PWA", export_excel: "Export Excel", search_placeholder: "Search signs...", mode_db: "Database", mode_qr: "QR Scanner", submit_approval: "Submit Approval", approval_title: "Pending Approvals", back_categories: "Back to Categories" },
+    de: { app_title: "ISO7010 Sicherheitszeichen", export_excel: "Excel exportieren", search_placeholder: "Zeichen suchen...", mode_db: "Datenbank", mode_qr: "QR-Scanner", submit_approval: "Genehmigung einreichen", approval_title: "Ausstehende Genehmigungen", back_categories: "Zurück zu Kategorien" }
 };
 
-// 四、 啟動流程
 document.addEventListener("DOMContentLoaded", () => {
     initI18n();
     setupEventListeners();
@@ -20,11 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
     fetchGASData();
     fetchPendingCount();
 
-    // 五、 自動同步計時器
-    setInterval(fetchGASData, 10000);       // 每10秒同步資料
-    setInterval(fetchPendingCount, 15000);  // 每15秒同步待審批數
+    setInterval(fetchGASData, 10000);       
+    setInterval(fetchPendingCount, 15000);  
 
-    // 七、 QR 規則：解析網址 ?id=P001
     const urlParams = new URLSearchParams(window.location.search);
     const targetId = urlParams.get('id');
     if (targetId) {
@@ -54,15 +56,19 @@ function updateUIText() {
 }
 
 function setupEventListeners() {
-    document.getElementById('search-input').addEventListener('input', renderSigns);
+    document.getElementById('search-input').addEventListener('input', () => {
+        currentView = 'categories';
+        renderSigns();
+    });
     document.getElementById('export-btn').addEventListener('click', exportExcel);
     
-    // 模式切換
     document.getElementById('mode-db').addEventListener('click', () => {
         document.getElementById('mode-db').classList.add('active');
         document.getElementById('mode-qr').classList.remove('active');
         document.getElementById('qr-reader-section').style.display = 'none';
         document.getElementById('signs-container').style.display = 'grid';
+        currentView = 'categories';
+        renderSigns();
     });
 
     document.getElementById('mode-qr').addEventListener('click', () => {
@@ -73,38 +79,26 @@ function setupEventListeners() {
         startQRScanner();
     });
 
-    // 關閉 Modal
     document.getElementById('close-edit-modal').onclick = () => document.getElementById('edit-modal').style.display = 'none';
     document.getElementById('close-approval-modal').onclick = () => document.getElementById('approval-modal').style.display = 'none';
 
-    // 提交審批表單
     document.getElementById('edit-form').addEventListener('submit', handleSignSubmit);
 }
 
-// 十一、 Header 長按 3 秒開啟 Approval Modal
 function setupHeaderLongPress() {
     let timer = null;
     const header = document.getElementById('main-header');
 
-    header.addEventListener('mousedown', () => {
-        timer = setTimeout(() => {
-            openApprovalModal();
-        }, 3000);
-    });
+    const startPress = () => { timer = setTimeout(openApprovalModal, 3000); };
+    const cancelPress = () => clearTimeout(timer);
 
-    header.addEventListener('mouseup', () => clearTimeout(timer));
-    header.addEventListener('mouseleave', () => clearTimeout(timer));
-
-    // 手機觸控支援
-    header.addEventListener('touchstart', () => {
-        timer = setTimeout(() => {
-            openApprovalModal();
-        }, 3000);
-    });
-    header.addEventListener('touchend', () => clearTimeout(timer));
+    header.addEventListener('mousedown', startPress);
+    header.addEventListener('mouseup', cancelPress);
+    header.addEventListener('mouseleave', cancelPress);
+    header.addEventListener('touchstart', startPress);
+    header.addEventListener('touchend', cancelPress);
 }
 
-// 從 GAS 抓取基礎 ISO7010 資料
 async function fetchSignsFromSheet() {
     try {
         const res = await fetch(`${GAS_API_URL}?action=getSigns`);
@@ -116,12 +110,10 @@ async function fetchSignsFromSheet() {
     }
 }
 
-// 從 GAS 抓取最新資料 (含 APPROVED 及 SubDirectories)
 async function fetchGASData() {
     try {
         const res = await fetch(`${GAS_API_URL}?action=getData`);
         const result = await res.json();
-        // 假設 result.subDirectories 包含已審批核准資料
         approvedDataMap = {};
         if (result && result.subDirectories) {
             result.subDirectories.forEach(item => {
@@ -145,12 +137,11 @@ async function fetchPendingCount() {
     }
 }
 
-// 三、 W類標誌規則與十五、完整流程處理
 function processAndRender() {
     processedSigns = [];
     rawSignsData.forEach(sign => {
-        if (sign.category === 'Warning sign') {
-            // 三、 動態展開為 Risk 1~4 四筆
+        const cat = sign.category || 'Uncategorized';
+        if (cat === 'Warning sign') {
             for (let i = 1; i <= 4; i++) {
                 const riskLevel = `Risk${i}`;
                 const uniqueKey = `${sign.id}_${riskLevel}`;
@@ -158,7 +149,8 @@ function processAndRender() {
 
                 processedSigns.push({
                     ...sign,
-                    risk: riskLevel, // 動態建立 1~4，唯讀不可編輯
+                    category: cat,
+                    risk: riskLevel,
                     freq: approvedInfo.Field === 'freq' ? approvedInfo.Value : (sign.freq || ''),
                     elim: approvedInfo.Field === 'elim' ? approvedInfo.Value : (sign.elim || ''),
                     sub: approvedInfo.Field === 'sub' ? approvedInfo.Value : (sign.sub || ''),
@@ -168,10 +160,13 @@ function processAndRender() {
                 });
             }
         } else {
-            const uniqueKey = `${sign.id}_${sign.risk || 'Risk1'}`;
+            const riskLevel = sign.risk || 'Risk1';
+            const uniqueKey = `${sign.id}_${riskLevel}`;
             const approvedInfo = approvedDataMap[uniqueKey] || {};
             processedSigns.push({
                 ...sign,
+                category: cat,
+                risk: riskLevel,
                 freq: approvedInfo.Field === 'freq' ? approvedInfo.Value : (sign.freq || ''),
                 elim: approvedInfo.Field === 'elim' ? approvedInfo.Value : (sign.elim || ''),
                 sub: approvedInfo.Field === 'sub' ? approvedInfo.Value : (sign.sub || ''),
@@ -187,26 +182,105 @@ function processAndRender() {
 function renderSigns() {
     const container = document.getElementById('signs-container');
     const keyword = document.getElementById('search-input').value.toLowerCase();
+    const backBtn = document.getElementById('back-to-categories');
     container.innerHTML = '';
 
-    const filtered = processedSigns.filter(s => 
-        (s.name && s.name.toLowerCase().includes(keyword)) || 
-        (s.id && s.id.toLowerCase().includes(keyword))
-    );
+    if (keyword.trim() !== '') {
+        backBtn.style.display = 'inline-block';
+        backBtn.onclick = () => {
+            document.getElementById('search-input').value = '';
+            currentView = 'categories';
+            renderSigns();
+        };
+        const filtered = processedSigns.filter(s => 
+            (s.name && s.name.toLowerCase().includes(keyword)) || 
+            (s.id && s.id.toLowerCase().includes(keyword))
+        );
+        renderSignCards(filtered, container);
+        return;
+    }
 
-    filtered.forEach(sign => {
+    if (currentView === 'categories') {
+        backBtn.style.display = 'none';
+        const categories = [...new Set(processedSigns.map(s => s.category))];
+        
+        categories.forEach(cat => {
+            const representative = processedSigns.find(s => s.category === cat);
+            const card = document.createElement('div');
+            card.className = 'category-card';
+            card.innerHTML = `
+                <img src="${representative ? representative.svg_url : ''}" alt="${cat}" onerror="this.src='https://via.placeholder.com/100'">
+                <h3>${cat}</h3>
+                <p>點擊進入分類</p>
+            `;
+            card.onclick = () => {
+                selectedCategory = cat;
+                currentView = 'signs_in_category';
+                renderSigns();
+            };
+            container.appendChild(card);
+        });
+    } else if (currentView === 'signs_in_category') {
+        backBtn.style.display = 'inline-block';
+        backBtn.onclick = () => {
+            currentView = 'categories';
+            selectedCategory = null;
+            renderSigns();
+        };
+        const signsInCat = processedSigns.filter(s => s.category === selectedCategory);
+        renderSignCards(signsInCat, container);
+    } else if (currentView === 'sign_detail') {
+        backBtn.style.display = 'inline-block';
+        backBtn.onclick = () => {
+            currentView = 'signs_in_category';
+            renderSigns();
+        };
+        renderSignDetailView(selectedSignDetail, container);
+    }
+}
+
+function renderSignCards(signs, container) {
+    signs.forEach(sign => {
         const card = document.createElement('div');
         card.className = 'sign-card';
         card.innerHTML = `
             <img src="${sign.svg_url}" alt="${sign.name}" onerror="this.src='https://via.placeholder.com/100'">
             <h3>${sign.id}: ${sign.name || ''}</h3>
-            <!-- 八、 Risk Level 顯示於警告三角形下方 -->
             <span class="risk-badge">${sign.risk}</span>
             <p>Freq: ${sign.freq} | Elim: ${sign.elim}</p>
-            <button onclick="openEditModal('${sign.id}', '${sign.risk}')">編輯控制</button>
         `;
+        card.onclick = () => {
+            selectedSignDetail = sign;
+            currentView = 'sign_detail';
+            renderSigns();
+        };
         container.appendChild(card);
     });
+}
+
+function renderSignDetailView(sign, container) {
+    container.innerHTML = `
+        <div class="detail-card" style="grid-column: 1 / -1;">
+            <div style="display:flex; gap:20px; align-items:center; width:100%; margin-bottom:20px;">
+                <img src="${sign.svg_url}" alt="${sign.name}" style="width:120px;height:120px;object-fit:contain;">
+                <div>
+                    <h2>${sign.id}: ${sign.name || ''}</h2>
+                    <p><b>分類 (Category):</b> ${sign.category}</p>
+                    <p><b>風險等級 (Risk):</b> <span class="risk-badge">${sign.risk}</span></p>
+                </div>
+            </div>
+            <h3>詳細危害控制資訊</h3>
+            <div class="detail-list" style="margin-top:15px;">
+                <div class="detail-item"><b>Freq:</b> ${sign.freq || '無'}</div>
+                <div class="detail-item"><b>Elim:</b> ${sign.elim || '無'}</div>
+                <div class="detail-item"><b>Sub:</b> ${sign.sub || '無'}</div>
+                <div class="detail-item"><b>Eng:</b> ${sign.eng || '無'}</div>
+                <div class="detail-item"><b>Admin:</b> ${sign.admin || '無'}</div>
+                <div class="detail-item"><b>PPE:</b> ${sign.ppe || '無'}</div>
+            </div>
+            <button onclick="openEditModal('${sign.id}', '${sign.risk}')" style="margin-top:20px; padding:10px 20px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer;">編輯此標誌控制項</button>
+        </div>
+    `;
 }
 
 function openEditModal(signId, riskLevel) {
@@ -214,7 +288,7 @@ function openEditModal(signId, riskLevel) {
     if (!sign) return;
 
     document.getElementById('edit-sign-id').value = sign.id;
-    document.getElementById('edit-risk-level').value = sign.risk;
+    document.getElementById('edit-risk-level').value = sign.risk; // 確保與畫面三角形下方一致且唯讀
     document.getElementById('val-freq').value = sign.freq;
     document.getElementById('val-elim').value = sign.elim;
     document.getElementById('val-sub').value = sign.sub;
@@ -226,14 +300,13 @@ function openEditModal(signId, riskLevel) {
     document.getElementById('edit-modal').style.display = 'flex';
 }
 
-// 十、 送審流程
 async function handleSignSubmit(e) {
     e.preventDefault();
     const payload = {
         action: 'submitApproval',
         signId: document.getElementById('edit-sign-id').value,
         risk: document.getElementById('edit-risk-level').value,
-        field: 'all', // 可依需求指定欄位
+        field: 'all',
         value: JSON.stringify({
             freq: document.getElementById('val-freq').value,
             elim: document.getElementById('val-elim').value,
@@ -264,7 +337,6 @@ async function handleSignSubmit(e) {
     }
 }
 
-// 十一、 開啟審批 Modal 與處理審批
 async function openApprovalModal() {
     const container = document.getElementById('approval-list-container');
     container.innerHTML = '載入中...';
@@ -319,7 +391,6 @@ async function reviewApproval(timestamp, signId, risk, status) {
     }
 }
 
-// 七、 QR 掃描與解析
 function handleQRDirectOpen(id) {
     document.getElementById('search-input').value = id;
     renderSigns();
@@ -341,7 +412,6 @@ function startQRScanner() {
                     renderSigns();
                 }
             } catch {
-                // 如果直接掃描到純 ID 文字
                 html5QrCode.stop();
                 document.getElementById('mode-db').click();
                 document.getElementById('search-input').value = decodedText;
@@ -352,7 +422,6 @@ function startQRScanner() {
     ).catch(err => console.log("QR Scanner error:", err));
 }
 
-// 十三、 Excel 匯出
 function exportExcel() {
     const exportData = processedSigns.map(s => ({
         ID: s.id,
@@ -375,6 +444,5 @@ function exportExcel() {
     const pad = n => String(n).padStart(2, '0');
     const timestampStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
     
-    // 檔名格式：ISO7010_Database_YYYYMMDD_HHMMSS.xlsx
     XLSX.writeFile(workbook, `ISO7010_Database_${timestampStr}.xlsx`);
 }
