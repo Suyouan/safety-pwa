@@ -1,37 +1,118 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO7010 安全標誌管理系統</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <!-- 頂部導覽列 -->
-    <header id="main-header">
-        <h1 id="header-title">ISO7010 安全標誌管理系統</h1>
-        <div id="header-actions">
-            <span id="pending-badge" style="display:none;">待審批: 0</span>
-        </div>
-    </header>
+// 全域狀態管理
+let state = {
+    signsData: [],          // 存放所有標誌資料（含展開後的W類）
+    isExpanded: false,      // 防重複展開旗標
+    isAdmin: false,         // 管理員登入狀態
+    pendingCount: 0         // 待審批數量
+};
 
-    <!-- 主要內容動態容器 (SPA 視圖) -->
-    <main id="app-container">
-        <!-- 載入中畫面 -->
-        <div id="loading-view" class="view active">
-            <p>正在載入系統資料，請稍候...</p>
-        </div>
-    </main>
+// 1. 系統啟動流程
+async function initApp() {
+    console.log("系統啟動中...");
+    initI18n();
+    setupEventListeners();
+    setupHeaderAdminLogin(); // 綁定管理員登入按鈕
+    
+    // 載入並初始化資料
+    await fetchSignsFromSheet();
+    
+    // 啟動背景輪詢
+    startPolling();
+}
 
-    <!-- 審批 Modal -->
-    <div id="approval-modal" class="modal" style="display:none;">
-        <div class="modal-content">
-            <h2>管理員審批後台</h2>
-            <div id="approval-list"></div>
-            <button id="close-modal-btn">關閉</button>
-        </div>
-    </div>
+// 2. 抓取主表並進行初次展開（確保只執行一次）
+async function fetchSignsFromSheet() {
+    try {
+        // 模擬從 GAS 或 Sheet 取得原始資料
+        let rawData = await callGasAPI('getSigns'); 
+        
+        if (!state.isExpanded) {
+            // 初次載入：執行 W 類展開
+            state.signsData = expandWSigns(rawData);
+            state.isExpanded = true; // 設置旗標，絕不重複展開
+        } else {
+            // 後續更新：僅更新數值，不重新展開
+            updateSignsData(rawData);
+        }
+        
+        renderTable(state.signsData);
+    } catch (error) {
+        console.error("載入資料失敗", error);
+    }
+}
 
-    <script src="app.js"></script>
-</body>
-</html>
+// W 類展開邏輯 (Category = 'Warning sign' 展開為 Risk 1 ~ Risk 4)
+function expandWSigns(data) {
+    let expandedList = [];
+    data.forEach(sign => {
+        if (sign.category === 'Warning sign') {
+            for (let i = 1; i <= 4; i++) {
+                expandedList.push({
+                    ...sign,
+                    riskLevel: `Risk ${i}`,
+                    uniqueKey: `${sign.id}_Risk${i}` // 唯一鍵 = ID + Risk
+                });
+            }
+        } else {
+            expandedList.push({
+                ...sign,
+                riskLevel: 'N/A',
+                uniqueKey: `${sign.id}_Normal`
+            });
+        }
+    });
+    return expandedList;
+}
+
+// 3. 背景自動同步機制 (Polling)
+function startPolling() {
+    // 每 10 秒同步 GAS 資料 (套用已展開結構)
+    setInterval(async () => {
+        await fetchGASDataSilently();
+    }, 10000);
+
+    // 每 15 秒同步待審批數量
+    setInterval(async () => {
+        await fetchPendingCount();
+    }, 15000);
+}
+
+// 4. 雙擊危害框格之雙模互動邏輯 (Dual-Mode)
+function handleCellDoubleClick(signId, riskLevel, field) {
+    if (state.isAdmin) {
+        // 【管理員模式】直接修改資料
+        let newValue = prompt("【管理員模式】請輸入要直接修改的新數值：");
+        if (newValue !== null) {
+            directUpdateData(signId, riskLevel, field, newValue);
+        }
+    } else {
+        // 【一般使用者模式】純輸入並送審 (PENDING)
+        let inputValue = prompt("請輸入該框格的新資料：");
+        if (inputValue) {
+            submitForApproval(signId, riskLevel, field, inputValue);
+        }
+    }
+}
+
+// 5. 管理員登入與自動彈出審批
+function setupHeaderAdminLogin() {
+    const loginBtn = document.getElementById('admin-login-btn'); // 假設右上角按鈕ID
+    loginBtn.addEventListener('click', async () => {
+        let pwd = prompt("請輸入管理員密碼：");
+        if (pwd === "0") {
+            state.isAdmin = true;
+            alert("管理員登入成功！");
+            
+            // 登入後檢查是否有 PENDING 資料，有則優先彈出 Modal
+            let pendingData = await checkPendingApprovals();
+            if (pendingData.length > 0) {
+                openApprovalModal(pendingData);
+            }
+        } else {
+            alert("密碼錯誤！");
+        }
+    });
+}
+
+// 當網頁載入完成後自動觸發系統啟動
+window.addEventListener('DOMContentLoaded', initApp);
