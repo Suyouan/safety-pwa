@@ -1,884 +1,1598 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>安全文化與意識</title>
-  
-  <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22%E5%AE%89%E5%85%A8%E6%96%87%E5%8C%96%E8%88%87%E6%84%8F%E8%AD%98%22%2C%22short_name%22%3A%22%E5%AE%89%E5%85%A8%E6%A8%99%E8%AA%8C%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f3f4f6%22%2C%22theme_color%22%3A%22%231f2937%22%7D">
-  <meta name="theme-color" content="#1f2937">
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
 
-  <style>
-    .no-zoom { touch-action: manipulation; }
-    .smooth-update { transition: all 0.3s ease-in-out; }
-    .no-select {
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-    }
-    #reader video {
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
-    }
-    .truncate-text {
-      white-space: nowrap; 
-      overflow: hidden; 
-      text-overflow: ellipsis; 
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>ISO7010 Safety PWA</title>
+
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+<script src0.0/qrcode.min.js"></script>
+
+<script src="https://unpkglsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+    background:#f5f5f5;
+    margin:0;
+    padding:0;
+}
+
+.sign-card{
+    background:white;
+    border-radius:12px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+
+.risk-level{
+    font-size:20px;
+    font-weight:bold;
+    color:#d97706;
+}
+
+.editable:hover{
+    background:#eef;
+    cursor:pointer;
+}
+
+.modal-bg{
+    position:fixed;
+    left:0;
+    top:0;
+    width:100%;
+    height:100%;
+    background:rgba(0,0,0,.55);
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:9999;
+}
+
+.modal-panel{
+    background:white;
+    width:90%;
+    max-width:900px;
+    max-height:90vh;
+    overflow:auto;
+    border-radius:10px;
+    padding:20px;
+}
+
+.badge{
+    background:red;
+    color:white;
+    border-radius:999px;
+    padding:2px 8px;
+    font-size:12px;
+}
+
+</style>
+
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
 
-  <!-- Header -->
-  <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
-    <div class="flex items-center space-x-3 cursor-pointer select-none no-select" id="header-title-container" title="長按3秒進入審批流程">
-      <h1 id="app-title" class="text-xl font-bold tracking-wide hover:text-blue-400 transition">
-        安全文化與意識
-      </h1>
-      <!-- 待審批數量 Badge -->
-      <span id="pending-badge" class="hidden bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse shadow-sm">
-        0 待審
-      </span>
+<body>
+
+<!-- HEADER -->
+
+<div class="bg-blue-600 text-white p-4 flex justify-between items-center">
+
+    <div id="header-title-container">
+        <h1 class="text-xl font-bold">
+            ISO7010 Safety
+        </h1>
     </div>
 
-    <div class="flex items-center space-x-2">
-      <label for="lang-select" class="text-sm hidden sm:inline">語言 / Lang:</label>
-      <select id="lang-select" class="bg-gray-800 text-white text-sm border border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <option value="zh" selected>繁體中文</option>
-        <option value="en">English</option>
-        <option value="de">Deutsch</option>
-      </select>
-    </div>
-  </header>
+    <div class="flex gap-2">
 
-  <!-- Main Content -->
-  <main class="flex-grow container mx-auto px-4 py-6 max-w-4xl">
-    <div class="grid grid-cols-3 gap-4 mb-8">
-      <button id="btn-text-search" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-blue-500 group">
-        <span class="text-3xl font-extrabold text-blue-600 group-hover:scale-110 transition">T</span>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_text_search">文字搜尋</span>
-      </button>
+        <select id="langSelector" class="text-black px-2 rounded">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+        </select>
 
-      <button id="btn-camera" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-green-500 group">
-        <svg class="w-8 h-8 text-green-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_camera">掃描 QR</span>
-      </button>
+        <button id="databaseBtn"
+            class="bg-white text-blue-600 px-3 rounded">
+            Database
+        </button>
 
-      <button id="btn-database" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-purple-500 group">
-        <svg class="w-8 h-8 text-purple-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8-1.79-8-4"></path>
-        </svg>
-        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_database">資料庫</span>
-      </button>
+        <button id="scanBtn"
+            class="bg-white text-blue-600 px-3 rounded">
+            Scan QR
+        </button>
+
+        <button id="exportBtn"
+            class="bg-green-500 px-3 rounded">
+            XLSX
+        </button>
+
+        <div id="pendingBadge"
+             class="badge">
+             0
+        </div>
+
     </div>
 
-    <!-- Navigation Bar (Breadcrumb & Back Button) -->
-    <div id="nav-bar-container" class="mb-4 flex items-center justify-between bg-white px-4 py-2 rounded-xl shadow-sm border hidden">
-      <div id="breadcrumb-container" class="text-sm text-gray-500"></div>
-      <button id="btn-back-step" class="text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition flex items-center space-x-1">
-        <span>← 返回上一步</span>
-      </button>
-    </div>
+</div>
 
-    <div id="content-area" class="w-full">
-      <div class="text-center py-12 text-gray-500 font-medium">資料庫同步載入中...</div>
-    </div>
-  </main>
+<!-- SEARCH -->
 
-  <!-- Search Modal -->
-  <div id="modal-search" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-      <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_search_title">輸入標誌流水編號</h3>
-      <input type="text" id="search-input" placeholder="例: W-HighVoltage-(2)" class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-      <div class="flex justify-end space-x-3">
-        <button id="btn-search-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" data-i18n="cancel">取消</button>
-        <button id="btn-search-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" data-i18n="confirm">確認</button>
-      </div>
-    </div>
-  </div>
+<div class="p-4">
 
-  <!-- Camera Modal -->
-  <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
-      <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold z-10">&times;</button>
-      <h3 class="text-lg font-bold mb-3 text-gray-900" data-i18n="modal_camera_title">掃描 ISO 7010 QR-Code</h3>
-      <div id="reader" class="w-full h-80 bg-black rounded-lg overflow-hidden relative"></div>
-      <p id="camera-status" class="text-xs text-gray-500 mt-3" data-i18n="camera_status_hint">請對準標誌上的 QR-Code</p>
-    </div>
-  </div>
+<input
+id="searchInput"
+type="text"
+placeholder="Search..."
+class="border p-2 w-full rounded">
 
-  <!-- Approval Modal -->
-  <div id="modal-approval" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
-      <div class="flex justify-between items-center mb-4 border-b pb-3">
-        <h3 class="text-xl font-bold text-gray-900" data-i18n="admin_approval_title">後台審批矩陣 (管理員)</h3>
-        <button id="btn-approval-close" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
-      </div>
-      <div id="approval-list" class="flex-grow overflow-y-auto space-y-3 p-1"></div>
-    </div>
-  </div>
+</div>
 
-  <!-- Detail Modal -->
-  <div id="modal-detail" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-      <h3 id="modal-detail-title" class="text-lg font-bold mb-2 text-gray-900">詳細資訊</h3>
-      <div id="modal-detail-content" class="text-sm text-gray-700 whitespace-pre-wrap max-h-60 overflow-y-auto bg-gray-50 p-3 rounded-lg border mb-4"></div>
-      <div class="flex justify-end">
-        <button id="btn-detail-close" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition" data-i18n="close">關閉</button>
-      </div>
-    </div>
-  </div>
+<!-- MAIN -->
 
-  <script>
-    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
+<div id="mainContent"
+     class="p-4">
 
-    let isoSignsData = []; 
-    let totalDatabaseMap = {}; // 總資料庫映射 (對應 GAS GET_TOTAL_DATA)
-    let lastSignature = "";    // 防閃頻簽章
-    let currentLang = "zh";
+</div>
 
-    const i18nDict = {
-      zh: {
-        app_title: "安全文化與意識",
-        nav_text_search: "文字搜尋",
-        nav_camera: "掃描 QR",
-        nav_database: "資料庫",
-        modal_search_title: "輸入標誌流水編號",
-        modal_camera_title: "掃描 ISO 7010 QR-Code",
-        admin_approval_title: "後台審批矩陣 (管理員)",
-        cancel: "取消", confirm: "確認", close: "關閉", approve: "通過", reject: "拒絕",
-        camera_status_hint: "請對準標誌上的 QR-Code",
-        not_found: "找不到符合該流水號的標誌資訊！",
-        double_click_hint: "雙擊框格編輯提交",
-        fields: {
-          freq: "發生頻率", elim: "消除", sub: "取代", eng: "工程管制", admin: "行政管制", ppe: "個人防護用具", risk: "風險等級"
-        }
-      },
-      en: {
-        app_title: "Safety Culture & Awareness",
-        nav_text_search: "Search ID", nav_camera: "Scan QR", nav_database: "Database",
-        modal_search_title: "Enter Sign Serial ID", modal_camera_title: "Scan ISO 7010 QR-Code", admin_approval_title: "Approval Workflow (Admin)",
-        cancel: "Cancel", confirm: "Confirm", close: "Close", approve: "Approve", reject: "Reject",
-        camera_status_hint: "Align QR-Code within frame", not_found: "No matching sign found for this Serial ID!", double_click_hint: "Double click to edit & submit",
-        fields: {
-          freq: "Frequency", elim: "Elimination", sub: "Substitution", eng: "Engineering Controls", admin: "Administrative Controls", ppe: "PPE", risk: "Risk Level"
-        }
-      },
-      de: {
-        app_title: "Sicherheitskultur & Bewusstsein",
-        nav_text_search: "ID Suchen", nav_camera: "QR Scannen", nav_database: "Datenbank",
-        modal_search_title: "Sicherheits-ID Eingeben", modal_camera_title: "ISO 7010 QR-Code Scannen", admin_approval_title: "Genehmigungsmatrix (Admin)",
-        cancel: "Cancel", confirm: "Bestätigen", close: "Schließen", approve: "Genehmigen", reject: "Ablehnen",
-        camera_status_hint: "Richten Sie den QR-Code aus", not_found: "Kein Übereinstimmendes Schild Gefunden!", double_click_hint: "Doppelklick zum Bearbeiten",
-        fields: {
-          freq: "Häufigkeit", elim: "Beseitigung", sub: "Substitution", eng: "Technische Kontrollen", admin: "Organisatorische Maßnahmen", ppe: "PSA", risk: "Risikostufe"
-        }
-      }
-    };
+<!-- DATABASE VIEW -->
 
-    let currentViewMode = "DATABASE"; 
-    let activeCategory = null;
-    let activeSignId = "";
-    let html5QrCode = null;
+<div
+id="databaseView"
+class="hidden p-4">
 
-    document.addEventListener("DOMContentLoaded", async () => {
-      initI18n();
-      setupEventListeners();
-      setupHeaderLongPress();
-      
-      // 初始化載入
-      await fetchSignsFromSheet();
-      await syncTotalData();
-      fetchPendingCount();
-    });
+<div id="signGrid"
+     class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
 
-    function normalizeCategory(rawCat) {
-      if (!rawCat) return "General sign";
-      const c = rawCat.toString().trim().toUpperCase();
-      if (c.startsWith("P") || c.includes("PROHIBITION") || c.includes("禁止")) return "Prohibition sign";
-      if (c.startsWith("W") || c.includes("WARNING") || c.includes("警告")) return "Warning sign";
-      if (c.startsWith("M") || c.includes("MANDATORY") || c.includes("強制")) return "Mandatory action sign";
-      if (c.startsWith("S") || c.includes("SAFE") || c.includes("安全")) return "Safe condition sign";
-      return rawCat; 
+</div>
+
+</div>
+
+<!-- QR SCANNER -->
+
+<div id="qrReaderContainer"
+     class="hidden p-4">
+
+<div id="qr-reader"></div>
+
+</div>
+
+<!-- APPROVAL MODAL -->
+
+<div
+id="approvalModal"
+class="modal-bg">
+
+<div class="modal-panel">
+
+<div class="flex justify-between">
+
+<h2 class="font-bold text-xl">
+Pending Approvals
+</h2>
+
+<button id="closeApprovalBtn">
+✕
+</button>
+
+</div>
+
+<hr class="my-4">
+
+<div id="approvalList"></div>
+
+</div>
+
+</div>
+
+<script>
+
+/****************************************
+CONFIG
+****************************************/
+
+const GAS_WEB_APP_URL =
+"https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec";
+
+/****************************************
+GLOBAL STATES
+****************************************/
+
+let isoSignsData = [];
+
+let dynamicSubDirectories = [];
+
+let currentViewMode = "DATABASE";
+
+let activeSignId = null;
+
+let currentLang = "zh";
+
+let lastDataSnapshot = "";
+
+let qrScanner = null;
+
+/****************************************
+I18N
+****************************************/
+
+const i18nDict = {
+
+zh:{
+risk:"風險等級",
+database:"資料庫",
+search:"搜尋"
+},
+
+en:{
+risk:"Risk Level",
+database:"Database",
+search:"Search
+/****************************************
+FETCH ISO DATA
+****************************************/
+
+async function fetchSignsFromSheet(){
+
+    try{
+
+        const res = await fetch(
+            `${GAS_WEB_APP_URL}?action=SIGNS`
+        );
+
+        isoSignsData = await res.json();
+
+    }catch(err){
+
+        console.error(err);
+
     }
 
-    async function fetchSignsFromSheet() {
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_SIGNS`);
-        const result = await res.json();
-        
-        if (result.status === "success" && result.data.length > 0) {
-          const rawData = result.data;
-          isoSignsData = [];
+}
 
-          rawData.forEach(item => {
-            const standardizedCat = normalizeCategory(item.category);
-            const isWarning = (standardizedCat === "Warning sign" || item.category?.toString().toUpperCase().startsWith("W"));
-            
-            if (isWarning) {
-              for (let f = 1; f <= 4; f++) {
-                isoSignsData.push({
-                  id: `${item.id}-(${f})`,
-                  originalId: item.id,
-                  category: standardizedCat,
-                  meaning: item.meaning,
-                  level: item.level || null,
-                  freq: f.toString(),
-                  hazard_control: item.hazard_control || "",
-                  name: {
-                    zh: (item.name_zh || item.id) + ` (頻率 ${f})`,
-                    en: (item.name_en || item.id) + ` (Freq ${f})`,
-                    de: (item.name_de || item.id) + ` (Freq ${f})`
-                  },
-                  svgUrl: item.svg_url
+/****************************************
+EXPAND W SIGNS
+****************************************/
+
+function expandWSigns(){
+
+    const expanded = [];
+
+    isoSignsData.forEach(sign=>{
+
+        if(
+            sign.category &&
+            sign.category.trim() === "Warning sign"
+        ){
+
+            for(let risk=1;risk<=4;risk++){
+
+                expanded.push({
+                    ...sign,
+                    risk:risk.toString()
                 });
-              }
-            } else {
-              isoSignsData.push({
-                id: item.id,
-                originalId: item.id,
-                category: standardizedCat,
-                meaning: item.meaning,
-                level: item.level || null,
-                freq: item.freq || "1",
-                hazard_control: item.hazard_control || "",
-                name: {
-                  zh: item.name_zh || item.id,
-                  en: item.name_en || item.id,
-                  de: item.name_de || item.id
+
+            }
+
+        }else{
+
+            expanded.push(sign);
+
+        }
+
+    });
+
+    isoSignsData = expanded;
+
+}
+
+/****************************************
+LOAD APPROVED DATA
+****************************************/
+
+async function fetchGASData(){
+
+    try{
+
+        const res =
+        await fetch(
+            `${GAS_WEB_APP_URL}?action=APPROVED`
+        );
+
+        dynamicSubDirectories =
+        await res.json();
+
+        mergeApprovedData();
+
+    }
+    catch(err){
+
+        console.error(err);
+
+    }
+
+}
+
+/****************************************
+MERGE APPROVED DATA
+****************************************/
+
+function mergeApprovedData(){
+
+    const snapshot =
+    JSON.stringify(dynamicSubDirectories);
+
+    if(snapshot === lastDataSnapshot){
+
+        return;
+
+    }
+
+    lastDataSnapshot = snapshot;
+
+    isoSignsData.forEach(sign=>{
+
+        dynamicSubDirectories.forEach(item=>{
+
+            if(
+                item.ID === sign.id &&
+                item.Risk === String(sign.risk)
+            ){
+
+                sign[item.Field] =
+                item.Value;
+
+            }
+
+        });
+
+    });
+
+    if(currentViewMode==="DATABASE"){
+
+        renderDatabase();
+
+    }else{
+
+        renderSingleSign(
+            activeSignId
+        );
+
+    }
+
+}
+
+/****************************************
+RENDER DATABASE
+****************************************/
+
+function renderDatabase(){
+
+    currentViewMode =
+    "DATABASE";
+
+    document
+        .getElementById("databaseView")
+        .classList.remove("hidden");
+
+    document
+        .getElementById("mainContent")
+        .innerHTML = "";
+
+    const grid =
+    document.getElementById(
+        "signGrid"
+    );
+
+    grid.innerHTML = "";
+
+    isoSignsData.forEach(sign=>{
+
+        const card =
+        document.createElement("div");
+
+        card.className =
+        "sign-card p-2 cursor-pointer";
+
+        card.innerHTML = `
+            ${sign.svg_url}
+
+            <div class="mt-2 text-center">
+
+                <div class="
+                    font-bold
+                    text-sm">
+
+                    ${sign.id}
+                </div>
+
+                <div class="
+                    text-xs
+                    mt-1">
+
+                    ${sign.name}
+                </div>
+
+                ${
+                    sign.category==="Warning sign"
+                    ?
+                    `<div class="risk-level">
+                        Risk ${sign.risk}
+                     </div>`
+                    :
+                    ""
+                }
+
+            </div>
+        `;
+
+        card.onclick = ()=>{
+
+            renderSingleSign(
+                sign.id,
+                sign.risk
+            );
+
+        };
+
+        grid.appendChild(card);
+
+    });
+
+}
+
+/****************************************
+RENDER SINGLE SIGN
+****************************************/
+
+function renderSingleSign(
+    id,
+    risk=null
+){
+
+    currentViewMode =
+    "SINGLE";
+
+    activeSignId = id;
+
+    document
+      .getElementById(
+        "databaseView"
+      )
+      .classList.add("hidden");
+
+    const sign =
+    isoSignsData.find(s=>{
+
+        if(risk){
+
+            return (
+                s.id===id &&
+                String(s.risk)===String(risk)
+            );
+
+        }
+
+        return s.id===id;
+
+    });
+
+    if(!sign){
+
+        return;
+
+    }
+
+    let riskHtml = "";
+
+    if(
+        sign.category==="Warning sign"
+    ){
+
+        riskHtml = `
+            <div class="
+                text-center mt-4">
+
+                <div class="
+                    risk-level">
+
+                    ${
+                        i18nDict[currentLang]
+                        .risk
+                    }
+                    ${sign.risk}
+
+                </div>
+
+            </div>
+        `;
+
+    }
+
+    document
+      .getElementById(
+          "mainContent"
+      )
+      .innerHTML = `
+
+    <div class="
+        sign-card p-6">
+
+        <div class="
+             flex justify-center">
+
+            ${sign.svg_url}
+
+        </div>
+
+        ${riskHtml}
+
+        <div class="
+             text-center
+             font-bold
+             text-2xl
+             mt-4">
+
+             ${sign.id}
+
+        </div>
+
+        <div class="
+             text-center
+             mt-2">
+
+             ${sign.name}
+
+        </div>
+
+        <div class="
+             mt-6
+             grid
+             gap-2">
+
+             ${renderControlField(
+                sign,
+                'freq',
+                'Frequency'
+             )}
+
+             ${renderControlField(
+                sign,
+                'elim',
+                'Elimination'
+             )}
+
+             ${renderControlField(
+                sign,
+                'sub',
+                'Substitution'
+             )}
+
+             ${renderControlField(
+                sign,
+                'eng',
+                'Engineering'
+             )}
+
+             ${renderControlField(
+                sign,
+                'admin',
+                'Administrative'
+             )}
+
+             ${renderControlField(
+                sign,
+                'ppe',
+                'PPE'
+             )}
+
+        </div>
+
+    </div>
+
+    `;
+
+}
+
+/****************************************
+FIELD UI
+****************************************/
+
+function renderControlField(
+    sign,
+    field,
+    title
+){
+
+    return `
+        <div
+        class="
+          editable
+          border
+          p-3
+          rounded"
+        ondblclick=
+        "editField(
+            '${sign.id}',
+            '${sign.risk}',
+            '${field}'
+        )">
+
+            <b>${title}</b>
+
+            <div>
+
+            ${
+              sign[field] || ""
+            }
+
+            </div>
+
+        </div>
+    `;
+
+}
+
+/****************************************
+SEARCH
+****************************************/
+
+function searchSigns(keyword){
+
+    keyword =
+    keyword.toLowerCase();
+
+    const result =
+    isoSignsData.filter(sign=>{
+
+        return (
+
+          sign.id
+          .toLowerCase()
+          .includes(keyword)
+
+          ||
+
+          sign.name
+          .toLowerCase()
+          .includes(keyword)
+
+        );
+
+    });
+
+    const grid =
+    document.getElementById(
+        "signGrid"
+    );
+
+    grid.innerHTML = "";
+
+    result.forEach(sign=>{
+
+        const div =
+        document.createElement("div");
+
+        div.className =
+        "sign-card p-2";
+
+        div.innerHTML = `
+            ${sign.svg_url}
+
+            <div class="text-center">
+
+                ${sign.id}
+
+            </div>
+        `;
+
+        div.onclick=()=>{
+
+            renderSingleSign(
+                sign.id,
+                sign.risk
+            );
+
+        };
+
+        grid.appendChild(div);
+
+    });
+
+}
+
+/****************************************
+URL PARSE
+****************************************/
+
+function parseUrlSign(){
+
+    const params =
+    new URLSearchParams(
+        window.location.search
+    );
+
+    const id =
+    params.get("id");
+
+    if(!id){
+
+        return;
+
+    }
+
+    const sign =
+    isoSignsData.find(
+      x=>x.id===id
+    );
+
+    if(sign){
+
+        renderSingleSign(
+            sign.id,
+            sign.risk
+        );
+
+    }
+
+}
+
+  /****************************************
+EDIT FIELD
+****************************************/
+
+async function editField(
+    signId,
+    risk,
+    field
+){
+
+    const sign =
+    isoSignsData.find(s=>
+
+        s.id===signId &&
+        String(s.risk)===String(risk)
+
+    );
+
+    if(!sign){
+
+        return;
+
+    }
+
+    const currentValue =
+    sign[field] || "";
+
+    const newValue =
+    prompt(
+        `Edit ${field}`,
+        currentValue
+    );
+
+    if(
+        newValue===null
+    ){
+        return;
+    }
+
+    const applicant =
+    prompt(
+        "Applicant Name",
+        ""
+    );
+
+    if(
+        !applicant
+    ){
+        return;
+    }
+
+    if(
+        !confirm(
+        "Submit Change Request?"
+        )
+    ){
+        return;
+    }
+
+    await submitRequest({
+        signId,
+        risk,
+        field,
+        value:newValue,
+        applicant
+    });
+
+}
+
+/****************************************
+SUBMIT REQUEST
+****************************************/
+
+async function submitRequest(
+    payload
+){
+
+    try{
+
+        const res =
+        await fetch(
+            GAS_WEB_APP_URL,
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":
+                    "application/json"
                 },
-                svgUrl: item.svg_url
-              });
+                body:JSON.stringify({
+
+                    action:"SUBMIT",
+
+                    ...payload
+
+                })
             }
-          });
+        );
 
-          if (!activeSignId && isoSignsData.length > 0) {
-            activeSignId = isoSignsData[0].id;
-          }
-          renderCurrentView();
+        const result =
+        await res.json();
+
+        if(result.success){
+
+            alert(
+              "Submitted"
+            );
+
+            await fetchGASData();
+
+            await fetchPendingCount();
+
         }
-      } catch (err) {
-        console.error("載入 Signs 清單失敗:", err);
-      }
+
+    }
+    catch(err){
+
+        console.error(err);
+
+        alert(
+          "Submit Failed"
+        );
+
     }
 
-    // 防閃頻資料同步函數 (串接 GAS GET_TOTAL_DATA)
-    async function syncTotalData() {
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?action=GET_TOTAL_DATA&_t=${new Date().getTime()}`);
-        const result = await res.json();
-        if (result.status === "success" && result.data) {
-          const newSignature = JSON.stringify(result.data);
-          
-          if (lastSignature !== newSignature) {
-            totalDatabaseMap = result.data;
-            lastSignature = newSignature;
-            
-            // 如果目前在單一檢視畫面，使用局部無感更新；否則重新渲染
-            if (currentViewMode === "SINGLE") {
-              updateActiveFieldsSilently();
-            } else {
-              renderCurrentView();
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("取得總資料庫失敗:", e);
-      }
+}
+
+/****************************************
+PENDING COUNT
+****************************************/
+
+async function fetchPendingCount(){
+
+    try{
+
+        const res =
+        await fetch(
+            `${GAS_WEB_APP_URL}?action=PENDINGCOUNT`
+        );
+
+        const data =
+        await res.json();
+
+        document
+        .getElementById(
+            "pendingBadge"
+        )
+        .innerText =
+        data.count || 0;
+
+    }
+    catch(err){
+
+        console.error(err);
+
     }
 
-    // 區域無感更新 (避免畫面閃頻)
-    function updateActiveFieldsSilently() {
-      const activeCard = document.querySelector(`[data-sign-id="${activeSignId}"]`);
-      if (!activeCard) {
-        renderCurrentView();
-        return;
-      }
-      
-      const rowData = totalDatabaseMap[activeSignId] || {};
-      document.querySelectorAll(`[data-sign-id="${activeSignId}"]`).forEach(el => {
-        const key = el.getAttribute("data-field-key");
-        if (!key) return;
-        
-        let newVal = rowData[key] || "";
-        if (!newVal && key === "risk") {
-          const match = activeSignId.match(/\((\d)\)/);
-          newVal = match ? match[1] : "N/A";
-        }
-        
-        const textContainer = el.querySelector(".truncate-text");
-        if (textContainer) {
-          const isOverflow = newVal.length > 25;
-          const truncated = isOverflow ? newVal.substring(0, 25) + "..." : newVal || "-";
-          textContainer.innerHTML = `${truncated}${isOverflow ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(newVal)}">[...]</button>` : ''}`;
-        }
-        el.setAttribute("data-full-text", encodeURIComponent(newVal));
-      });
-      bindSubFieldEvents();
+}
+
+/****************************************
+OPEN APPROVAL MODAL
+****************************************/
+
+async function openApprovalModal(){
+
+    try{
+
+        document
+          .getElementById(
+             "approvalModal"
+          )
+          .style.display =
+          "flex";
+
+        const res =
+        await fetch(
+            `${GAS_WEB_APP_URL}?action=PENDING`
+        );
+
+        const data =
+        await res.json();
+
+        renderPendingList(
+            data
+        );
+
+    }
+    catch(err){
+
+        console.error(err);
+
     }
 
-    async function fetchPendingCount() {
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING&_t=${new Date().getTime()}`, { method: "GET", redirect: "follow" });
-        const result = await res.json();
-        const badge = document.getElementById("pending-badge");
-        if (result.status === "success" && Array.isArray(result.data)) {
-          const count = result.data.length;
-          if (count > 0) {
-            badge.textContent = `${count} 待審`;
-            badge.classList.remove("hidden");
-          } else {
-            badge.classList.add("hidden");
-          }
-        }
-      } catch (e) {
-        console.warn("無法取得待審批數量:", e);
-      }
-    }
+}
 
-    function initI18n() {
-      document.getElementById("lang-select").addEventListener("change", (e) => {
-        currentLang = e.target.value;
-        updatePageLanguage();
-      });
-    }
+/****************************************
+PENDING UI
+****************************************/
 
-    function updatePageLanguage() {
-      const dict = i18nDict[currentLang];
-      document.getElementById("app-title").textContent = dict.app_title;
-      document.querySelectorAll("[data-i18n]").forEach(el => {
-        const key = el.getAttribute("data-i18n");
-        if (dict[key]) el.textContent = dict[key];
-      });
-      renderCurrentView();
-    }
+function renderPendingList(
+    rows
+){
 
-    function renderCurrentView() {
-      const container = document.getElementById("content-area");
-      const navBarContainer = document.getElementById("nav-bar-container");
-      const breadcrumb = document.getElementById("breadcrumb-container");
-      container.innerHTML = "";
+    const container =
+    document.getElementById(
+        "approvalList"
+    );
 
-      if (currentViewMode === "DATABASE") {
-        navBarContainer.classList.add("hidden");
-        renderDatabaseCategories(container);
-      } else if (currentViewMode === "CATEGORY_LIST") {
-        navBarContainer.classList.remove("hidden");
-        breadcrumb.innerHTML = `<span class="cursor-pointer text-blue-600 hover:underline" id="bc-home">資料庫</span> &gt; <span class="font-bold text-gray-700">${activeCategory}</span>`;
-        document.getElementById("bc-home").addEventListener("click", () => {
-          currentViewMode = "DATABASE";
-          renderCurrentView();
-        });
-        renderCategorySignsList(container, activeCategory);
-      } else if (currentViewMode === "SINGLE") {
-        navBarContainer.classList.remove("hidden");
-        breadcrumb.innerHTML = `<span class="cursor-pointer text-blue-600 hover:underline" id="bc-home">資料庫</span> &gt; <span class="cursor-pointer text-blue-600 hover:underline" id="bc-cat">${activeCategory}</span> &gt; <span class="font-bold text-gray-700">${activeSignId}</span>`;
-        document.getElementById("bc-home").addEventListener("click", () => {
-          currentViewMode = "DATABASE";
-          renderCurrentView();
-        });
-        document.getElementById("bc-cat").addEventListener("click", () => {
-          currentViewMode = "CATEGORY_LIST";
-          renderCurrentView();
-        });
-        renderSingleSignDetail(container, activeSignId);
-      }
-    }
+    container.innerHTML="";
 
-    function handleBackStep() {
-      if (currentViewMode === "SINGLE") {
-        currentViewMode = "CATEGORY_LIST";
-        renderCurrentView();
-      } else if (currentViewMode === "CATEGORY_LIST") {
-        currentViewMode = "DATABASE";
-        renderCurrentView();
-      } else {
-        currentViewMode = "DATABASE";
-        renderCurrentView();
-      }
-    }
+    rows.forEach(row=>{
 
-    function renderDatabaseCategories(container) {
-      const groups = {};
-      const targetCategories = ["Prohibition sign", "Warning sign", "Mandatory action sign", "Safe condition sign"];
-      targetCategories.forEach(cat => { groups[cat] = []; });
+        const item =
+        document.createElement(
+            "div"
+        );
 
-      isoSignsData.forEach(sign => {
-        const cat = sign.category;
-        if (!groups[cat]) groups[cat] = [];
-        groups[cat].push(sign);
-      });
+        item.className =
+        "border p-3 rounded mb-3";
 
-      const grid = document.createElement("div");
-      grid.className = "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4";
-
-      Object.keys(groups).forEach(cat => {
-        const items = groups[cat];
-        if (items.length === 0) return;
-
-        const representative = items[0];
-        // --- [核心修改開始] 清洗代表名稱並加上正確的風險等級 ---
-        let rawRepName = representative.name[currentLang] || representative.name.zh;
-        let cleanRepName = rawRepName
-          .replace(/\s*[\(\（]頻率\s*\d+[\)\）]/gi, "")
-          .replace(/\s*[\(\（]風險等級[：:]\s*\d+[\)\）]/gi, "");
-
-        // 如果是 Warning sign，取得它的對應風險等級
-        const isWarningCat = (cat === "Warning sign");
-        const rowData = totalDatabaseMap[representative.id] || {};
-        const autoRisk = representative.level || (representative.id.match(/\((\d)\)/) ? representative.id.match(/\((\d)\)/)[1] : "1");
-        const repRiskVal = rowData["risk"] || autoRisk;
-
-        const repName = isWarningCat ? `${cleanRepName} (風險等級：${repRiskVal})` : cleanRepName;
-        // --- [核心修改結束] ---
-        
-        const item = document.createElement("div");
-        item.className = "bg-white p-5 rounded-xl shadow border border-gray-100 flex items-center space-x-4 hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
-        
         item.innerHTML = `
-          <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-50 rounded-lg p-1 border">
-            <img src="${representative.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${cat}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:folder-outline.svg';">
-          </div>
-          <div class="flex-grow">
-            <h4 class="font-bold text-gray-900 text-base">${cat}</h4>
-            <p class="text-xs text-gray-500 mt-1">代表: ${repName}</p>
-            <span class="inline-block mt-2 text-[10px] text-purple-600 font-semibold bg-purple-50 px-2 py-0.5 rounded-full">共 ${items.length} 項標誌</span>
-          </div>
-        `;
 
-        item.addEventListener("click", () => {
-          activeCategory = cat;
-          currentViewMode = "CATEGORY_LIST";
-          renderCurrentView();
-        });
+            <div>
 
-        grid.appendChild(item);
-      });
+                <b>
+                ${row.signId}
+                </b>
 
-      container.appendChild(grid);
-    }
+                ${
+                  row.risk
+                  ?
+                  `(Risk ${row.risk})`
+                  :
+                  ''
+                }
 
-    function renderCategorySignsList(container, categoryName) {
-      const signsInCat = isoSignsData.filter(s => s.category === categoryName);
-      const grid = document.createElement("div");
-      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
-
-      signsInCat.forEach(sign => {
-        const signName = sign.name[currentLang] || sign.name.zh;
-        const item = document.createElement("div");
-        item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-blue-300 group";
-        
-        item.innerHTML = `
-          <div class="w-16 h-16 flex items-center justify-center mb-1">
-            <img src="${sign.svgUrl}" class="w-full h-full object-contain group-hover:scale-105 transition" alt="${signName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-circle-outline.svg';">
-          </div>
-          <span class="mt-2 font-bold text-gray-800 text-sm line-clamp-2">${signName}</span>
-          <span class="text-[10px] text-gray-400 font-mono mt-0.5">${sign.id}</span>
-        `;
-
-        item.addEventListener("click", () => {
-          activeSignId = sign.id;
-          currentViewMode = "SINGLE";
-          renderCurrentView();
-        });
-
-        grid.appendChild(item);
-      });
-
-      container.appendChild(grid);
-    }
-
-    function renderSingleSignDetail(container, signId) {
-      const sign = isoSignsData.find(s => s.id.toLowerCase() === signId.toLowerCase());
-      if (!sign) {
-        container.innerHTML = `<div class="text-center py-12 text-gray-500 font-medium">${i18nDict[currentLang].not_found}</div>`;
-        return;
-      }
-
-      const isWarning = (sign.category === "Warning sign");
-
-      // 1. 決定該標誌的風險等級 (優先從資料庫拿，若無則從 ID 的括號或 sign.level 取得)
-      const rowData = totalDatabaseMap[sign.id] || {};
-      const autoRisk = sign.level || (sign.id.match(/\((\d)\)/) ? sign.id.match(/\((\d)\)/)[1] : "1");
-      const currentRiskVal = rowData["risk"] || autoRisk;
-
-      // 2. [核心修改] 處理標題：移除 "(頻率X)" 並加上 "(風險等級：X)"
-      let rawName = sign.name[currentLang] || sign.name.zh;
-      
-      // 使用正規表達式移除 "(頻率 X)" 或 "(頻率X)" 字樣 (不區分大小寫，處理全形半形括號)
-      let cleanName = rawName.replace(/\s*[\(\（]頻率\s*\d+[\)\）]/gi, "");
-      
-      // 加上新的風險等級後綴
-      const signTitleName = isWarning ? `${cleanName} (風險等級：${currentRiskVal})` : cleanName;
-
-      // 3. 三角形下方的風險等級 1~4 顯示區塊 (此區塊為對應顯示與唯讀效果)
-      const freqIndicatorHtml = isWarning ? `
-        <div class="mt-2 flex flex-col items-center">
-          <span class="text-xs text-gray-500 font-medium mb-1">風險等級</span>
-          <div class="flex items-center space-x-1">
-            ${[1, 2, 3, 4].map(n => `
-              <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${currentRiskVal === n.toString() ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600'}">${n}</span>
-            `).join('')}
-          </div>
-        </div>
-      ` : '';
-
-      // 4. 組合成卡片 HTML
-      const card = document.createElement("div");
-      card.className = "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 max-w-2xl mx-auto smooth-update";
-      card.innerHTML = `
-        <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
-          <div class="flex flex-col items-center text-center">
-            <div class="w-28 h-28 flex items-center justify-center p-1 bg-gray-50 rounded-xl border">
-              <img src="${sign.svgUrl}" class="w-full h-full object-contain" alt="${signTitleName}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://api.iconify.design/mdi:alert-decagram-outline.svg';">
             </div>
-            ${freqIndicatorHtml}
-            <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
-          </div>
 
-          <div class="flex flex-col items-center sm:items-end">
-            <div id="qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}" class="p-2 bg-white border rounded-xl shadow-inner"></div>
-            <span class="mt-3 text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-md border">${sign.id}</span>
-          </div>
-        </div>
-        <div class="mt-6 border-t pt-4 space-y-2">
-          <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            ${renderSubFieldsHtml(sign)}
-          </div>
-        </div>
-      `;
-
-      container.appendChild(card);
-
-      setTimeout(() => {
-        const qrContainer = document.getElementById(`qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}`);
-        if (qrContainer) {
-          qrContainer.innerHTML = "";
-          new QRCode(qrContainer, { text: sign.id, width: 90, height: 90 });
-        }
-      }, 50);
-
-      if (isWarning) {
-        bindSubFieldEvents();
-      }
-
-      // 如果資料庫中的 risk 欄位目前是空的，自動觸發將這個等級填入 ISO7010總資料
-      if (isWarning && !rowData["risk"] && currentRiskVal) {
-        submitPendingData(sign.id, "risk", sign.freq || "1", currentRiskVal,true);
-      }
-    }
-
-    function renderSubFieldsHtml(sign) {
-      const fieldKeys = ["freq", "elim", "sub", "eng", "admin", "ppe", "risk"];
-      const fieldsDict = i18nDict[currentLang].fields;
-      const rowData = totalDatabaseMap[sign.id] || {};
-
-      return fieldKeys.map(key => {
-        const fieldName = fieldsDict[key];
-        
-        let displayContent = "";
-if (key === "freq") {
-  displayContent = sign.freq;
-} else if (key === "risk") {
-  // 核心修改：如果資料庫目前是空的，優先顯示該標誌定義好的風險等級 (sign.level 或 ID中的括號數字)
-  const autoRisk = sign.level || (sign.id.match(/\((\d)\)/) ? sign.id.match(/\((\d)\)/)[1] : "1");
-  displayContent = rowData[key] || autoRisk; 
-} else {
-          displayContent = rowData[key] || "";
-          if (!displayContent && key === "eng" && sign.hazard_control) {
-            displayContent = sign.hazard_control;
-          }
-        }
-        
-        const isOverflow = displayContent.length > 25;
-        const truncatedContent = isOverflow ? displayContent.substring(0, 25) + "..." : displayContent || "-";
-        
-        const moreBtnHtml = isOverflow 
-          ? `<button class="text-blue-600 font-bold ml-1 hover:underline text-xs inline-block btn-more-detail" data-full-text="${encodeURIComponent(displayContent)}">[...]</button>` 
-          : '';
-
-        // Risk 欄位設為唯讀，其餘（包含 freq）可雙擊送審編輯
-        const isReadOnly = (key === "risk");
-        const boxClass = isReadOnly 
-          ? "border rounded-lg p-3 bg-gray-100 text-gray-500 cursor-not-allowed" 
-          : "sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom";
-
-        return `
-          <div class="${boxClass}"
-               data-sign-id="${sign.id}" data-field-key="${key}" data-freq="${sign.freq}" data-full-text="${encodeURIComponent(displayContent)}">
-            <div class="flex justify-between font-semibold text-gray-600 mb-1">
-              <span>${fieldName} ${isReadOnly ? '(唯讀)' : ''}</span>
+            <div>
+                Field:
+                ${row.field}
             </div>
-            <div class="text-gray-800 font-medium truncate-text">${truncatedContent}${moreBtnHtml}</div>
-          </div>
+
+            <div>
+                Value:
+                ${row.value}
+            </div>
+
+            <div>
+                Applicant:
+                ${row.applicant}
+            </div>
+
+            <div class="
+                mt-3 flex gap-2">
+
+                <button
+                class="
+                bg-green-500
+                text-white
+                px-3 py-1 rounded"
+                onclick="
+                    reviewRequest(
+                    '${row.rowId}',
+                    'APPROVED'
+                    )
+                ">
+
+                APPROVED
+
+                </button>
+
+                <button
+                class="
+                bg-red-500
+                text-white
+                px-3 py-1 rounded"
+                onclick="
+                    reviewRequest(
+                    '${row.rowId}',
+                    'REJECTED'
+                    )
+                ">
+
+                REJECTED
+
+                </button>
+
+            </div>
+
         `;
-      }).join('');
-    }
 
-    function bindSubFieldEvents() {
-      document.querySelectorAll(".btn-more-detail").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const fullText = decodeURIComponent(btn.getAttribute("data-full-text"));
-          showDetailModal("詳細危害控制資訊", fullText);
-        });
-      });
+        container.appendChild(
+            item
+        );
 
-      document.querySelectorAll(".sub-field-box").forEach(box => {
-        if (box.classList.contains('cursor-not-allowed')) return;
-
-        let lastTapTime = 0;
-
-        box.addEventListener("touchend", (e) => {
-          if (e.target.closest('.btn-more-detail')) return;
-          const currentTime = new Date().getTime();
-          const tapLength = currentTime - lastTapTime;
-          if (tapLength < 300 && tapLength > 0) {
-            e.preventDefault();
-            triggerBoxEdit(box);
-          }
-          lastTapTime = currentTime;
-        });
-
-        box.addEventListener("dblclick", (e) => {
-          if (e.target.closest('.btn-more-detail')) return;
-          triggerBoxEdit(box);
-        });
-      });
-    }
-
-    function triggerBoxEdit(box) {
-      const signId = box.getAttribute("data-sign-id");
-      const fieldKey = box.getAttribute("data-field-key");
-      const riskVal = box.getAttribute("data-risk");
-      const fieldName = i18nDict[currentLang].fields[fieldKey];
-      
-      const userInput = prompt(`【雙擊送審】請輸入 ${signId}（風險等級: ${riskVal}）之「${fieldName}」更新內容：`);
-      if (userInput && userInput.trim() !== "") {
-        submitPendingData(signId, fieldKey, riskVal, userInput.trim());
-      }
-    }
-
-    async function submitPendingData(signId, fieldKey, riskVal, val, isSilent = false) {
-      const payload = {
-        action: "SUBMIT",
-        applicant: "現場使用者",
-        signId: signId,
-        freq: riskVal,
-        content: JSON.stringify({
-          id: signId, field: fieldKey, value: val, freq: riskVal, path: `ISO7010 > ${signId} (Freq ${riskVal}) > ${fieldKey}`
-        })
-      };
-
-      try {
-        const res = await fetch(GAS_WEB_APP_URL, {
-          method: "POST", mode: "cors", redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        if (result.status === "success") {
-      // 只有在非靜默模式下才跳出提示
-      if (!isSilent) {
-        alert("🎉 雙擊送審成功！資料已送交後台審批。");
-      }
-          syncTotalData();
-          fetchPendingCount();
-        } else {
-          alert("❌ 送審失敗：" + result.message);
-        }
-      } catch (err) {
-        alert("網路通訊失敗，請檢查網路連線。");
-      }
-    }
-
-    function setupHeaderLongPress() {
-      const titleContainer = document.getElementById("header-title-container");
-      let pressTimer = null;
-
-      titleContainer.addEventListener("mousedown", startPress);
-      titleContainer.addEventListener("touchstart", startPress, { passive: true });
-      titleContainer.addEventListener("mouseup", cancelPress);
-      titleContainer.addEventListener("touchend", cancelPress);
-      titleContainer.addEventListener("mouseleave", cancelPress);
-
-      function startPress() {
-        pressTimer = setTimeout(() => { openApprovalModal(); }, 3000);
-      }
-
-      function cancelPress() {
-        if (pressTimer) clearTimeout(pressTimer);
-      }
-    }
-
-    async function openApprovalModal() {
-      const modal = document.getElementById("modal-approval");
-      const listContainer = document.getElementById("approval-list");
-      listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">雲端資料加載中...</div>`;
-      modal.classList.remove("hidden");
-
-      try {
-        const res = await fetch(`${GAS_WEB_APP_URL}?status=PENDING`, { method: "GET", redirect: "follow" });
-        const result = await res.json();
-
-        if (result.status === "success" && result.data.length > 0) {
-          listContainer.innerHTML = "";
-          result.data.forEach((item) => {
-            let parsedContent = {};
-            try { parsedContent = JSON.parse(item.content); } catch (e) { parsedContent = { path: "未定義路徑", value: item.content }; }
-
-            const itemDiv = document.createElement("div");
-            itemDiv.className = "p-4 bg-gray-50 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-gray-100 transition mb-2 gap-3";
-            itemDiv.innerHTML = `
-              <div>
-                <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${parsedContent.path || '資料區塊'}</span>
-                <p class="text-sm font-semibold text-gray-800 mt-1">${parsedContent.value}</p>
-                <span class="text-[10px] text-gray-400">申請者: ${item.applicant} | 時間: ${new Date(item.timestamp).toLocaleTimeString()}</span>
-              </div>
-              <div class="flex space-x-2 self-end sm:self-center">
-                <button onclick="reviewItem('${item.rowId}', 'APPROVED')" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
-                  ${i18nDict[currentLang].approve || '通過'}
-                </button>
-                <button onclick="reviewItem('${item.rowId}', 'REJECTED')" class="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition">
-                  ${i18nDict[currentLang].reject || '拒絕'}
-                </button>
-              </div>
-            `;
-            listContainer.appendChild(itemDiv);
-          });
-        } else {
-          listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">目前雲端無待審批的訊息。</div>`;
-        }
-      } catch (err) {
-        listContainer.innerHTML = `<div class="text-center py-8 text-red-500">加載待審資料失敗，請確認網路！</div>`;
-      }
-    }
-
-    window.reviewItem = async function(rowId, status) {
-      const actionText = status === "APPROVED" ? "核准並同步寫入資料庫" : "拒絕";
-      if (!confirm(`確定要【${actionText}】此筆申請嗎？`)) return;
-
-      const payload = { action: "REVIEW", rowId: rowId, reviewStatus: status, reviewer: "管理員" };
-
-      try {
-        const res = await fetch(GAS_WEB_APP_URL, {
-          method: "POST", mode: "cors", redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        if (result.status === "success") {
-          alert(`✅ 已成功【${actionText}】！`);
-          openApprovalModal();
-          fetchPendingCount();
-          syncTotalData();
-        } else {
-          alert("❌ 審批處理失敗：" + result.message);
-        }
-      } catch (err) {
-        alert("網路通訊失敗。");
-      }
-    };
-
-    function showDetailModal(title, text) {
-      document.getElementById("modal-detail-title").textContent = title;
-      document.getElementById("modal-detail-content").textContent = text;
-      document.getElementById("modal-detail").classList.remove("hidden");
-    }
-
-    document.getElementById("btn-detail-close").addEventListener("click", () => {
-      document.getElementById("modal-detail").classList.add("hidden");
-    });
-    document.getElementById("btn-approval-close").addEventListener("click", () => {
-      document.getElementById("modal-approval").classList.add("hidden");
     });
 
-    function setupEventListeners() {
-      document.getElementById("btn-back-step").addEventListener("click", () => {
-        handleBackStep();
-      });
+}
 
-      document.getElementById("btn-database").addEventListener("click", () => {
-        currentViewMode = "DATABASE";
-        renderCurrentView();
-      });
-      document.getElementById("btn-text-search").addEventListener("click", () => {
-        document.getElementById("modal-search").classList.remove("hidden");
-      });
-      document.getElementById("btn-search-cancel").addEventListener("click", () => {
-        document.getElementById("modal-search").classList.add("hidden");
-      });
-      document.getElementById("btn-search-confirm").addEventListener("click", () => {
-        const val = document.getElementById("search-input").value.trim();
-        if (val) {
-          activeSignId = val;
-          const sign = isoSignsData.find(s => s.id.toLowerCase() === val.toLowerCase());
-          if (sign) {
-            activeCategory = sign.category;
-            currentViewMode = "SINGLE";
-            renderCurrentView();
-            document.getElementById("modal-search").classList.add("hidden");
-          } else {
-            alert("找不到該流水號標誌！");
-          }
-        }
-      });
-      document.getElementById("btn-camera").addEventListener("click", () => {
-        document.getElementById("modal-camera").classList.remove("hidden");
-        startCameraScanner();
-      });
-      document.getElementById("btn-camera-close").addEventListener("click", () => {
-        stopCameraScanner();
-        document.getElementById("modal-camera").classList.add("hidden");
-      });
+/****************************************
+REVIEW REQUEST
+****************************************/
+
+async function reviewRequest(
+    rowId,
+    reviewStatus
+){
+
+    const reviewer =
+    prompt(
+        "Reviewer",
+        ""
+    );
+
+    if(
+        !reviewer
+    ){
+        return;
     }
 
-    function startCameraScanner() {
-      if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("reader");
-      }
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          stopCameraScanner();
-          document.getElementById("modal-camera").classList.add("hidden");
-          const sign = isoSignsData.find(s => s.id.toLowerCase() === decodedText.toLowerCase());
-          if (sign) {
-            activeCategory = sign.category;
-            activeSignId = sign.id;
-            currentViewMode = "SINGLE";
-            renderCurrentView();
-          } else {
-            alert(`掃描成功，但系統找不到此標誌 ID: ${decodedText}`);
-          }
+    try{
+
+        const res =
+        await fetch(
+            GAS_WEB_APP_URL,
+            {
+                method:"POST",
+
+                headers:{
+                    "Content-Type":
+                    "application/json"
+                },
+
+                body:JSON.stringify({
+
+                    action:
+                    "REVIEW",
+
+                    rowId,
+
+                    reviewStatus,
+
+                    reviewer
+
+                })
+
+            }
+        );
+
+        const result =
+        await res.json();
+
+        if(result.success){
+
+            await openApprovalModal();
+
+            await fetchGASData();
+
+            await fetchPendingCount();
+
+        }
+
+    }
+    catch(err){
+
+        console.error(err);
+
+    }
+
+}
+
+/****************************************
+HEADER LONG PRESS
+****************************************/
+
+function setupHeaderLongPress(){
+
+    const header =
+    document.getElementById(
+        "header-title-container"
+    );
+
+    let timer = null;
+
+    header.addEventListener(
+        "mousedown",
+        ()=>{
+
+            timer =
+            setTimeout(
+                ()=>{
+
+                    openApprovalModal();
+
+                },
+                3000
+            );
+
+        }
+    );
+
+    header.addEventListener(
+        "mouseup",
+        ()=>{
+
+            clearTimeout(
+                timer
+            );
+
+        }
+    );
+
+    header.addEventListener(
+        "mouseleave",
+        ()=>{
+
+            clearTimeout(
+                timer
+            );
+
+        }
+    );
+
+    header.addEventListener(
+        "touchstart",
+        ()=>{
+
+            timer =
+            setTimeout(
+                ()=>{
+
+                    openApprovalModal();
+
+                },
+                3000
+            );
+
+        }
+    );
+
+    header.addEventListener(
+        "touchend",
+        ()=>{
+
+            clearTimeout(
+                timer
+            );
+
+        }
+    );
+
+}
+
+/****************************************
+CLOSE MODAL
+****************************************/
+
+function closeApprovalModal(){
+
+    document
+      .getElementById(
+          "approvalModal"
+      )
+      .style.display =
+      "none";
+
+}
+
+  /****************************************
+QR SCANNER
+****************************************/
+
+function startQrScanner(){
+
+    document
+      .getElementById(
+        "qrReaderContainer"
+      )
+      .classList.remove(
+        "hidden"
+      );
+
+    if(qrScanner){
+
+        qrScanner.stop();
+
+    }
+
+    qrScanner =
+    new Html5Qrcode(
+        "qr-reader"
+    );
+
+    qrScanner.start(
+
+        {
+            facingMode:
+            "environment"
         },
-        (error) => {}
-      ).catch(err => {
-        console.warn("相機啟動失敗", err);
-      });
+
+        {
+            fps:10,
+            qrbox:250
+        },
+
+        qrText => {
+
+            handleQrResult(
+                qrText
+            );
+
+        },
+
+        err => {}
+
+    );
+
+}
+
+function handleQrResult(
+    qrText
+){
+
+    try{
+
+        const url =
+        new URL(qrText);
+
+        const id =
+        url.searchParams.get(
+            "id"
+        );
+
+        if(!id){
+
+            alert(
+                "Invalid QR"
+            );
+
+            return;
+
+        }
+
+        const sign =
+        isoSignsData.find(
+            x=>x.id===id
+        );
+
+        if(sign){
+
+            renderSingleSign(
+                sign.id,
+                sign.risk
+            );
+
+        }
+
+        if(qrScanner){
+
+            qrScanner.stop();
+
+        }
+
+    }
+    catch(err){
+
+        console.error(err);
+
+        alert(
+            "Invalid QR"
+        );
+
     }
 
-    // 每 15 秒背景輪詢同步總資料庫與待審狀態
-    setInterval(() => {
-      syncTotalData();
-      fetchPendingCount();
-    }, 15000);
-    
-    function stopCameraScanner() {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(err => console.log(err));
-      }
-    }
-  </script>
+}
+
+/****************************************
+XLSX EXPORT
+****************************************/
+
+async function exportExcel(){
+
+    await fetchGASData();
+
+    const rows = [];
+
+    isoSignsData.forEach(sign=>{
+
+        rows.push({
+
+            ID:sign.id,
+
+            Category:
+            sign.category,
+
+            Risk:
+            sign.risk || "",
+
+            Name:
+            sign.name,
+
+            Frequency:
+            sign.freq || "",
+
+            Elimination:
+            sign.elim || "",
+
+            Substitution:
+            sign.sub || "",
+
+            Engineering:
+            sign.eng || "",
+
+            Administrative:
+            sign.admin || "",
+
+            PPE:
+            sign.ppe || ""
+
+        });
+
+    });
+
+    const ws =
+    XLSX.utils.json_to_sheet(
+        rows
+    );
+
+    const wb =
+    XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+
+        wb,
+
+        ws,
+
+        "ISO7010"
+
+    );
+
+    const today =
+    new Date();
+
+    const ts =
+        today
+        .toISOString()
+        .replace(/[-:]/g,"")
+        .replace("T","_")
+        .substring(0,15);
+
+    XLSX.writeFile(
+
+        wb,
+
+        `ISO7010_Database_${ts}.xlsx`
+
+    );
+
+}
+
+/****************************************
+LANGUAGE
+****************************************/
+
+function initI18n(){
+
+    document
+      .getElementById(
+        "langSelector"
+      )
+      .addEventListener(
+
+        "change",
+
+        e=>{
+
+            currentLang =
+            e.target.value;
+
+            if(
+              currentViewMode
+              ==="DATABASE"
+            ){
+
+                renderDatabase();
+
+            }
+            else{
+
+                const sign =
+                isoSignsData.find(
+                    x=>x.id===activeSignId
+                );
+
+                if(sign){
+
+                    renderSingleSign(
+                        sign.id,
+                        sign.risk
+                    );
+
+                }
+
+            }
+
+        }
+
+    );
+
+}
+
+/****************************************
+EVENT LISTENERS
+****************************************/
+
+function setupEventListeners(){
+
+    document
+      .getElementById(
+        "databaseBtn"
+      )
+      .addEventListener(
+
+        "click",
+
+        ()=>{
+
+            renderDatabase();
+
+        }
+
+    );
+
+    document
+      .getElementById(
+        "scanBtn"
+      )
+      .addEventListener(
+
+        "click",
+
+        ()=>{
+
+            startQrScanner();
+
+        }
+
+    );
+
+    document
+      .getElementById(
+        "exportBtn"
+      )
+      .addEventListener(
+
+        "click",
+
+        exportExcel
+
+    );
+
+    document
+      .getElementById(
+        "closeApprovalBtn"
+      )
+      .addEventListener(
+
+        "click",
+
+        closeApprovalModal
+
+    );
+
+    document
+      .getElementById(
+        "searchInput"
+      )
+      .addEventListener(
+
+        "input",
+
+        e=>{
+
+            searchSigns(
+
+                e.target.value
+
+            );
+
+        }
+
+    );
+
+}
+
+/****************************************
+PWA REGISTER
+****************************************/
+
+if(
+    "serviceWorker"
+    in navigator
+){
+
+    window.addEventListener(
+
+        "load",
+
+        ()=>{
+
+            navigator
+            .serviceWorker
+            .register(
+
+              "./sw.js"
+
+            )
+            .then(()=>{
+
+                console.log(
+                  "SW Registered"
+                );
+
+            })
+            .catch(err=>{
+
+                console.error(
+                    err
+                );
+
+            });
+
+        }
+
+    );
+
+}
+
+/****************************************
+HELPER
+****************************************/
+
+function showToast(msg){
+
+    console.log(msg);
+
+}
+
+/****************************************
+END
+****************************************/
+
+</script>
+
 </body>
+
 </html>
