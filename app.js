@@ -2,8 +2,8 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOF
 
 let rawSigns = [];
 let approvedData = {};
-let isExpanded = false; // 防重複展開旗標
-let isAdmin = false;    // 管理員狀態（透過長按啟用）
+let isExpanded = false;
+let isAdmin = false;
 let currentViewPath = { level: 'categories', category: null, name: null, id: null, risk: null };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -33,8 +33,24 @@ function setupEventListeners() {
         }, 1000);
     }
 
-    // 掃描 QR 按鈕事件
-    document.getElementById('scan-qr-btn').addEventListener('click', startQRCodeScanner);
+    // 綁定「資料庫模式」按鈕點擊事件（對應截圖中的按鈕）
+    const dbBtn = document.querySelector('button:nth-of-type(1)') || document.getElementById('db-mode-btn');
+    // 如果您的按鈕沒有 ID，我們直接透過文字或選擇器綁定
+    document.querySelectorAll('button').forEach(btn => {
+        if (btn.innerText.includes('資料庫模式')) {
+            btn.onclick = () => {
+                currentViewPath = { level: 'categories', category: null };
+                renderCurrentView();
+            };
+        }
+    });
+
+    // 綁定「QR 掃描模式」按鈕
+    document.querySelectorAll('button').forEach(btn => {
+        if (btn.innerText.includes('QR')) {
+            btn.onclick = startQRCodeScanner;
+        }
+    });
 }
 
 // 取得主表與已核准資料
@@ -45,7 +61,11 @@ async function fetchSignsFromSheet() {
         let fetchedSigns = json.signs || [];
         approvedData = json.approved || {};
 
-        // W類防重複展開機制：僅初次執行一次
+        if (fetchedSigns.length === 0) {
+            document.getElementById('app-container').innerHTML = `<p style="text-align:center; color:red;">警告：從 Google 試算表抓到的資料為空，請檢查 GAS 部署或工作表名稱！</p>`;
+            return;
+        }
+
         if (!isExpanded) {
             rawSigns = expandWSigns(fetchedSigns);
             isExpanded = true;
@@ -56,10 +76,11 @@ async function fetchSignsFromSheet() {
         renderCurrentView();
     } catch (e) {
         console.error("資料載入失敗", e);
+        document.getElementById('app-container').innerHTML = `<p style="text-align:center; color:red;">連線至 GAS 失敗: ${e.message}</p>`;
     }
 }
 
-// W類前端動態展開 (Category='Warning sign' 1 變 4，唯一鍵 = ID + Risk)
+// W類前端動態展開
 function expandWSigns(signs) {
     let expandedList = [];
     signs.forEach(sign => {
@@ -102,19 +123,21 @@ async function fetchPendingCount() {
     try {
         let res = await fetch(`${GAS_URL}?action=getPendingCount`);
         let json = await res.json();
+        // 假設畫面上有名為 pending-badge 的元素
         let badge = document.getElementById('pending-badge');
-        if (json.count > 0) {
+        if (badge && json.count > 0) {
             badge.innerText = `待審批: ${json.count}`;
             badge.style.display = 'inline-block';
-        } else {
+        } else if (badge) {
             badge.style.display = 'none';
         }
     } catch (e) { console.error(e); }
 }
 
-// 檢視層級切換
+// 檢視層級切換渲染
 function renderCurrentView() {
     const container = document.getElementById('app-container');
+    if (!container) return;
     container.innerHTML = '';
 
     if (currentViewPath.level === 'categories') renderCategoryView(container);
@@ -126,12 +149,12 @@ function renderCurrentView() {
 
 function renderCategoryView(container) {
     let categories = [...new Set(rawSigns.map(s => s.category))];
-    let html = `<div class="grid-container">`;
+    let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     categories.forEach(cat => {
         let firstSign = rawSigns.find(s => s.category === cat);
         html += `
-            <div class="card" onclick="navigateToCategory('${cat}')">
-                <img src="${firstSign?.svg_url || firstSign?.image || ''}" alt="${cat}">
+            <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="navigateToCategory('${cat}')">
+                <img src="${firstSign?.svg_url || firstSign?.image || ''}" alt="${cat}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
                 <h3>${cat}</h3>
             </div>
         `;
@@ -146,12 +169,12 @@ window.navigateToCategory = (cat) => {
 
 function renderSignsView(container, cat) {
     let signs = rawSigns.filter(s => s.category === cat);
-    let html = `<button onclick="backToCategories()">⬅ 返回分類</button><h2>${cat} 標誌列表</h2><div class="grid-container">`;
+    let html = `<button onclick="backToCategories()" style="margin-bottom:15px; padding:6px 12px;">⬅ 返回分類</button><h2>${cat} 標誌列表</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     signs.forEach(s => {
         html += `
-            <div class="card" onclick="handleSignClick('${s.id}', '${s.category}', '${s.name}')">
-                <img src="${s.svg_url || s.image}" alt="${s.name}">
-                <p>${s.id} - ${s.name}</p>
+            <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="handleSignClick('${s.id}', '${s.category}', '${s.name}')">
+                <img src="${s.svg_url || s.image}" alt="${s.name}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
+                <p><strong>${s.id}</strong><br>${s.name}</p>
             </div>
         `;
     });
@@ -176,12 +199,12 @@ window.handleSignClick = (id, category, name) => {
 function renderNamesView(container, cat) {
     let wSigns = rawSigns.filter(s => s.category === cat);
     let uniqueNames = [...new Set(wSigns.map(s => s.name))];
-    let html = `<button onclick="navigateToCategory('${cat}')">⬅ 返回 ${cat}</button><h2>注意標誌群組</h2><div class="grid-container">`;
+    let html = `<button onclick="navigateToCategory('${cat}')" style="margin-bottom:15px; padding:6px 12px;">⬅ 返回 ${cat}</button><h2>注意標誌群組</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     uniqueNames.forEach(name => {
         let sample = wSigns.find(s => s.name === name);
         html += `
-            <div class="card" onclick="navigateToRisks('${name}')">
-                <img src="${sample.svg_url || sample.image}" alt="${name}">
+            <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="navigateToRisks('${name}')">
+                <img src="${sample.svg_url || sample.image}" alt="${name}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
                 <p>${name}</p>
             </div>
         `;
@@ -197,14 +220,14 @@ window.navigateToRisks = (name) => {
 function renderRisksView(container, name) {
     let variants = rawSigns.filter(s => s.name === name);
     let sample = variants[0];
-    let html = `<button onclick="currentViewPath.level='names'; renderCurrentView();">⬅ 返回群組</button><h2>${name} - 風險等級選擇</h2><div class="grid-container">`;
+    let html = `<button onclick="currentViewPath.level='names'; renderCurrentView();" style="margin-bottom:15px; padding:6px 12px;">⬅ 返回群組</button><h2>${name} - 風險等級選擇</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     
     for (let i = 1; i <= 4; i++) {
         let variant = variants.find(v => Number(v.risk) === i) || sample;
         html += `
-            <div class="card" onclick="navigateToDetail('${variant.id}', '${i}')">
-                <img src="${variant.svg_url || variant.image}" alt="Risk ${i}">
-                <p>Risk Level: ${i}</p>
+            <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="navigateToDetail('${variant.id}', '${i}')">
+                <img src="${variant.svg_url || variant.image}" alt="Risk ${i}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
+                <p><strong>Risk Level: ${i}</strong></p>
             </div>
         `;
     }
@@ -222,28 +245,27 @@ function renderDetailView(container, id, risk) {
     let currentData = approvedData[uniqueKey] || approvedData[`${sign.id}_Normal`] || sign;
 
     let html = `
-        <button onclick="window.history.back()">⬅ 返回</button>
-        <div class="table-container" style="margin-top:15px;">
+        <button onclick="currentViewPath.level='signs'; renderCurrentView();" style="margin-bottom:15px; padding:6px 12px;">⬅ 返回列表</button>
+        <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
             <h2>${sign.name} (ID: ${sign.id})</h2>
-            <img src="${sign.svg_url || sign.image}" style="max-width:150px; display:block; margin: 0 auto 1rem auto;">
+            <img src="${sign.svg_url || sign.image}" style="max-width:120px; height:120px; object-fit:contain; display:block; margin: 0 auto 1rem auto;">
             <p><strong>風險等級 (Risk Level):</strong> ${risk} <span style="font-size:0.8rem; color:gray;">(唯讀不可編輯)</span></p>
             <p style="color: #64748b; font-size: 0.9rem;">提示：一般雙擊送審；管理員模式下雙擊可直接修改或清空刪除資料。</p>
             
-            <table class="control-table">
-                <tr><th>控制項欄位</th><th>內容值</th></tr>
-                <tr><td>頻率 (freq)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'freq', this)">${currentData.freq || ''}</td></tr>
-                <tr><td>排除 (elim)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'elim', this)">${currentData.elim || ''}</td></tr>
-                <tr><td>替代 (sub)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'sub', this)">${currentData.sub || ''}</td></tr>
-                <tr><td>工程 (eng)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'eng', this)">${currentData.eng || ''}</td></tr>
-                <tr><td>管理 (admin)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'admin', this)">${currentData.admin || ''}</td></tr>
-                <tr><td>防護具 (ppe)</td><td class="editable-cell" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'ppe', this)">${currentData.ppe || ''}</td></tr>
+            <table style="width:100%; border-collapse:collapse; margin-top:15px;">
+                <tr><th style="border:1px solid #cbd5e1; padding:10px; background:#e2e8f0;">控制項欄位</th><th style="border:1px solid #cbd5e1; padding:10px; background:#e2e8f0;">內容值</th></tr>
+                <tr><td style="border:1px solid #cbd5e1; padding:10px;">頻率 (freq)</td><td style="border:1px solid #cbd5e1; padding:10px; background:#f8fafc; cursor:pointer;" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'freq', this)">${currentData.freq || ''}</td></tr>
+                <tr><td style="border:1px solid #cbd5e1; padding:10px;">排除 (elim)</td><td style="border:1px solid #cbd5e1; padding:10px; background:#f8fafc; cursor:pointer;" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'elim', this)">${currentData.elim || ''}</td></tr>
+                <tr><td style="border:1px solid #cbd5e1; padding:10px;">替代 (sub)</td><td style="border:1px solid #cbd5e1; padding:10px; background:#f8fafc; cursor:pointer;" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'sub', this)">${currentData.sub || ''}</td></tr>
+                <tr><td style="border:1px solid #cbd5e1; padding:10px;">工程 (eng)</td><td style="border:1px solid #cbd5e1; padding:10px; background:#f8fafc; cursor:pointer;" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'eng', this)">${currentData.eng || ''}</td></tr>
+                <tr><td style="border:1px solid #cbd5e1; padding:10px;">管理 (admin)</td><td style="border:1px solid #cbd5e1; padding:10px; background:#f8fafc; cursor:pointer;" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'admin', this)">${currentData.admin || ''}</td></tr>
+                <tr><td style="border:1px solid #cbd5e1; padding:10px;">防護具 (ppe)</td><td style="border:1px solid #cbd5e1; padding:10px; background:#f8fafc; cursor:pointer;" ondblclick="handleCellEdit('${sign.id}', '${risk}', 'ppe', this)">${currentData.ppe || ''}</td></tr>
             </table>
         </div>
     `;
     container.innerHTML = html;
 }
 
-// 雙擊互動：支援一般送審與管理員修改／刪除
 window.handleCellEdit = function(signId, risk, field, cell) {
     if (cell.querySelector('input')) return;
     let oldText = cell.innerText;
@@ -306,74 +328,24 @@ async function sendDirectDelete(signId, risk, field) {
     } catch (e) { console.error(e); }
 }
 
-// Header 長按 3 秒啟用管理員與開啟 Modal 審批
 function setupHeaderLongPress() {
-    let header = document.getElementById('main-header');
+    let header = document.querySelector('header');
     let timer = null;
 
     const triggerAdmin = () => {
         isAdmin = true;
         alert("【系統提示】管理員權限已啟動！");
-        openApprovalModal();
     };
 
-    header.addEventListener('mousedown', () => { timer = setTimeout(triggerAdmin, 3000); });
-    header.addEventListener('mouseup', () => clearTimeout(timer));
-    header.addEventListener('touchstart', () => { timer = setTimeout(triggerAdmin, 3000); });
-    header.addEventListener('touchend', () => clearTimeout(timer));
-
-    document.getElementById('pending-badge').addEventListener('click', () => {
-        if (isAdmin) openApprovalModal();
-        else alert("請先透過 Header 長按 3 秒啟動管理員權限！");
-    });
+    if (header) {
+        header.addEventListener('mousedown', () => { timer = setTimeout(triggerAdmin, 3000); });
+        header.addEventListener('mouseup', () => clearTimeout(timer));
+        header.addEventListener('touchstart', () => { timer = setTimeout(triggerAdmin, 3000); });
+        header.addEventListener('touchend', () => clearTimeout(timer));
+    }
 }
 
-async function openApprovalModal() {
-    let modal = document.getElementById('approval-modal');
-    let listDiv = document.getElementById('approval-list');
-    modal.style.display = 'flex';
-    listDiv.innerHTML = '載入中...';
-
-    try {
-        let res = await fetch(`${GAS_URL}?action=getPendingApprovals`);
-        let json = await res.json();
-        let items = json.data || [];
-
-        if (items.length === 0) {
-            listDiv.innerHTML = '<p>目前沒有待審批項目。</p>';
-            return;
-        }
-
-        let html = '';
-        items.forEach((item) => {
-            html += `
-                <div style="border-bottom: 1px solid #ccc; padding: 10px 0;">
-                    <p><strong>ID:</strong> ${item.signId} | <strong>Risk:</strong> ${item.risk} | <strong>欄位:</strong> ${item.field}</p>
-                    <p><strong>新內容:</strong> ${item.value}</p>
-                    <button onclick="reviewItem('${item.signId}', '${item.risk}', '${item.field}', '${item.value}', 'APPROVED')" style="background:green; color:white; padding:4px 8px;">通過</button>
-                    <button onclick="reviewItem('${item.signId}', '${item.risk}', '${item.field}', '${item.value}', 'REJECTED')" style="background:red; color:white; padding:4px 8px;">拒絕</button>
-                </div>
-            `;
-        });
-        listDiv.innerHTML = html;
-    } catch (e) { listDiv.innerHTML = '載入失敗'; }
-}
-
-window.reviewItem = async function(signId, risk, field, value, status) {
-    await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'processApproval', signId, risk, field, value, status, reviewer: 'Admin' })
-    });
-    alert(`已完成審批: ${status}`);
-    openApprovalModal();
-    fetchSignsFromSheet();
-};
-
-document.getElementById('close-modal-btn').onclick = () => {
-    document.getElementById('approval-modal').style.display = 'none';
-};
-
-// QR 碼相機掃描與權限防呆實作
+// 修正後的相機掃描模組（帶有完整的錯誤防呆與畫面提示）
 async function startQRCodeScanner() {
     let container = document.getElementById('qr-scanner-modal');
     if (!container) {
@@ -383,9 +355,9 @@ async function startQRCodeScanner() {
         container.innerHTML = `
             <div style="background:white; padding:20px; border-radius:8px; text-align:center; max-width:90%;">
                 <h3>請對準 QR Code 進行掃描</h3>
-                <video id="preview-video" style="width:100%; max-width:300px; height:auto; background:#000;"></video>
+                <video id="preview-video" autoplay playsinline style="width:100%; max-width:300px; height:auto; background:#000;"></video>
                 <br><br>
-                <button id="close-scanner-btn" style="padding:8px 16px; background:red; color:white; border:none; border-radius:4px;">關閉相機</button>
+                <button id="close-scanner-btn" style="padding:8px 16px; background:red; color:white; border:none; border-radius:4px; cursor:pointer;">關閉相機</button>
             </div>
         `;
         document.body.appendChild(container);
@@ -393,6 +365,11 @@ async function startQRCodeScanner() {
     container.style.display = 'flex';
 
     try {
+        // 請求相機權限 (注意：部分舊版瀏覽器或非 https 環境下 navigator.mediaDevices 可能為 undefined)
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("您的瀏覽器不支援相機存取，或目前不是安全連線 (HTTPS)。");
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         const videoElement = document.getElementById('preview-video');
         videoElement.srcObject = stream;
@@ -403,8 +380,8 @@ async function startQRCodeScanner() {
             container.style.display = 'none';
         };
     } catch (error) {
-        // 嚴格落實：若使用者不允許權限，則關閉相機模組與視窗
-        alert("已拒絕相機權限或不支援相機，將關閉相機模組。");
+        console.warn("相機啟用失敗：", error);
+        alert("無法開啟相機： " + error.message + "\n(請確認已授權相機權限，且網址為 HTTPS)");
         container.style.display = 'none';
     }
 }
