@@ -1,502 +1,337 @@
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec";
 
-let rawSignsData = [];      
-let processedSigns = [];    
-let approvedDataMap = {};   
-let currentLang = 'zh';
-
-let currentView = 'categories'; 
-let selectedCategory = null;
-let selectedSignDetail = null;
-
-// 多語系字典定義（包含控制欄位與標題的多語系支援）
-const i18nText = {
-    zh: { 
-        app_title: "ISO7010 安全標誌系統", export_excel: "匯出 Excel", search_placeholder: "輸入關鍵字搜尋標誌...", mode_db: "資料庫模式", mode_qr: "QR 掃描模式", submit_approval: "提交審批", approval_title: "待審批清單", back_categories: "返回分類",
-        edit_title: "編輯危害控制", risk_level: "風險等級 (唯讀):", applicant: "申請人 (Applicant):",
-        freq: "頻率 (Freq):", elim: "消除 (Elim):", sub: "替代 (Sub):", eng: "工程控制 (Eng):", admin: "管理控制 (Admin):", ppe: "個人防護具 (PPE):",
-        no_control: "此標誌無七大危害控制項目", edit_hint: "(提示：長按項目或點擊下方按鈕可編輯)", click_to_edit: "編輯此標誌控制項"
-    },
-    en: { 
-        app_title: "ISO7010 Safety PWA", export_excel: "Export Excel", search_placeholder: "Search signs...", mode_db: "Database", mode_qr: "QR Scanner", submit_approval: "Submit Approval", approval_title: "Pending Approvals", back_categories: "Back to Categories",
-        edit_title: "Edit Hazard Control", risk_level: "Risk Level (Read-only):", applicant: "Applicant:",
-        freq: "Freq:", elim: "Elim:", sub: "Sub:", eng: "Eng:", admin: "Admin:", ppe: "PPE:",
-        no_control: "This sign has no hazard control items.", edit_hint: "(Hint: Long press item or click button below to edit)", click_to_edit: "Edit Control"
-    },
-    de: { 
-        app_title: "ISO7010 Sicherheitszeichen", export_excel: "Excel exportieren", search_placeholder: "Zeichen suchen...", mode_db: "Datenbank", mode_qr: "QR-Scanner", submit_approval: "Genehmigung einreichen", approval_title: "Ausstehende Genehmigungen", back_categories: "Zurück zu Kategorien",
-        edit_title: "Gefahrenkontrolle bearbeiten", risk_level: "Risikostufe (Schreibgeschützt):", applicant: "Antragsteller:",
-        freq: "Freq:", elim: "Elim:", sub: "Sub:", eng: "Eng:", admin: "Admin:", ppe: "PPE:",
-        no_control: "Dieses Zeichen hat keine Gefahrenkontrolle.", edit_hint: "(Hinweis: Halten Sie gedrückt oder klicken Sie unten)", click_to_edit: "Kontrolle bearbeiten"
-    }
-};
+let rawSigns = [];
+let approvedData = {};
+let currentViewPath = { level: 'categories', category: null, name: null, id: null };
 
 document.addEventListener("DOMContentLoaded", () => {
     initI18n();
     setupEventListeners();
-    setupHeaderLongPress();
     fetchSignsFromSheet();
-    fetchGASData();
-    fetchPendingCount();
-
-    setInterval(fetchGASData, 10000);       
-    setInterval(fetchPendingCount, 15000);  
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetId = urlParams.get('id');
-    if (targetId) {
-        setTimeout(() => handleQRDirectOpen(targetId), 1000);
-    }
+    setupHeaderLongPress();
+    
+    // 定期同步
+    setInterval(fetchGASData, 10000);
+    setInterval(fetchPendingCount, 15000);
 });
 
 function initI18n() {
-    const select = document.getElementById('lang-select');
-    select.value = currentLang;
-    select.addEventListener('change', (e) => {
-        currentLang = e.target.value;
-        updateUIText();
-        if (currentView === 'sign_detail' && selectedSignDetail) {
-            renderSignDetailView(selectedSignDetail, document.getElementById('signs-container'));
-        }
-    });
-}
-
-function updateUIText() {
-    const texts = i18nText[currentLang];
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (texts[key]) el.textContent = texts[key];
-    });
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        const key = el.getAttribute('data-i18n-placeholder');
-        if (texts[key]) el.placeholder = texts[key];
-    });
+    // 預留多語系初始化
 }
 
 function setupEventListeners() {
-    document.getElementById('search-input').addEventListener('input', () => {
-        currentView = 'categories';
-        renderSigns();
-    });
-    document.getElementById('export-btn').addEventListener('click', exportExcel);
-    
-    document.getElementById('mode-db').addEventListener('click', () => {
-        document.getElementById('mode-db').classList.add('active');
-        document.getElementById('mode-qr').classList.remove('active');
-        document.getElementById('qr-reader-section').style.display = 'none';
-        document.getElementById('signs-container').style.display = 'grid';
-        currentView = 'categories';
-        renderSigns();
-    });
-
-    document.getElementById('mode-qr').addEventListener('click', () => {
-        document.getElementById('mode-qr').classList.add('active');
-        document.getElementById('mode-db').classList.remove('active');
-        document.getElementById('qr-reader-section').style.display = 'block';
-        document.getElementById('signs-container').style.display = 'none';
-        startQRScanner();
-    });
-
-    document.getElementById('close-edit-modal').onclick = () => document.getElementById('edit-modal').style.display = 'none';
-    document.getElementById('close-approval-modal').onclick = () => document.getElementById('approval-modal').style.display = 'none';
-
-    document.getElementById('edit-form').addEventListener('submit', handleSignSubmit);
-}
-
-function setupHeaderLongPress() {
-    let timer = null;
-    const header = document.getElementById('main-header');
-    const startPress = () => { timer = setTimeout(openApprovalModal, 3000); };
-    const cancelPress = () => clearTimeout(timer);
-
-    header.addEventListener('mousedown', startPress);
-    header.addEventListener('mouseup', cancelPress);
-    header.addEventListener('mouseleave', cancelPress);
-    header.addEventListener('touchstart', startPress);
-    header.addEventListener('touchend', cancelPress);
+    // QR Code 支援
+    const urlParams = new URLSearchParams(window.location.search);
+    const qid = urlParams.get('id');
+    if (qid) {
+        // 若帶有 id 則直接導向該標誌詳細頁
+        setTimeout(() => {
+            let target = rawSigns.find(s => s.id === qid);
+            if (target) showDetailView(target);
+        }, 1000);
+    }
 }
 
 async function fetchSignsFromSheet() {
     try {
-        const res = await fetch(`${GAS_API_URL}?action=getSigns`);
-        const data = await res.json();
-        rawSignsData = data || [];
-        processAndRender();
+        let res = await fetch(`${GAS_URL}?action=getData`);
+        let json = await res.json();
+        rawSigns = json.signs || [];
+        approvedData = json.approved || {};
+        
+        renderCurrentView();
     } catch (e) {
-        console.error("fetchSignsFromSheet error:", e);
+        console.error("資料載入失敗", e);
     }
 }
 
 async function fetchGASData() {
     try {
-        const res = await fetch(`${GAS_API_URL}?action=getData`);
-        const result = await res.json();
-        approvedDataMap = {};
-        if (result && result.subDirectories) {
-            result.subDirectories.forEach(item => {
-                const key = `${item.ID}_${item.Risk}`;
-                approvedDataMap[key] = item;
-            });
-        }
-        processAndRender();
+        let res = await fetch(`${GAS_URL}?action=getData`);
+        let json = await res.json();
+        approvedData = json.approved || {};
     } catch (e) {
-        console.error("fetchGASData error:", e);
+        console.error("背景同步失敗", e);
     }
 }
 
 async function fetchPendingCount() {
     try {
-        const res = await fetch(`${GAS_API_URL}?action=getPendingCount`);
-        const data = await res.json();
-        document.getElementById('pending-badge').textContent = data.count || 0;
+        let res = await fetch(`${GAS_URL}?action=getPendingCount`);
+        let json = await res.json();
+        let badge = document.getElementById('pending-badge');
+        if (json.count > 0) {
+            badge.innerText = `待審批: ${json.count}`;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
     } catch (e) {
-        console.error("fetchPendingCount error:", e);
+        console.error("取得待審批數量失敗", e);
     }
 }
 
-function processAndRender() {
-    processedSigns = [];
-    rawSignsData.forEach(sign => {
-        const cat = sign.category || 'Uncategorized';
-        // 只有 Warning sign (注意標誌) 才展開為 Risk 1~4 並具有七大控制項
-        if (cat === 'Warning sign') {
-            for (let i = 1; i <= 4; i++) {
-                const riskLevel = `Risk${i}`;
-                const uniqueKey = `${sign.id}_${riskLevel}`;
-                const approvedInfo = approvedDataMap[uniqueKey] || {};
-
-                processedSigns.push({
-                    ...sign,
-                    category: cat,
-                    risk: riskLevel,
-                    hasControl: true,
-                    freq: approvedInfo.Field === 'freq' ? approvedInfo.Value : (sign.freq || ''),
-                    elim: approvedInfo.Field === 'elim' ? approvedInfo.Value : (sign.elim || ''),
-                    sub: approvedInfo.Field === 'sub' ? approvedInfo.Value : (sign.sub || ''),
-                    eng: approvedInfo.Field === 'eng' ? approvedInfo.Value : (sign.eng || ''),
-                    admin: approvedInfo.Field === 'admin' ? approvedInfo.Value : (sign.admin || ''),
-                    ppe: approvedInfo.Field === 'ppe' ? approvedInfo.Value : (sign.ppe || '')
-                });
-            }
-        } else {
-            // 其他分類僅維持基本說明，不具備七大危害控制與風險展開
-            const uniqueKey = `${sign.id}_Risk1`;
-            const approvedInfo = approvedDataMap[uniqueKey] || {};
-            processedSigns.push({
-                ...sign,
-                category: cat,
-                risk: '',
-                hasControl: false,
-                freq: '', elim: '', sub: '', eng: '', admin: '', ppe: ''
-            });
-        }
-    });
-    renderSigns();
-}
-
-function renderSigns() {
-    const container = document.getElementById('signs-container');
-    const keyword = document.getElementById('search-input').value.toLowerCase();
-    const backBtn = document.getElementById('back-to-categories');
+// 檢視層級切換核心
+function renderCurrentView() {
+    const container = document.getElementById('app-container');
     container.innerHTML = '';
 
-    if (keyword.trim() !== '') {
-        backBtn.style.display = 'inline-block';
-        backBtn.onclick = () => {
-            document.getElementById('search-input').value = '';
-            currentView = 'categories';
-            renderSigns();
-        };
-        const filtered = processedSigns.filter(s => 
-            (s.name && s.name.toLowerCase().includes(keyword)) || 
-            (s.id && s.id.toLowerCase().includes(keyword))
-        );
-        renderSignCards(filtered, container);
-        return;
-    }
-
-    if (currentView === 'categories') {
-        backBtn.style.display = 'none';
-        const categories = [...new Set(processedSigns.map(s => s.category))];
-        
-        categories.forEach(cat => {
-            const representative = processedSigns.find(s => s.category === cat);
-            const card = document.createElement('div');
-            card.className = 'category-card';
-            card.innerHTML = `
-                <img src="${representative ? representative.svg_url : ''}" alt="${cat}" onerror="this.src='https://via.placeholder.com/100'">
-                <h3>${cat}</h3>
-                <p>點擊進入分類</p>
-            `;
-            card.onclick = () => {
-                selectedCategory = cat;
-                currentView = 'signs_in_category';
-                renderSigns();
-            };
-            container.appendChild(card);
-        });
-    } else if (currentView === 'signs_in_category') {
-        backBtn.style.display = 'inline-block';
-        backBtn.onclick = () => {
-            currentView = 'categories';
-            selectedCategory = null;
-            renderSigns();
-        };
-        const signsInCat = processedSigns.filter(s => s.category === selectedCategory);
-        renderSignCards(signsInCat, container);
-    } else if (currentView === 'sign_detail') {
-        backBtn.style.display = 'inline-block';
-        backBtn.onclick = () => {
-            currentView = 'signs_in_category';
-            renderSigns();
-        };
-        renderSignDetailView(selectedSignDetail, container);
+    if (currentViewPath.level === 'categories') {
+        renderCategoryView(container);
+    } else if (currentViewPath.level === 'signs') {
+        renderSignsView(container, currentViewPath.category);
+    } else if (currentViewPath.level === 'names') {
+        renderNamesView(container, currentViewPath.category);
+    } else if (currentViewPath.level === 'risks') {
+        renderRisksView(container, currentViewPath.name);
+    } else if (currentViewPath.level === 'detail') {
+        renderDetailView(container, currentViewPath.id);
     }
 }
 
-function renderSignCards(signs, container) {
-    signs.forEach(sign => {
-        const card = document.createElement('div');
-        card.className = 'sign-card';
-        card.innerHTML = `
-            <img src="${sign.svg_url}" alt="${sign.name}" onerror="this.src='https://via.placeholder.com/100'">
-            <h3>${sign.id}: ${sign.name || ''}</h3>
-            ${sign.risk ? `<span class="risk-badge">${sign.risk}</span>` : ''}
-        `;
-        card.onclick = () => {
-            selectedSignDetail = sign;
-            currentView = 'sign_detail';
-            renderSigns();
-        };
-        container.appendChild(card);
-    });
-}
-
-function renderSignDetailView(sign, container) {
-    const t = i18nText[currentLang];
+// 第一層：顯示 Category 代表圖示
+function renderCategoryView(container) {
+    let categories = [...new Set(rawSigns.map(s => s.category))];
+    let html = `<div class="grid-container">`;
     
-    let controlContentHtml = '';
-    if (sign.hasControl) {
-        controlContentHtml = `
-            <h3>${t.edit_title}</h3>
-            <p style="font-size:0.85rem; color:#64748b; margin-bottom:10px;">${t.edit_hint}</p>
-            <div class="detail-list">
-                <div class="detail-item" data-field="freq"><b>${t.freq}</b> ${sign.freq || '無'}</div>
-                <div class="detail-item" data-field="elim"><b>${t.elim}</b> ${sign.elim || '無'}</div>
-                <div class="detail-item" data-field="sub"><b>${t.sub}</b> ${sign.sub || '無'}</div>
-                <div class="detail-item" data-field="eng"><b>${t.eng}</b> ${sign.eng || '無'}</div>
-                <div class="detail-item" data-field="admin"><b>${t.admin}</b> ${sign.admin || '無'}</div>
-                <div class="detail-item" data-field="ppe"><b>${t.ppe}</b> ${sign.ppe || '無'}</div>
+    categories.forEach(cat => {
+        let firstSign = rawSigns.find(s => s.category === cat);
+        html += `
+            <div class="card" onclick="navigateToCategory('${cat}')">
+                <img src="${firstSign.svg_url || firstSign.image}" alt="${cat}">
+                <h3>${cat}</h3>
             </div>
-            <button onclick="openEditModal('${sign.id}', '${sign.risk}')" style="margin-top:20px; padding:10px 20px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer;">${t.click_to_edit}</button>
         `;
-    } else {
-        controlContentHtml = `<p style="margin-top:20px; color:#64748b; font-style:italic;">${t.no_control}</p>`;
-    }
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+}
 
-    container.innerHTML = `
-        <div class="detail-card" style="grid-column: 1 / -1;">
-            <div style="display:flex; gap:20px; align-items:center; width:100%; margin-bottom:20px;">
-                <img src="${sign.svg_url}" alt="${sign.name}" style="width:120px;height:120px;object-fit:contain;">
-                <div>
-                    <h2>${sign.id}: ${sign.name || ''}</h2>
-                    <p><b>Category:</b> ${sign.category}</p>
-                    ${sign.risk ? `<p><b>Risk:</b> <span class="risk-badge">${sign.risk}</span></p>` : ''}
-                </div>
+window.navigateToCategory = function(cat) {
+    currentViewPath = { level: 'signs', category: cat };
+    renderCurrentView();
+};
+
+// 第二層：顯示該 Category 的所有標誌
+function renderSignsView(container, cat) {
+    let signs = rawSigns.filter(s => s.category === cat);
+    let html = `<button onclick="backToCategories()">⬅ 返回分類</button><h2>${cat} 標誌列表</h2><div class="grid-container">`;
+    
+    signs.forEach(s => {
+        html += `
+            <div class="card" onclick="handleSignClick('${s.id}', '${s.category}', '${s.name}')">
+                <img src="${s.svg_url || s.image}" alt="${s.name}">
+                <p>${s.id} - ${s.name}</p>
             </div>
-            ${controlContentHtml}
+        `;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+window.backToCategories = function() {
+    currentViewPath = { level: 'categories', category: null };
+    renderCurrentView();
+};
+
+window.handleSignClick = function(id, category, name) {
+    if (category === 'Warning sign') {
+        // W 類進入 Name 檢視
+        currentViewPath = { level: 'names', category: category, name: name };
+        renderCurrentView();
+    } else {
+        // 非 W 類直接進詳細頁
+        currentViewPath = { level: 'detail', id: id };
+        renderCurrentView();
+    }
+};
+
+// 第三層：Warning sign 的 Name 檢視
+function renderNamesView(container, cat) {
+    // 找出該 category 下不重複的 name
+    let wSigns = rawSigns.filter(s => s.category === cat);
+    let uniqueNames = [...new Set(wSigns.map(s => s.name))];
+    
+    let html = `<button onclick="navigateToCategory('${cat}')">⬅ 返回 ${cat}</button><h2>注意標誌群組</h2><div class="grid-container">`;
+    uniqueNames.forEach(name => {
+        let sample = wSigns.find(s => s.name === name);
+        html += `
+            <div class="card" onclick="navigateToRisks('${name}')">
+                <img src="${sample.svg_url || sample.image}" alt="${name}">
+                <p>${name}</p>
+            </div>
+        `;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+window.navigateToRisks = function(name) {
+    currentViewPath = { level: 'risks', name: name };
+    renderCurrentView();
+};
+
+// 第四層：Warning sign 的 4 個 Risk 等級檢視
+function renderRisksView(container, name) {
+    let variants = rawSigns.filter(s => s.name === name); // 應展開為 4 個風險等級
+    let html = `<button onclick="currentViewPath.level='names'; renderCurrentView();">⬅ 返回群組</button><h2>${name} - 風險等級選擇</h2><div class="grid-container">`;
+    
+    // 動態產生 1~4 風險等級呈現
+    for(let i=1; i<=4; i++) {
+        let variant = variants.find(v => String(v.risk) === String(i)) || variants[0];
+        html += `
+            <div class="card" onclick="navigateToDetail('${variant.id}_Risk${i}')">
+                <img src="${variant.svg_url || variant.image}" alt="Risk ${i}">
+                <p>風險等級 (Risk Level): ${i}</p>
+            </div>
+        `;
+    }
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+window.navigateToDetail = function(compoundId) {
+    // compoundId 格式為 id_RiskX
+    let realId = compoundId.split('_')[0];
+    let riskLv = compoundId.split('_Risk')[1];
+    currentViewPath = { level: 'detail', id: realId, risk: riskLv };
+    renderCurrentView();
+};
+
+// 第五層：詳細頁與 7 大危害控制表單 (支援雙擊編輯)
+function renderDetailView(container, id) {
+    let sign = rawSigns.find(s => s.id === id);
+    let riskLevel = currentViewPath.risk || sign.risk || '1';
+    let uniqueKey = `${sign.id}_${riskLevel}`;
+    
+    // 套用已審批資料
+    let currentData = approvedData[uniqueKey] || sign;
+
+    let html = `
+        <button onclick="window.history.back()">⬅ 返回</button>
+        <div class="table-container">
+            <h2>標誌詳情: ${sign.name} (ID: ${sign.id})</h2>
+            <img src="${sign.svg_url || sign.image}" style="max-width:150px; display:block; margin: 0 auto 1rem auto;">
+            <p><strong>風險等級 (Risk Level):</strong> ${riskLevel}</p>
+            <p style="color: #64748b; font-size: 0.9rem;">提示：雙擊表格右側 6 個控制欄位即可輸入新資訊並送審（支援手機與電腦雙擊）。</p>
+            
+            <table class="control-table">
+                <tr><th>控制項欄位</th><th>內容值</th></tr>
+                <tr><td class="readonly-cell">頻率 (freq)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'freq')">${currentData.freq || ''}</td></tr>
+                <tr><td class="readonly-cell">排除 (elim)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'elim')">${currentData.elim || ''}</td></tr>
+                <tr><td class="readonly-cell">替代 (sub)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'sub')">${currentData.sub || ''}</td></tr>
+                <tr><td class="readonly-cell">工程控制 (eng)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'eng')">${currentData.eng || ''}</td></tr>
+                <tr><td class="readonly-cell">管理控制 (admin)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'admin')">${currentData.admin || ''}</td></tr>
+                <tr><td class="readonly-cell">個人防護具 (ppe)</td><td class="editable-cell" ondblclick="makeEditable(this, '${sign.id}', '${riskLevel}', 'ppe')">${currentData.ppe || ''}</td></tr>
+            </table>
         </div>
     `;
-
-    // 支援手機友善的雙擊或長按編輯觸發
-    if (sign.hasControl) {
-        const detailItems = container.querySelectorAll('.detail-item');
-        detailItems.forEach(item => {
-            let pressTimer = null;
-            // 雙擊事件 (滑鼠/電腦)
-            item.addEventListener('dblclick', () => openEditModal(sign.id, sign.risk));
-            // 長按事件 (手機友善，按住 0.8 秒觸發編輯)
-            item.addEventListener('touchstart', () => {
-                pressTimer = setTimeout(() => openEditModal(sign.id, sign.risk), 800);
-            });
-            item.addEventListener('touchend', () => clearTimeout(pressTimer));
-            item.addEventListener('touchmove', () => clearTimeout(pressTimer));
-        });
-    }
+    container.innerHTML = html;
 }
 
-function openEditModal(signId, riskLevel) {
-    const sign = processedSigns.find(s => s.id === signId && s.risk === riskLevel);
-    if (!sign || !sign.hasControl) return;
+// 雙擊編輯並提交送審
+window.makeEditable = function(cell, signId, risk, field) {
+    if (cell.querySelector('input')) return;
+    let oldVal = cell.innerText;
+    cell.innerHTML = `<input type="text" value="${oldVal}" style="width:90%; padding:4px;" />`;
+    let input = cell.querySelector('input');
+    input.focus();
 
-    // 動態更新 Modal 內的語系文字
-    const t = i18nText[currentLang];
-    document.getElementById('edit-modal-title').textContent = t.edit_title;
-    document.getElementById('lbl-risk-level').childNodes[0].nodeValue = t.risk_level + " ";
-    document.getElementById('lbl-freq').childNodes[0].nodeValue = t.freq + " ";
-    document.getElementById('lbl-elim').childNodes[0].nodeValue = t.elim + " ";
-    document.getElementById('lbl-sub').childNodes[0].nodeValue = t.sub + " ";
-    document.getElementById('lbl-eng').childNodes[0].nodeValue = t.eng + " ";
-    document.getElementById('lbl-admin').childNodes[0].nodeValue = t.admin + " ";
-    document.getElementById('lbl-ppe').childNodes[0].nodeValue = t.ppe + " ";
-    document.getElementById('lbl-applicant').childNodes[0].nodeValue = t.applicant + " ";
-
-    document.getElementById('edit-sign-id').value = sign.id;
-    document.getElementById('edit-risk-level').value = sign.risk; 
-    document.getElementById('val-freq').value = sign.freq;
-    document.getElementById('val-elim').value = sign.elim;
-    document.getElementById('val-sub').value = sign.sub;
-    document.getElementById('val-eng').value = sign.eng;
-    document.getElementById('val-admin').value = sign.admin;
-    document.getElementById('val-ppe').value = sign.ppe;
-    document.getElementById('val-applicant').value = '';
-
-    document.getElementById('edit-modal').style.display = 'flex';
-}
-
-async function handleSignSubmit(e) {
-    e.preventDefault();
-    const payload = {
-        action: 'submitApproval',
-        signId: document.getElementById('edit-sign-id').value,
-        risk: document.getElementById('edit-risk-level').value,
-        field: 'all',
-        value: JSON.stringify({
-            freq: document.getElementById('val-freq').value,
-            elim: document.getElementById('val-elim').value,
-            sub: document.getElementById('val-sub').value,
-            eng: document.getElementById('val-eng').value,
-            admin: document.getElementById('val-admin').value,
-            ppe: document.getElementById('val-ppe').value
-        }),
-        applicant: document.getElementById('val-applicant').value
+    input.onblur = async function() {
+        let newVal = input.value;
+        cell.innerText = newVal;
+        if (newVal !== oldVal) {
+            await submitApproval(signId, risk, field, newVal);
+        }
     };
 
-    try {
-        const res = await fetch(GAS_API_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        if (result.success) {
-            alert('已成功送審 (PENDING)');
-            document.getElementById('edit-modal').style.display = 'none';
-            fetchPendingCount();
-        } else {
-            alert('送審失敗: ' + result.message);
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            input.blur();
         }
-    } catch (err) {
-        console.error(err);
-        alert('送審發生錯誤');
+    };
+};
+
+async function submitApproval(signId, risk, field, value) {
+    try {
+        let res = await fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'submit',
+                signId: signId,
+                risk: risk,
+                field: field,
+                value: value,
+                applicant: 'User'
+            })
+        });
+        let result = await res.json();
+        if (result.status === 'success') {
+            alert('已成功送交審批！');
+        }
+    } catch (e) {
+        console.error("送審失敗", e);
+        alert('送審失敗，請檢查網路連線');
     }
+}
+
+// 長按 Header 3 秒開啟管理員審批後台
+function setupHeaderLongPress() {
+    let header = document.getElementById('main-header');
+    let timer = null;
+
+    header.addEventListener('mousedown', () => {
+        timer = setTimeout(openApprovalModal, 3000);
+    });
+    header.addEventListener('mouseup', () => clearTimeout(timer));
+    header.addEventListener('touchstart', () => {
+        timer = setTimeout(openApprovalModal, 3000);
+    });
+    header.addEventListener('touchend', () => clearTimeout(timer));
 }
 
 async function openApprovalModal() {
-    const container = document.getElementById('approval-list-container');
-    container.innerHTML = '載入中...';
-    document.getElementById('approval-modal').style.display = 'flex';
+    let modal = document.getElementById('approval-modal');
+    let listDiv = document.getElementById('approval-list');
+    modal.style.display = 'flex';
+    listDiv.innerHTML = '載入中...';
 
     try {
-        const res = await fetch(`${GAS_API_URL}?action=getPendingApprovals`);
-        const list = await res.json();
-        container.innerHTML = '';
+        let res = await fetch(`${GAS_URL}?action=getPending`);
+        let pendingItems = await res.json();
 
-        if (!list || list.length === 0) {
-            container.innerHTML = '<p>目前沒有待審批項目。</p>';
+        if (pendingItems.length === 0) {
+            listDiv.innerHTML = '<p>目前沒有待審批項目。</p>';
             return;
         }
 
-        list.forEach(item => {
-            const div = document.createElement('div');
-            div.style.borderBottom = '1px solid #ddd';
-            div.style.padding = '10px 0';
-            div.innerHTML = `
-                <p><b>ID:</b> ${item.signId} | <b>Risk:</b> ${item.risk} | <b>申請人:</b> ${item.applicant}</p>
-                <p><b>內容:</b> ${item.value}</p>
-                <button onclick="reviewApproval('${item.timestamp}', '${item.signId}', '${item.risk}', 'APPROVED')">核准 (APPROVED)</button>
-                <button onclick="reviewApproval('${item.timestamp}', '${item.signId}', '${item.risk}', 'REJECTED')" style="background:#ef4444; color:white;">駁回 (REJECTED)</button>
+        let html = '';
+        pendingItems.forEach((item, idx) => {
+            html += `
+                <div style="border-bottom: 1px solid #ccc; padding: 10px 0;">
+                    <p><strong>標誌 ID:</strong> ${item.signId} | <strong>風險:</strong> ${item.risk} | <strong>欄位:</strong> ${item.field}</p>
+                    <p><strong>新內容:</strong> ${item.value}</p>
+                    <button onclick="reviewItem(${idx}, 'APPROVED', '${item.signId}', '${item.risk}', '${item.field}', '${item.value}')" style="background:green; color:white;">通過</button>
+                    <button onclick="reviewItem(${idx}, 'REJECTED', '${item.signId}', '${item.risk}', '${item.field}', '${item.value}')" style="background:red; color:white;">拒絕</button>
+                </div>
             `;
-            container.appendChild(div);
         });
+        listDiv.innerHTML = html;
     } catch (e) {
-        container.innerHTML = '<p>載入失敗</p>';
+        listDiv.innerHTML = '載入失敗';
     }
 }
 
-async function reviewApproval(timestamp, signId, risk, status) {
-    const reviewer = prompt("請輸入審批人姓名:") || "Admin";
-    try {
-        const res = await fetch(GAS_API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'reviewApproval', timestamp, signId, risk, status, reviewer })
-        });
-        const result = await res.json();
-        if (result.success) {
-            alert(`已完成審批: ${status}`);
-            openApprovalModal();
-            fetchGASData();
-            fetchPendingCount();
-        } else {
-            alert('審批失敗');
-        }
-    } catch (e) {
-        console.error(e);
-        alert('審批發生錯誤');
-    }
-}
+window.reviewItem = async function(index, status, signId, risk, field, value) {
+    await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'review', signId, risk, field, value, status, reviewer: 'Admin' })
+    });
+    alert(`審批結果已儲存: ${status}`);
+    openApprovalModal(); // 重新整理列表
+    fetchSignsFromSheet(); // 更新前端
+};
 
-function handleQRDirectOpen(id) {
-    document.getElementById('search-input').value = id;
-    renderSigns();
-}
-
-function startQRScanner() {
-    const html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        (decodedText) => {
-            try {
-                const url = new URL(decodedText);
-                const id = url.searchParams.get('id');
-                if (id) {
-                    html5QrCode.stop();
-                    document.getElementById('mode-db').click();
-                    document.getElementById('search-input').value = id;
-                    renderSigns();
-                }
-            } catch {
-                html5QrCode.stop();
-                document.getElementById('mode-db').click();
-                document.getElementById('search-input').value = decodedText;
-                renderSigns();
-            }
-        },
-        (error) => {}
-    ).catch(err => console.log("QR Scanner error:", err));
-}
-
-function exportExcel() {
-    const exportData = processedSigns.map(s => ({
-        ID: s.id,
-        Name: s.name,
-        Category: s.category,
-        Risk: s.risk,
-        Freq: s.freq,
-        Elim: s.elim,
-        Sub: s.sub,
-        Eng: s.eng,
-        Admin: s.admin,
-        PPE: s.ppe
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "ISO7010_Data");
-
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const timestampStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    
-    XLSX.writeFile(workbook, `ISO7010_Database_${timestampStr}.xlsx`);
-}
+document.getElementById('close-modal-btn').onclick = () => {
+    document.getElementById('approval-modal').style.display = 'none';
+};
