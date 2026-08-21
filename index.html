@@ -1,157 +1,621 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>安全文化與意識</title>
+  
+  <!-- PWA Manifest & Meta -->
+  <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22%E5%AE%89%E5%85%A8%E6%96%87%E5%8C%96%E8%88%87%E6%84%8F%E8%AD%98%22%2C%22short_name%22%3A%22%E5%AE%89%E5%85%A8%E6%A8%99%E8%AA%8C%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f3f4f6%22%2C%22theme_color%22%3A%22%231f2937%22%7D">
+  <meta name="theme-color" content="#1f2937">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QRCode.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- HTML5-QRCode Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
-<meta charset="UTF-8">
-
-<meta name="viewport"
-content="width=device-width,initial-scale=1">
-
-<title>
-ISO7010 Safety PWA
-</title>
-
-https://cdn.tailwindcss.com
-
+  <style>
+    /* 禁用編輯區域預設雙擊縮放 */
+    .no-zoom {
+      touch-action: manipulation;
+    }
+    .smooth-update {
+      transition: all 0.3s ease-in-out;
+    }
+  </style>
 </head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col">
 
-<body class="bg-gray-100">
+  <!-- 頂部導覽列 Header (功能1: 主題 & 語言切換 & 後台觸發) -->
+  <header class="bg-gray-900 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-40">
+    <h1 id="app-title" class="text-xl font-bold select-none cursor-pointer tracking-wide hover:text-blue-400 transition"
+        title="長按3秒進入審批流程">
+      安全文化與意識
+    </h1>
 
-<header
-class="bg-blue-600 text-white p-4">
+    <div class="flex items-center space-x-2">
+      <label for="lang-select" class="text-sm hidden sm:inline">語言 / Lang:</label>
+      <select id="lang-select" class="bg-gray-800 text-white text-sm border border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="zh" selected>繁體中文</option>
+        <option value="en">English</option>
+        <option value="de">Deutsch</option>
+      </select>
+    </div>
+  </header>
 
-<h1 class="text-xl font-bold">
+  <!-- 主內容區域 -->
+  <main class="flex-grow container mx-auto px-4 py-6 max-w-4xl">
+    
+    <!-- 頂部三大功能按鈕 (T, 相機, 資料庫) -->
+    <div class="grid grid-cols-3 gap-4 mb-8">
+      <button id="btn-text-search" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-blue-500 group">
+        <span class="text-3xl font-extrabold text-blue-600 group-hover:scale-110 transition">T</span>
+        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_text_search">文字搜尋</span>
+      </button>
 
-ISO7010 Safety PWA
+      <button id="btn-camera" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-green-500 group">
+        <svg class="w-8 h-8 text-green-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_camera">掃描 QR</span>
+      </button>
 
-</h1>
+      <button id="btn-database" class="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition border-2 border-transparent hover:border-purple-500 group">
+        <svg class="w-8 h-8 text-purple-600 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+        </svg>
+        <span class="text-xs sm:text-sm font-medium mt-1 text-gray-600" data-i18n="nav_database">資料庫</span>
+      </button>
+    </div>
 
-</header>
+    <!-- 主要內容動態展現區域 -->
+    <div id="content-area" class="w-full">
+      <!-- 首頁/詳細頁/資料庫清單動態切換 -->
+    </div>
+  </main>
 
-<div class="p-4">
+  <!-- 文字搜尋 Modal -->
+  <div id="modal-search" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_search_title">輸入標誌流水編號</h3>
+      <input type="text" id="search-input" placeholder="例: W-HighVoltage-(2)" class="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      <div class="flex justify-end space-x-3">
+        <button id="btn-search-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition" data-i18n="cancel">取消</button>
+        <button id="btn-search-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" data-i18n="confirm">確認</button>
+      </div>
+    </div>
+  </div>
 
-<button
-onclick="loadSigns()"
-class="bg-blue-600 text-white px-4 py-2 rounded">
+  <!-- 相機 QR 掃描 Modal -->
+  <div id="modal-camera" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex flex-col items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative flex flex-col items-center">
+      <button id="btn-camera-close" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+      <h3 class="text-lg font-bold mb-4 text-gray-900" data-i18n="modal_camera_title">掃描 ISO 7010 QR-Code</h3>
+      <div id="reader" class="w-full h-64 bg-black rounded-lg overflow-hidden"></div>
+      <p id="camera-status" class="text-xs text-gray-500 mt-3" data-i18n="camera_status_hint">請對準標誌上的 QR-Code</p>
+    </div>
+  </div>
 
-Load Data
+  <!-- 後台「審批流程」Modal -->
+  <div id="modal-approval" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center mb-4 border-b pb-3">
+        <h3 class="text-xl font-bold text-gray-900" data-i18n="admin_approval_title">後台審批矩陣 (管理員)</h3>
+        <button id="btn-approval-close" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+      </div>
+      <div id="approval-list" class="flex-grow overflow-y-auto space-y-3 p-1">
+        <!-- 待審批資料動態渲染 -->
+      </div>
+    </div>
+  </div>
 
-</button>
+  <!-- 詳情長按展開 Modal -->
+  <div id="modal-detail" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+      <h3 id="modal-detail-title" class="text-lg font-bold mb-2 text-gray-900">詳細資訊</h3>
+      <div id="modal-detail-content" class="text-sm text-gray-700 whitespace-pre-wrap max-h-60 overflow-y-auto bg-gray-50 p-3 rounded-lg border mb-4"></div>
+      <div class="flex justify-end">
+        <button id="btn-detail-close" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition" data-i18n="close">關閉</button>
+      </div>
+    </div>
+  </div>
 
-</div>
+  <script>
+    // ==================== 全局設定與資料結構 ====================
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
 
-<div
-id="status"
-class="p-4 text-sm">
+    const i18nDict = {
+      zh: {
+        app_title: "安全文化與意識",
+        nav_text_search: "文字搜尋",
+        nav_camera: "掃描 QR",
+        nav_database: "資料庫",
+        modal_search_title: "輸入標誌流水編號",
+        modal_camera_title: "掃描 ISO 7010 QR-Code",
+        admin_approval_title: "後台審批矩陣 (管理員)",
+        cancel: "取消",
+        confirm: "確認",
+        close: "關閉",
+        approve: "通過",
+        camera_status_hint: "請對準標誌上的 QR-Code",
+        not_found: "找不到符合該流水號的標誌資訊！",
+        double_click_hint: "雙擊框格編輯提交",
+        fields: {
+          freq: "發生頻率",
+          elim: "消除",
+          sub: "取代",
+          eng: "工程管制",
+          admin: "行政管制",
+          ppe: "個人防護用具",
+          risk: "風險等級"
+        }
+      },
+      en: {
+        app_title: "Safety Culture & Awareness",
+        nav_text_search: "Search ID",
+        nav_camera: "Scan QR",
+        nav_database: "Database",
+        modal_search_title: "Enter Sign Serial ID",
+        modal_camera_title: "Scan ISO 7010 QR-Code",
+        admin_approval_title: "Approval Workflow (Admin)",
+        cancel: "Cancel",
+        confirm: "Confirm",
+        close: "Close",
+        approve: "Approve",
+        camera_status_hint: "Align QR-Code within frame",
+        not_found: "No matching sign found for this Serial ID!",
+        double_click_hint: "Double click to edit & submit",
+        fields: {
+          freq: "Frequency",
+          elim: "Elimination",
+          sub: "Substitution",
+          eng: "Engineering Controls",
+          admin: "Administrative Controls",
+          ppe: "PPE",
+          risk: "Risk Level"
+        }
+      },
+      de: {
+        app_title: "Sicherheitskultur & Bewusstsein",
+        nav_text_search: "ID Suchen",
+        nav_camera: "QR Scannen",
+        nav_database: "Datenbank",
+        modal_search_title: "Sicherheits-ID Eingeben",
+        modal_camera_title: "ISO 7010 QR-Code Scannen",
+        admin_approval_title: "Genehmigungsmatrix (Admin)",
+        cancel: "Abbrechen",
+        confirm: "Bestätigen",
+        close: "Schließen",
+        approve: "Genehmigen",
+        camera_status_hint: "Richten Sie den QR-Code aus",
+        not_found: "Kein Übereinstimmendes Schild Gefunden!",
+        double_click_hint: "Doppelklick zum Bearbeiten",
+        fields: {
+          freq: "Häufigkeit",
+          elim: "Beseitigung",
+          sub: "Substitution",
+          eng: "Technische Kontrollen",
+          admin: "Organisatorische Maßnahmen",
+          ppe: "PSA",
+          risk: "Risikostufe"
+        }
+      }
+    };
 
-Ready
+    let currentLang = "zh";
 
-</div>
+    // ISO 7010 標誌資料 (包含 W:注意, P:禁止, M:強制, E:救護)
+    const isoSignsData = [
+      {
+        category: "W",
+        meaning: "HighVoltage",
+        level: "2",
+        id: "W-HighVoltage-(2)",
+        name: { zh: "當心觸電", en: "Warning; Electricity", de: "Warnung vor gefährlicher elektrischer Spannung" },
+        svg: `<polygon points="50,5 95,90 5,90" fill="#FACC15" stroke="#000" stroke-width="6"/><path d="M50,25 L35,55 L50,55 L45,80 L65,48 L50,48 Z" fill="#000"/>`
+      },
+      {
+        category: "W",
+        meaning: "ToxicMaterial",
+        level: "4",
+        id: "W-ToxicMaterial-(4)",
+        name: { zh: "當心有毒物質", en: "Warning; Toxic material", de: "Warnung vor giftigen Stoffen" },
+        svg: `<polygon points="50,5 95,90 5,90" fill="#FACC15" stroke="#000" stroke-width="6"/><circle cx="50" cy="45" r="12" fill="#000"/><path d="M35,65 L65,65 M40,55 L60,75 M60,55 L40,75" stroke="#000" stroke-width="4"/>`
+      },
+      {
+        category: "P",
+        meaning: "NoSmoking",
+        level: null,
+        id: "P-NoSmoking",
+        name: { zh: "禁止吸菸", en: "No smoking", de: "Rauchen verboten" },
+        svg: `<circle cx="50" cy="50" r="42" fill="none" stroke="#DC2626" stroke-width="10"/><line x1="20" y1="20" x2="80" y2="80" stroke="#DC2626" stroke-width="10"/><rect x="30" y="46" width="35" height="8" fill="#000"/>`
+      },
+      {
+        category: "M",
+        meaning: "WearEarProtection",
+        level: null,
+        id: "M-WearEarProtection",
+        name: { zh: "必須戴聽力防護具", en: "Wear ear protection", de: "Gehörschutz benutzen" },
+        svg: `<circle cx="50" cy="50" r="45" fill="#2563EB"/><circle cx="50" cy="50" r="22" fill="none" stroke="#FFF" stroke-width="6"/><path d="M30,50 Q30,30 50,30 Q70,30 70,50" fill="none" stroke="#FFF" stroke-width="6"/>`
+      }
+    ];
 
-<div
-id="grid"
-class="
-grid
-grid-cols-2
-md:grid-cols-4
-gap-4
-p-4">
+    let dynamicSubDirectories = {};
+    let pendingApprovalMatrix = [];
+    let currentViewMode = "SINGLE"; // "SINGLE" (單一注意標誌) 或 "DATABASE" (資料庫簡覽清單)
+    let activeSignId = "W-HighVoltage-(2)"; // 預設顯示首頁的注意標誌
 
-</div>
-
-<script>
-
-const GAS_URL =
-"https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec";
-
-let isoSignsData = [];
-
-async function loadSigns(){
-
-    document
-    .getElementById("status")
-    .innerText =
-    "Loading...";
-
-    try{
-
-        const response =
-        await fetch(
-            GAS_URL +
-            "?action=SIGNS"
-        );
-
-        isoSignsData =
-        await response.json();
-
-        renderSigns();
-
-        document
-        .getElementById("status")
-        .innerText =
-        isoSignsData.length +
-        " signs loaded";
-
-    }
-    catch(error){
-
-        console.error(error);
-
-        document
-        .getElementById("status")
-        .innerText =
-        error.toString();
-
-    }
-
-}
-
-function renderSigns(){
-
-    const grid =
-    document
-    .getElementById("grid");
-
-    grid.innerHTML = "";
-
-    isoSignsData.forEach(sign=>{
-
-        const card =
-        document.createElement("div");
-
-        card.className =
-        "bg-white p-2 rounded shadow";
-
-        const svg =
-        sign.svg_url || "";
-
-        card.innerHTML = `
-
-            ${svg}
-
-            <div class="font-bold">
-
-            ${sign.id}
-
-            </div>
-
-            <div>
-
-            ${sign.name}
-
-            </div>
-
-        `;
-
-        grid.appendChild(card);
-
+    document.addEventListener("DOMContentLoaded", () => {
+      initI18n();
+      renderCurrentView();
+      setupEventListeners();
+      setupHeaderLongPress();
+      fetchGASData();
     });
 
-}
+    function initI18n() {
+      document.getElementById("lang-select").addEventListener("change", (e) => {
+        currentLang = e.target.value;
+        updatePageLanguage();
+      });
+    }
 
-</script>
+    function updatePageLanguage() {
+      const dict = i18nDict[currentLang];
+      document.getElementById("app-title").textContent = dict.app_title;
+      document.querySelectorAll("[data-i18n]").forEach(el => {
+        const key = el.getAttribute("data-i18n");
+        if (dict[key]) el.textContent = dict[key];
+      });
+      renderCurrentView();
+    }
 
+    // 依據當前 View 渲染畫面
+    function renderCurrentView() {
+      const container = document.getElementById("content-area");
+      container.innerHTML = "";
+
+      if (currentViewMode === "SINGLE") {
+        renderSingleSignDetail(container, activeSignId);
+      } else if (currentViewMode === "DATABASE") {
+        renderDatabaseListView(container);
+      }
+    }
+
+    // 修改點3: 渲染單一標誌的詳細資訊卡片 (首頁模式/點選詳情)
+    function renderSingleSignDetail(container, signId) {
+      const sign = isoSignsData.find(s => s.id.toLowerCase() === signId.toLowerCase());
+      if (!sign) {
+        container.innerHTML = `<div class="text-center py-12 text-gray-500 font-medium">${i18nDict[currentLang].not_found}</div>`;
+        return;
+      }
+
+      const signTitleName = sign.name[currentLang] || sign.name.zh;
+      
+      // 等級數字顯示於三角形下方獨立空間
+      const levelHtml = (sign.category === "W" && sign.level) 
+        ? `<div class="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-400 text-yellow-900 font-black text-sm rounded-full inline-block shadow-sm">等級 ${sign.level}</div>` 
+        : '';
+
+      // 修改點1: 只有「注意標誌 (category === 'W')」才渲染 7 大資訊子目錄
+      const subFieldsHtml = (sign.category === "W") ? `
+        <div class="mt-6 border-t pt-4 space-y-2">
+          <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">${i18nDict[currentLang].double_click_hint}</h5>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+            ${renderSubFieldsHtml(sign.id)}
+          </div>
+        </div>
+      ` : '';
+
+      const card = document.createElement("div");
+      card.className = "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 max-w-2xl mx-auto smooth-update";
+      card.innerHTML = `
+        <div class="flex flex-col sm:flex-row items-center justify-between border-b pb-6 gap-4">
+          <div class="flex flex-col items-center text-center">
+            <svg class="w-28 h-28" viewBox="0 0 100 100">${sign.svg}</svg>
+            ${levelHtml}
+            <h3 class="mt-3 font-bold text-gray-900 text-lg">${signTitleName}</h3>
+          </div>
+
+          <div class="flex flex-col items-center sm:items-end">
+            <div id="qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}" class="p-2 bg-white border rounded-xl shadow-inner"></div>
+            <span class="mt-3 text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-md border">${sign.id}</span>
+          </div>
+        </div>
+        ${subFieldsHtml}
+      `;
+
+      container.appendChild(card);
+
+      // 動態繪製 QR Code
+      setTimeout(() => {
+        const qrContainer = document.getElementById(`qrcode-${sign.id.replace(/[^a-zA-Z0-9]/g, '')}`);
+        if (qrContainer) {
+          qrContainer.innerHTML = "";
+          new QRCode(qrContainer, {
+            text: sign.id,
+            width: 90,
+            height: 90
+          });
+        }
+      }, 50);
+
+      if (sign.category === "W") {
+        bindSubFieldEvents();
+      }
+    }
+
+    // 修改點2: 點擊資料庫後的呈現狀態 -> 僅以「標誌圖案」與「意思」顯示
+    function renderDatabaseListView(container) {
+      const grid = document.createElement("div");
+      grid.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4";
+
+      isoSignsData.forEach(sign => {
+        const signName = sign.name[currentLang] || sign.name.zh;
+        const item = document.createElement("div");
+        item.className = "bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition cursor-pointer hover:border-purple-300 group";
+        
+        item.innerHTML = `
+          <svg class="w-16 h-16 group-hover:scale-105 transition" viewBox="0 0 100 100">${sign.svg}</svg>
+          <span class="mt-2 font-bold text-gray-800 text-sm">${signName}</span>
+          <span class="text-[10px] text-gray-400 font-mono mt-0.5">${sign.id}</span>
+        `;
+
+        // 點擊圖案後，切換顯示該圖案的詳細資訊
+        item.addEventListener("click", () => {
+          activeSignId = sign.id;
+          currentViewMode = "SINGLE";
+          renderCurrentView();
+        });
+
+        grid.appendChild(item);
+      });
+
+      container.appendChild(grid);
+    }
+
+    function renderSubFieldsHtml(signId) {
+      const fieldKeys = ["freq", "elim", "sub", "eng", "admin", "ppe", "risk"];
+      const fieldsDict = i18nDict[currentLang].fields;
+
+      return fieldKeys.map(key => {
+        const fieldName = fieldsDict[key];
+        const approvedValues = (dynamicSubDirectories[signId] && dynamicSubDirectories[signId][key]) || [];
+        let displayContent = approvedValues.map(v => v[currentLang] || v.zh).join(" | ");
+        
+        const isOverflow = displayContent.length > 25;
+        const truncatedContent = isOverflow ? displayContent.substring(0, 25) + "..." : displayContent || "-";
+
+        return `
+          <div class="sub-field-box border rounded-lg p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer no-zoom"
+               data-sign-id="${signId}" data-field-key="${key}" data-full-text="${displayContent}">
+            <div class="flex justify-between font-semibold text-gray-600 mb-1">
+              <span>${fieldName}</span>
+            </div>
+            <div class="text-gray-800 font-medium truncate-text">${truncatedContent}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function bindSubFieldEvents() {
+      document.querySelectorAll(".sub-field-box").forEach(box => {
+        let pressTimer = null;
+
+        box.addEventListener("touchstart", startPress);
+        box.addEventListener("mousedown", startPress);
+        box.addEventListener("touchend", cancelPress);
+        box.addEventListener("mouseup", cancelPress);
+        box.addEventListener("mouseleave", cancelPress);
+
+        function startPress() {
+          pressTimer = setTimeout(() => {
+            const fullText = box.getAttribute("data-full-text");
+            if (fullText) showDetailModal("詳細危害控制資訊", fullText);
+          }, 3000);
+        }
+
+        function cancelPress() {
+          if (pressTimer) clearTimeout(pressTimer);
+        }
+
+        box.addEventListener("dblclick", () => {
+          const signId = box.getAttribute("data-sign-id");
+          const fieldKey = box.getAttribute("data-field-key");
+          const fieldName = i18nDict[currentLang].fields[fieldKey];
+          promptSubmitInput(signId, fieldKey, fieldName);
+        });
+      });
+    }
+
+    function promptSubmitInput(signId, fieldKey, fieldName) {
+      const userInput = prompt(`【待審批提交】請輸入 ${signId} 之「${fieldName}」資訊：`);
+      if (userInput && userInput.trim() !== "") {
+        submitPendingData(signId, fieldKey, userInput.trim());
+      }
+    }
+
+    function submitPendingData(signId, fieldKey, val) {
+      const payload = {
+        action: "submitInfo",
+        id: signId,
+        path: `ISO7010 > ${signId} > ${fieldKey}`,
+        field: fieldKey,
+        value: val
+      };
+
+      pendingApprovalMatrix.push(payload);
+      alert("提交成功！資料已進入「待審批狀態」，審核通過後頁面將自動同步。");
+
+      if (GAS_WEB_APP_URL && GAS_WEB_APP_URL !== "YOUR_GAS_WEB_APP_URL_HERE") {
+        fetch(GAS_WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) }).catch(err => console.log(err));
+      }
+    }
+
+    function setupHeaderLongPress() {
+      const titleEl = document.getElementById("app-title");
+      let pressTimer = null;
+
+      titleEl.addEventListener("mousedown", startPress);
+      titleEl.addEventListener("touchstart", startPress);
+      titleEl.addEventListener("mouseup", cancelPress);
+      titleEl.addEventListener("touchend", cancelPress);
+      titleEl.addEventListener("mouseleave", cancelPress);
+
+      function startPress() {
+        pressTimer = setTimeout(() => { openApprovalModal(); }, 3000);
+      }
+
+      function cancelPress() {
+        if (pressTimer) clearTimeout(pressTimer);
+      }
+    }
+
+    function openApprovalModal() {
+      const modal = document.getElementById("modal-approval");
+      const listContainer = document.getElementById("approval-list");
+      listContainer.innerHTML = "";
+
+      if (pendingApprovalMatrix.length === 0) {
+        listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">目前無待審批的訊息。</div>`;
+      } else {
+        pendingApprovalMatrix.forEach((item, index) => {
+          const itemDiv = document.createElement("div");
+          itemDiv.className = "p-4 bg-gray-50 rounded-xl border flex justify-between items-center hover:bg-gray-100 transition";
+          itemDiv.innerHTML = `
+            <div>
+              <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${item.path}</span>
+              <p class="text-sm font-semibold text-gray-800 mt-1">${item.value}</p>
+            </div>
+            <button onclick="approveItem(${index})" class="px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
+              ${i18nDict[currentLang].approve}
+            </button>
+          `;
+          listContainer.appendChild(itemDiv);
+        });
+      }
+
+      modal.classList.remove("hidden");
+    }
+
+    window.approveItem = function(index) {
+      const approvedItem = pendingApprovalMatrix.splice(index, 1)[0];
+      if (!dynamicSubDirectories[approvedItem.id]) dynamicSubDirectories[approvedItem.id] = {};
+      if (!dynamicSubDirectories[approvedItem.id][approvedItem.field]) dynamicSubDirectories[approvedItem.id][approvedItem.field] = [];
+
+      dynamicSubDirectories[approvedItem.id][approvedItem.field].push({
+        zh: approvedItem.value,
+        en: approvedItem.value,
+        de: approvedItem.value
+      });
+
+      renderCurrentView();
+      openApprovalModal();
+
+      if (GAS_WEB_APP_URL && GAS_WEB_APP_URL !== "YOUR_GAS_WEB_APP_URL_HERE") {
+        fetch(GAS_WEB_APP_URL, { method: "POST", body: JSON.stringify({ action: "approveItem", ...approvedItem }) }).catch(err => console.log(err));
+      }
+    };
+
+    function setupEventListeners() {
+      // 「T」文字搜尋
+      document.getElementById("btn-text-search").addEventListener("click", () => {
+        document.getElementById("modal-search").classList.remove("hidden");
+      });
+      document.getElementById("btn-search-cancel").addEventListener("click", () => {
+        document.getElementById("modal-search").classList.add("hidden");
+      });
+      document.getElementById("btn-search-confirm").addEventListener("click", () => {
+        const query = document.getElementById("search-input").value.trim();
+        document.getElementById("modal-search").classList.add("hidden");
+        if (query) {
+          activeSignId = query;
+          currentViewMode = "SINGLE";
+          renderCurrentView();
+        }
+      });
+
+      // 「資料庫」按鈕 -> 切換為圖案列表簡覽模式
+      document.getElementById("btn-database").addEventListener("click", () => {
+        currentViewMode = "DATABASE";
+        renderCurrentView();
+      });
+
+      // 「相機」QR 掃描按鈕
+      let html5QrCode = null;
+      document.getElementById("btn-camera").addEventListener("click", () => {
+        const modalCam = document.getElementById("modal-camera");
+        modalCam.classList.remove("hidden");
+
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 200, height: 200 } },
+          (decodedText) => {
+            html5QrCode.stop();
+            modalCam.classList.add("hidden");
+            activeSignId = decodedText;
+            currentViewMode = "SINGLE";
+            renderCurrentView();
+          },
+          (err) => {}
+        ).catch(err => {
+          alert("無法取得相機權限，相機程式已關閉。");
+          modalCam.classList.add("hidden");
+        });
+      });
+
+      document.getElementById("btn-camera-close").addEventListener("click", () => {
+        if (html5QrCode) html5QrCode.stop().catch(() => {});
+        document.getElementById("modal-camera").classList.add("hidden");
+      });
+
+      document.getElementById("btn-approval-close").addEventListener("click", () => {
+        document.getElementById("modal-approval").classList.add("hidden");
+      });
+
+      document.getElementById("btn-detail-close").addEventListener("click", () => {
+        document.getElementById("modal-detail").classList.add("hidden");
+      });
+    }
+
+    function showDetailModal(title, content) {
+      document.getElementById("modal-detail-title").textContent = title;
+      document.getElementById("modal-detail-content").textContent = content;
+      document.getElementById("modal-detail").classList.remove("hidden");
+    }
+
+    function fetchGASData() {
+      if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "YOUR_GAS_WEB_APP_URL_HERE") return;
+      fetch(`${GAS_WEB_APP_URL}?action=getData`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "success" && data.data) {
+            renderCurrentView();
+          }
+        }).catch(err => console.log("Fetch error:", err));
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swCode = `
+          self.addEventListener('install', e => self.skipWaiting());
+          self.addEventListener('activate', e => self.clients.claim());
+          self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response("Offline"))));
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+      });
+    }
+  </script>
 </body>
-
 </html>
+"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(updated_html)
+
+print("index.html 更新成功！")
