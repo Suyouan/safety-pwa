@@ -36,6 +36,7 @@
     
     <!-- 工具列 -->
     <div class="toolbar">
+        <button onclick="goBack()" style="background: #6c757d;">⬅️ 返回</button>
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
         <button onclick="startQRScanner()">開啟 QR 掃描</button>
         <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
@@ -136,8 +137,17 @@
         window.onload = function() {
             initPhase5();
             updateAdminUI();
-            // 已移除原本的 setupHeaderLongPress() 綁定
         };
+
+        // ==================== 返回功能預留 ====================
+        function goBack() {
+            // 目前預設行為為瀏覽器歷史上一頁，您未來可依需求改成切換不同的檢視畫面 (View)
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                alert("目前已是首頁或無上一頁記錄");
+            }
+        }
 
         async function initPhase5() {
             try {
@@ -188,6 +198,8 @@
             
             let adminElements = document.querySelectorAll('.admin-only');
             adminElements.forEach(el => {
+                if (el.id === 'controlView') return;
+
                 if (el.tagName === 'TR' || el.tagName === 'DIV') {
                     el.style.display = isAdmin ? 'block' : 'none';
                 } else {
@@ -269,7 +281,6 @@
             document.getElementById('qrModal').style.display = 'none';
         }
 
-        // 開啟管理者中心 Modal 的按鍵觸發函式
         function openAdminModal() {
             document.getElementById('adminModal').style.display = 'block';
             updateAdminUI();
