@@ -403,55 +403,47 @@
                 isCommitted = true;
                 let newVal = inputEl.value.trim();
 
+                // 如果一般使用者沒輸入就失焦，恢復原狀
                 if (!newVal && !isAdmin) {
                     cell.innerText = originalVal || '-';
                     return;
                 }
 
-                let finalVal = '';
-                if (isAdmin) {
-                    // 【管理者模式】直接覆寫新值（不加分號），並僅更新前端畫面與暫存資料
-                    finalVal = newVal;
-                    cell.innerText = finalVal || '-';
+                let uniqueKey = document.getElementById('evalUniqueKey').value;
+                let item = masterData.find(d => d.uniqueKey === uniqueKey);
 
-                    let uniqueKey = document.getElementById('evalUniqueKey').value;
-                    let item = masterData.find(d => d.uniqueKey === uniqueKey);
+                if (isAdmin) {
+                    // 【管理者模式】直接覆寫新值，僅更新前端暫存，需按「儲存評估變更」才寫入資料庫
+                    cell.innerText = newVal || '-';
                     if (item) {
-                        item[fieldKey] = finalVal; // 僅更新前端暫存
+                        item[fieldKey] = newVal;
                     }
-                    
-                    document.getElementById('status').innerText = `💡 [管理者] 欄位 [${fieldKey}] 已暫存修改，請記得點擊右上角「儲存評估變更」以寫入資料庫！`;
+                    document.getElementById('status').innerText = `💡 [管理者] 欄位 [${fieldKey}] 已暫存修改，請記得點擊右上角「儲存評估變更」！`;
 
                 } else {
-                    // 【一般使用者模式】與原資訊以「 ; 」合併，並立即送出待審批
-                    finalVal = originalVal ? `${originalVal} ; ${newVal}` : newVal;
-                    cell.innerText = finalVal || '-';
+                    // 【一般使用者模式】畫面保持原本的內容（不擅自做 ; 合併），只將新輸入的內容送出待審批
+                    cell.innerText = originalVal || '-';
 
-                    let uniqueKey = document.getElementById('evalUniqueKey').value;
-                    let item = masterData.find(d => d.uniqueKey === uniqueKey);
-                    if (item) {
-                        item[fieldKey] = finalVal;
-                    }
-
-                    document.getElementById('status').innerText = `⏳ 資訊已更新，欄位 [${fieldKey}] 已進入後台等待審批...`;
+                    document.getElementById('status').innerText = `⏳ 您的建議已送出，欄位 [${fieldKey}] 正等待管理員審批...`;
                     try {
-                        let rowId = item.id || item.ID || '';
-                        let rowRisk = item.risk || item.Risk || '';
+                        let rowId = item ? (item.id || item.ID || '') : '';
+                        let rowRisk = item ? (item.risk || item.Risk || '') : '';
                         let updatePayload = {
                             action: 'submitPendingApproval',
                             id: rowId,
                             risk: rowRisk,
                             field: fieldKey,
-                            value: finalVal
+                            value: newVal // 只傳送新輸入的值，由後端審批流程決定何時與舊值以「;」合併
                         };
                         await fetch(GAS_URL, {
                             method: 'POST',
                             mode: 'no-cors',
                             body: JSON.stringify(updatePayload)
                         });
-                        alert("✅ 您的修改已送出，目前已進入後台等待審批！");
+                        alert("✅ 您的修改已送出，目前已進入後台等待管理員審批！");
                     } catch (e) {
                         console.error("審批傳送異常：", e);
+                        alert("❌ 審批送出失敗，請檢查網路連線。");
                     }
                 }
             }
