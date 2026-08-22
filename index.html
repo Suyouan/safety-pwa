@@ -292,12 +292,11 @@
         isAdmin = true;
         sessionStorage.setItem('isAdmin', 'true');
         
-        // 🔹【關鍵】必須加上這行，才會去尋找所有 admin-only 並把它們顯示出來！
-        if (typeof renderUI === 'function') {
-            renderUI(masterData); 
-        } else if (typeof updateAdminUI === 'function') {
-            updateAdminUI();
-        }
+        // 🔹【修正重點】強制讓所有 admin-only 顯示出來
+        let elements = document.querySelectorAll('.admin-only');
+        elements.forEach(function(el) {
+            el.style.display = 'inline-block'; // 或者是 'block'
+        });
 
         alert("管理員登入成功！");
         document.getElementById('adminModal').style.display = 'none';
