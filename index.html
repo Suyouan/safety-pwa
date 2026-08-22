@@ -287,18 +287,25 @@
         }
 
         function verifyLogin() {
-            let inputPwd = document.getElementById('pwdInput').value;
-            if (inputPwd === '0') {
-                isAdmin = true;
-                sessionStorage.setItem('isAdmin', 'true');
-                updateAdminUI();
-                alert("管理員登入成功！");
-                document.getElementById('adminModal').style.display = 'none';
-                document.getElementById('pwdInput').value = '';
-            } else {
-                alert("密碼錯誤！預設密碼為 0");
-            }
+    let inputPwd = document.getElementById('pwdInput').value;
+    if (inputPwd === '0') { // 假設您的預設密碼是 0
+        isAdmin = true;
+        sessionStorage.setItem('isAdmin', 'true');
+        
+        // 🔹【關鍵】必須加上這行，才會去尋找所有 admin-only 並把它們顯示出來！
+        if (typeof renderUI === 'function') {
+            renderUI(masterData); 
+        } else if (typeof updateAdminUI === 'function') {
+            updateAdminUI();
         }
+
+        alert("管理員登入成功！");
+        document.getElementById('adminModal').style.display = 'none';
+        document.getElementById('pwdInput').value = '';
+    } else {
+        alert("密碼錯誤！");
+    }
+}
 
         async function changePassword() {
             let oldP = document.getElementById('oldPwd').value;
