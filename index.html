@@ -244,9 +244,16 @@
                 let result = await response.json();
                 
                 if (result.status === "success") {
-                    masterData = expandWSigns(result.data);
+                    // 直接使用後端傳過來的資料，並為每一筆資料賦予獨特的 uniqueKey
+                    masterData = result.data.map(item => {
+                        let rowId = item.id || item.ID || 'unknown';
+                        let rowRisk = item.risk || item.Risk || 'Normal';
+                        item.uniqueKey = `${rowId}-${rowRisk}`;
+                        return item;
+                    });
+                    
                     renderCategoryGrid(masterData);
-                    document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數（含展開）：${masterData.length} 筆`;
+                    document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
                 } else {
                     document.getElementById('status').innerText = "❌ 載入失敗：" + result.message;
                 }
@@ -256,28 +263,7 @@
             }
         }
 
-        function expandWSigns(rawData) {
-            let expanded = [];
-            rawData.forEach(item => {
-                let rawCategory = item.category || item.Category || '';
-                let cat = String(rawCategory).trim();
-
-                if (cat === 'Warning sign') {
-                    for (let r = 1; r <= 4; r++) {
-                        let cloneItem = Object.assign({}, item);
-                        cloneItem.risk = `Risk ${r}`;
-                        let rowId = cloneItem.id || cloneItem.ID || 'unknown';
-                        cloneItem.uniqueKey = `${rowId}-Risk${r}`;
-                        expanded.push(cloneItem);
-                    }
-                } else {
-                    let rowId = item.id || item.ID || 'unknown';
-                    item.uniqueKey = `${rowId}-${item.risk || item.Risk || 'Normal'}`;
-                    expanded.push(item);
-                }
-            });
-            return expanded;
-        }
+    
 
         function renderCategoryGrid(data) {
             let gridContainer = document.getElementById('categoryGridContainer');
@@ -767,9 +753,17 @@
                 return;
             }
 
-            let rawItem = { id: newId, category: newCat, name: newName, svg_url: newImg };
-            let newExpandedItems = expandWSigns([rawItem]);
-            masterData.push(...newExpandedItems);
+            // 建立新項目並賦予預設的 uniqueKey (若為 Warning sign 且後端會自動展開，前端先以預設 Normal 加入)
+            let newItem = { 
+                id: newId, 
+                category: newCat, 
+                name: newName, 
+                svg_url: newImg,
+                risk: 'Normal',
+                uniqueKey: `${newId}-Normal`
+            };
+            
+            masterData.push(newItem);
 
             document.getElementById('addModal').style.display = 'none';
             if (currentCategory === newCat) {
@@ -789,6 +783,8 @@
                 });
                 alert(`✅ 標誌 [${newId}] 已成功新增並同步至雲端！`);
                 document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
+                // 建議新增後重新載入以同步後端正確展開的 4 行資料
+                setTimeout(() => initPhase5(), 1500);
             } catch (e) {
                 alert("❌ 網路連線失敗，無法寫入雲端");
             }
