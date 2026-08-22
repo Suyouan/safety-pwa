@@ -23,6 +23,9 @@
         .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .action-btn { padding: 4px 8px; font-size: 12px; margin: 2px; }
         .admin-only { display: none; }
+        /* 雙擊互動提示樣式 (僅適用於 W 類別的風險等級互動格) */
+        .dblclick-risk-cell { cursor: pointer; }
+        .dblclick-risk-cell:hover { background-color: #fff0c2; }
     </style>
 </head>
 <body>
@@ -48,7 +51,7 @@
     <table id="signTable">
         <thead>
             <tr>
-                <th>圖示預覽</th>
+                <th>圖示預覽 / 風險等級</th>
                 <th>ID</th>
                 <th>Category</th>
                 <th>Name</th>
@@ -139,9 +142,7 @@
             updateAdminUI();
         };
 
-        // ==================== 返回功能預留 ====================
         function goBack() {
-            // 目前預設行為為瀏覽器歷史上一頁，您未來可依需求改成切換不同的檢視畫面 (View)
             if (window.history.length > 1) {
                 window.history.back();
             } else {
@@ -216,7 +217,9 @@
             data.forEach(item => {
                 let tr = document.createElement('tr');
                 let rawCategory = item.category || item.Category || '';
-                if (String(rawCategory).trim() === 'Warning sign') {
+                let isWarning = String(rawCategory).trim() === 'Warning sign';
+                
+                if (isWarning) {
                     tr.classList.add('warning-sign');
                 }
                 
@@ -232,18 +235,62 @@
                         <button class="action-btn" style="background:#dc3545;" onclick="deleteRow('${rowId}', '${rowRisk}')">刪除</button>
                     </td>`;
                 }
+
+                // 針對 W 類別的風險等級框格套用雙擊送審互動（一般類別則維持普通顯示）
+                let riskCellHtml = `<strong>${rowRisk}</strong>`;
+                if (isWarning) {
+                    riskCellHtml = `<strong class="dblclick-risk-cell" ondblclick="submitRowAudit('${item.uniqueKey}')" title="雙擊此處可將此危害控制等級資料送審">${rowRisk} (可送審)</strong>`;
+                }
                 
                 tr.innerHTML = `
-                    <td>${imgUrl ? `<img src="${imgUrl}" width="35" height="35" style="object-fit:contain;" onerror="this.src='https://via.placeholder.com/35?text=NoImg'">` : '無'}</td>
+                    <td>
+                        ${imgUrl ? `<img src="${imgUrl}" width="35" height="35" style="object-fit:contain;" onerror="this.src='https://via.placeholder.com/35?text=NoImg'">` : '無'}
+                        <div style="font-size: 11px; color: #555; margin-top: 3px; font-weight: bold;">${rowRisk}</div>
+                    </td>
                     <td>${rowId}</td>
                     <td>${rawCategory}</td>
                     <td>${rowName}</td>
-                    <td><strong>${rowRisk}</strong></td>
+                    <td>${riskCellHtml}</td>
                     <td><small style="color: #666;">${item.uniqueKey}</small></td>
                     ${actionHtml}
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // W 類別風險等級框格雙擊送審動作
+        async function submitRowAudit(uniqueKey) {
+            let item = masterData.find(d => d.uniqueKey === uniqueKey);
+            if (!item) return;
+
+            let rowId = item.id || item.ID || '';
+            let rowName = item.name || item.Name || '';
+            let rowRisk = item.risk || item.Risk || '';
+
+            let confirmAudit = confirm(`【W類別危害控制送審】\n您確定要將以下風險等級資料送出審核嗎？\n\n・ID: ${rowId}\n・名稱: ${rowName}\n・風險等級: ${rowRisk}`);
+            if (!confirmAudit) return;
+
+            document.getElementById('status').innerText = `⏳ 正在將 ID [${rowId}] (${rowRisk}) 送審中...`;
+
+            try {
+                let response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ 
+                        action: 'auditRecord', 
+                        id: rowId, 
+                        risk: rowRisk,
+                        name: rowName 
+                    })
+                });
+
+                alert(`✅ ID [${rowId}] (${rowRisk}) 危害控制資料已成功送審！`);
+                document.getElementById('status').innerText = `✅ 系統就緒 | 上次送審：ID ${rowId} (${rowRisk})`;
+            } catch (e) {
+                console.error("送審失敗：", e);
+                alert("❌ 網路連線異常，送審失敗。");
+                document.getElementById('status').innerText = "❌ 送審同步失敗";
+            }
         }
 
         function handleSearch() {
@@ -428,7 +475,7 @@
         }
 
         async function submitAdd() {
-            let newId = document.getElementById('addId').value.trim();
+            let newId = document.getElementById('addId'].value.trim();
             let newCat = document.getElementById('addCategory').value.trim();
             let newName = document.getElementById('addName').value.trim();
             let newImg = document.getElementById('addImg').value.trim();
