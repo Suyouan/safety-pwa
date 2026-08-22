@@ -390,38 +390,58 @@
         }
 
         async function submitAdd() {
-            let newId = document.getElementById('addId').value.trim();
-            let newCat = document.getElementById('addCategory').value.trim();
-            let newName = document.getElementById('addName').value.trim();
-            let newImg = document.getElementById('addImg').value.trim();
+    let newId = document.getElementById('addId').value.trim();
+    let newCat = document.getElementById('addCategory').value.trim();
+    let newName = document.getElementById('addName').value.trim();
+    let newImg = document.getElementById('addImg').value.trim();
 
-            if (!newId || !newCat || !newName) {
-                alert("請至少填寫 ID、Category 與 Name！");
-                return;
-            }
+    if (!newId || !newCat || !newName) {
+        alert("請至少填寫 ID、Category 與 Name！");
+        return;
+    }
 
-            try {
-                document.getElementById('status').innerText = "正在新增資料至試算表...";
-                let response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ 
-                        action: 'addRecord', 
-                        id: newId, 
-                        category: newCat, 
-                        name: newName, 
-                        svg_url: newImg 
-                    })
-                });
+    // 1. 先在前端建立新資料物件
+    let rawItem = {
+        id: newId,
+        category: newCat,
+        name: newName,
+        svg_url: newImg
+    };
 
-                alert("已送出新增請求，請稍候重新整理同步資料。");
-                document.getElementById('addModal').style.display = 'none';
-                setTimeout(() => initPhase5(), 2000);
-            } catch (e) {
-                alert("連線錯誤，無法新增");
-                document.getElementById('status').innerText = "❌ 網路異常";
-            }
-        }
+    // 2. 透過展開邏輯處理（若是 Warning sign 會自動展開 4 個 Risk）
+    let newExpandedItems = expandWSigns([rawItem]);
+
+    // 3. 即時推入本地資料庫並重新繪製畫面（使用者立刻看到結果）
+    masterData.push(...newExpandedItems);
+    renderUI(masterData);
+
+    // 4. 關閉 Modal 視窗並更新狀態列
+    document.getElementById('addModal').style.display = 'none';
+    document.getElementById('status').innerText = `⏳ 正在將新標誌 [${newId}] 寫入 Google 試算表...`;
+
+    try {
+        // 5. 背景同步至 Google Apps Script 後端
+        await fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({ 
+                action: 'addRecord', 
+                id: newId, 
+                category: newCat, 
+                name: newName, 
+                svg_url: newImg 
+            })
+        });
+
+        alert(`✅ 標誌 [${newId}] 已成功新增並同步至雲端！`);
+        document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數（含展開）：${masterData.length} 筆`;
+
+    } catch (e) {
+        console.error("新增失敗：", e);
+        alert("❌ 網路連線失敗，無法寫入雲端試算表");
+        document.getElementById('status').innerText = "❌ 新增同步失敗，請檢查網路連線";
+    }
+}
 
         // ==================== 批次匯出 Excel 格式 ====================
         function exportToExcel() {
