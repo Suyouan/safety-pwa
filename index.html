@@ -187,8 +187,13 @@
             
             let adminElements = document.querySelectorAll('.admin-only');
             adminElements.forEach(el => {
-                el.style.display = isAdmin ? '' : 'none';
-            });
+    // 根據元素原本的特性給予正確的 display，避免空字串失效
+    if (el.tagName === 'TR' || el.tagName === 'DIV') {
+        el.style.display = isAdmin ? 'block' : 'none';
+    } else {
+        el.style.display = isAdmin ? 'inline-block' : 'none';
+    }
+});
 
             if (data.length === 0) {
                 let colSpanCount = isAdmin ? 7 : 6;
