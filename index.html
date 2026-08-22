@@ -2,63 +2,77 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>ISO7010 安全標誌管理系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISO7010 - Phase 1 驗證</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; background: #f4f7f6; }
-        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
+        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; vertical-align: middle; }
         th { background: #007bff; color: white; }
         .warning-sign { background: #fff3cd; }
+        #status { font-weight: bold; padding: 10px; background: #e2e3e5; border-radius: 4px; }
     </style>
 </head>
 <body>
 
     <h2>ISO7010 安全標誌管理系統 (Phase 1 驗證)</h2>
-    <div id="status">正在載入系統資料...</div>
+    <div id="status">正在初始化系統，準備連線 GAS...</div>
     
     <table id="signTable">
         <thead>
             <tr>
+                <th>圖示預覽</th>
                 <th>ID</th>
                 <th>Category</th>
                 <th>Name</th>
                 <th>Risk Level</th>
-                <th>Freq</th>
-                <th>Elim</th>
+                <th>唯一鍵 (uniqueKey)</th>
             </tr>
         </thead>
         <tbody id="tableBody"></tbody>
     </table>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; // 請替換您的 GAS 部署網址
+        // ⚠️ 請將此處換成您實際部署的 GAS 網頁應用程式網址
+        const GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE"; 
         let masterData = [];
 
-        async function initSystem() {
+        // 頁面載入時執行初始化
+        window.onload = function() {
+            initPhase1();
+        };
+
+        async function initPhase1() {
             try {
-                document.getElementById('status').innerText = "正在連線 GAS 讀取資料...";
+                document.getElementById('status').innerText = "正在向 GAS 發送請求...";
                 let response = await fetch(GAS_URL);
                 let result = await response.json();
                 
                 if (result.status === "success") {
-                    // 1. 執行 W 類標誌動態展開 (1變4)
+                    console.log("GAS 原始資料載入成功：", result.data);
+                    
+                    // 執行 W 類標誌動態展開 (1變4)
                     masterData = expandWSigns(result.data);
-                    renderUI(masterData);
-                    document.getElementById('status').innerText = `載入成功！總筆數（含展開）：${masterData.length}`;
+                    
+                    // 渲染畫面
+                    renderPhase1UI(masterData);
+                    
+                    document.getElementById('status').innerText = `✅ Phase 1 驗證成功！原始筆數：${result.data.length} 筆 | 展開後總筆數：${masterData.length} 筆`;
                 } else {
-                    document.getElementById('status').innerText = "載入失敗：" + result.message;
+                    document.getElementById('status').innerText = "❌ 載入失敗：" + result.message;
                 }
             } catch (error) {
-                console.error(error);
-                document.getElementById('status').innerText = "網路連線異常，請檢查主控台";
+                console.error("連線錯誤：", error);
+                document.getElementById('status').innerText = "❌ 網路連線異常，請按 F12 打開 Console 查看詳細錯誤。";
             }
         }
 
-        // W類標誌規則：Category='Warning sign' 展開為 Risk 1~4，唯一鍵 = ID + Risk
+        // W 類標誌展開邏輯
         function expandWSigns(rawData) {
             let expanded = [];
             rawData.forEach(item => {
-                if (item.category === 'Warning sign') {
+                // 檢查 category 是否為 Warning sign (注意大小寫與字串吻合)
+                if (item.category && item.category.trim() === 'Warning sign') {
                     for (let r = 1; r <= 4; r++) {
                         let cloneItem = Object.assign({}, item);
                         cloneItem.risk = `Risk ${r}`;
@@ -73,26 +87,30 @@
             return expanded;
         }
 
-        function renderUI(data) {
+        // 渲染 UI 函數
+        function renderPhase1UI(data) {
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
+            
             data.forEach(item => {
                 let tr = document.createElement('tr');
-                if (item.category === 'Warning sign') tr.classList.add('warning-sign');
+                if (item.category && item.category.trim() === 'Warning sign') {
+                    tr.classList.add('warning-sign');
+                }
+                
+                let imgUrl = item.svg_url || item.image || '';
                 
                 tr.innerHTML = `
-                    <td>${item.id}</td>
-                    <td>${item.category}</td>
-                    <td>${item.name}</td>
+                    <td>${imgUrl ? `<img src="${imgUrl}" width="35" height="35" style="object-fit:contain;" onerror="this.src='https://via.placeholder.com/35?text=NoImg'">` : '無'}</td>
+                    <td>${item.id || ''}</td>
+                    <td>${item.category || ''}</td>
+                    <td>${item.name || ''}</td>
                     <td><strong>${item.risk || '-'}</strong></td>
-                    <td>${item.freq || ''}</td>
-                    <td>${item.elim || ''}</td>
+                    <td><small style="color: #666;">${item.uniqueKey}</small></td>
                 `;
                 tbody.appendChild(tr);
             });
         }
-
-        window.onload = initSystem;
     </script>
 </body>
 </html>
