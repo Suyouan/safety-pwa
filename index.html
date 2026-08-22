@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO7010 - 完整安全標誌管理系統 (Phase 5)</title>
+    <title>ISO7010 - 極簡分類與風險評估管理系統</title>
     <!-- 引入 SheetJS (xlsx.js) 用於直接產生 Excel 檔案 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -18,14 +18,31 @@
         th { background: #007bff; color: white; }
         .warning-sign { background: #fff3cd; }
         #status { font-weight: bold; padding: 10px; background: #e2e3e5; border-radius: 4px; margin-bottom: 15px; }
+        
+        /* 導覽層級狀態 */
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+
+        /* 首頁極簡卡片網格樣式 */
+        .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .category-card { background: white; border-radius: 8px; padding: 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .category-card:hover { transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .category-card img { width: 60px; height: 60px; object-fit: contain; margin-bottom: 10px; }
+        .category-card h3 { margin: 5px 0 0 0; font-size: 16px; color: #007bff; }
+
         /* Modal 樣式 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
-        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 450px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .action-btn { padding: 4px 8px; font-size: 12px; margin: 2px; }
         .admin-only { display: none; }
-        /* 雙擊互動提示樣式 (僅適用於 W 類別的風險等級互動格) */
-        .dblclick-risk-cell { cursor: pointer; }
-        .dblclick-risk-cell:hover { background-color: #fff0c2; }
+
+        /* 第三層評估表單與雙擊編輯框格 */
+        .eval-table { width: 100%; margin-top: 10px; border-collapse: collapse; }
+        .eval-table td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        .eval-table td.label-col { background: #f8f9fa; font-weight: bold; width: 35%; }
+        .editable-cell { cursor: pointer; background: #fffdf0; }
+        .editable-cell:hover { background-color: #fff3cd; }
+        .readonly-cell { background: #e9ecef; color: #6c757d; }
     </style>
 </head>
 <body>
@@ -39,7 +56,7 @@
     
     <!-- 工具列 -->
     <div class="toolbar">
-        <button onclick="goBack()" style="background: #6c757d;">⬅️ 返回</button>
+        <button id="backBtn" onclick="goBackToCategory()" style="background: #6c757d; display: none;">⬅️ 返回分類首頁</button>
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
         <button onclick="startQRScanner()">開啟 QR 掃描</button>
         <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
@@ -47,21 +64,79 @@
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
     </div>
 
-    <!-- 主資料表格 -->
-    <table id="signTable">
-        <thead>
-            <tr>
-                <th>圖示預覽 / 風險等級</th>
-                <th>ID</th>
-                <th>Category</th>
-                <th>Name</th>
-                <th>Risk Level</th>
-                <th>唯一鍵 (uniqueKey)</th>
-                <th id="actionHeader" class="admin-only">管理者操作</th>
-            </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-    </table>
+    <!-- 第一層：極簡 Category 首頁 (網格檢視) -->
+    <div id="categoryView" class="view-section active">
+        <h3>📁 依 Category 分類檢視</h3>
+        <div id="categoryGridContainer" class="category-grid"></div>
+    </div>
+
+    <!-- 第二層：分類明細列表檢視 -->
+    <div id="detailView" class="view-section">
+        <h3 id="detailCategoryTitle">分類明細</h3>
+        <table id="signTable">
+            <thead>
+                <tr>
+                    <th>圖示預覽</th>
+                    <th>ID</th>
+                    <th>Category</th>
+                    <th>Name</th>
+                    <th>Risk Level</th>
+                    <th>唯一鍵 (uniqueKey)</th>
+                    <th id="actionHeader" class="admin-only">管理者操作</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 第三層：單一標誌詳情與 7 大危害評估 Modal -->
+    <div id="evalModal" class="modal">
+        <div class="modal-content">
+            <div style="text-align: center;">
+                <img id="evalModalImg" src="" width="70" height="70" style="object-fit:contain; margin-bottom:5px;" onerror="this.src='https://via.placeholder.com/70?text=NoImg'">
+                <h3 id="evalModalTitle" style="margin: 5px 0;">標誌風險評估詳情</h3>
+                <p id="evalModalSub" style="font-size: 13px; color: #666; margin-bottom: 10px;"></p>
+            </div>
+            
+            <p style="font-size: 12px; color: #d9534f; margin-bottom: 5px;">💡 提示：前 6 項危害控制欄位可直接**雙擊**進行編輯修改！</p>
+            
+            <input type="hidden" id="evalUniqueKey">
+            <table class="eval-table">
+                <tr>
+                    <td class="label-col">1. 發生頻率 (freq)</td>
+                    <td id="cell_freq" class="editable-cell" ondblclick="enableCellEdit('freq')" title="雙擊編輯">載入中...</td>
+                </tr>
+                <tr>
+                    <td class="label-col">2. 消除 (elim)</td>
+                    <td id="cell_elim" class="editable-cell" ondblclick="enableCellEdit('elim')" title="雙擊編輯">載入中...</td>
+                </tr>
+                <tr>
+                    <td class="label-col">3. 取代 (sub)</td>
+                    <td id="cell_sub" class="editable-cell" ondblclick="enableCellEdit('sub')" title="雙擊編輯">載入中...</td>
+                </tr>
+                <tr>
+                    <td class="label-col">4. 工程管制 (eng)</td>
+                    <td id="cell_eng" class="editable-cell" ondblclick="enableCellEdit('eng')" title="雙擊編輯">載入中...</td>
+                </tr>
+                <tr>
+                    <td class="label-col">5. 行政管制 (admin)</td>
+                    <td id="cell_admin" class="editable-cell" ondblclick="enableCellEdit('admin')" title="雙擊編輯">載入中...</td>
+                </tr>
+                <tr>
+                    <td class="label-col">6. 個人防護用具 (ppe)</td>
+                    <td id="cell_ppe" class="editable-cell" ondblclick="enableCellEdit('ppe')" title="雙擊編輯">載入中...</td>
+                </tr>
+                <tr>
+                    <td class="label-col">7. 風險等級 (risk)</td>
+                    <td id="cell_risk" class="readonly-cell">唯讀</td>
+                </tr>
+            </table>
+
+            <br>
+            <button onclick="saveEvaluation()" style="width: 100%; margin-bottom: 8px; background: #28a745;">💾 儲存評估變更</button>
+            <button onclick="document.getElementById('evalModal').style.display='none'" style="width: 100%; background: #6c757d;">❌ 關閉視窗</button>
+        </div>
+    </div>
 
     <!-- QR 掃描 Modal -->
     <div id="qrModal" class="modal">
@@ -97,22 +172,6 @@
         </div>
     </div>
 
-    <!-- 資料編輯 Modal -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
-            <h3>編輯標誌資料</h3>
-            <input type="hidden" id="editUniqueKey">
-            <label style="font-size:12px; color:#666;">ID (不可修改)</label>
-            <input type="text" id="editId" disabled style="width: 93%; padding: 6px; margin-bottom: 8px; background:#eee;">
-            <label style="font-size:12px; color:#666;">Name</label>
-            <input type="text" id="editName" style="width: 93%; padding: 6px; margin-bottom: 8px;">
-            <label style="font-size:12px; color:#666;">Risk Level</label>
-            <input type="text" id="editRisk" style="width: 93%; padding: 6px; margin-bottom: 15px;">
-            <button onclick="saveEdit()" style="width: 100%; margin-bottom: 8px; background: #28a745;">儲存變更</button>
-            <button onclick="document.getElementById('editModal').style.display='none'" style="width: 100%; background: #6c757d;">取消</button>
-        </div>
-    </div>
-
     <!-- 新增標誌 Modal -->
     <div id="addModal" class="modal">
         <div class="modal-content">
@@ -134,6 +193,7 @@
         const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
         let masterData = [];
         let currentFilteredData = [];
+        let currentCategory = null;
         let mediaStream = null;
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
 
@@ -142,12 +202,14 @@
             updateAdminUI();
         };
 
-        function goBack() {
-            if (window.history.length > 1) {
-                window.history.back();
-            } else {
-                alert("目前已是首頁或無上一頁記錄");
-            }
+        function goBackToCategory() {
+            currentCategory = null;
+            document.getElementById('categoryView').classList.add('active');
+            document.getElementById('detailView').classList.remove('active');
+            document.getElementById('backBtn').style.display = 'none';
+            document.getElementById('searchInput').value = '';
+            renderCategoryGrid(masterData);
+            document.getElementById('status').innerText = `✅ 系統就緒 | 請選擇分類`;
         }
 
         async function initPhase5() {
@@ -158,7 +220,7 @@
                 
                 if (result.status === "success") {
                     masterData = expandWSigns(result.data);
-                    renderUI(masterData);
+                    renderCategoryGrid(masterData);
                     document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數（含展開）：${masterData.length} 筆`;
                 } else {
                     document.getElementById('status').innerText = "❌ 載入失敗：" + result.message;
@@ -192,7 +254,56 @@
             return expanded;
         }
 
-        function renderUI(data) {
+        // 渲染第一層：極簡 Category 首頁卡片
+        function renderCategoryGrid(data) {
+            let gridContainer = document.getElementById('categoryGridContainer');
+            gridContainer.innerHTML = '';
+
+            // 依 Category 分群
+            let categoriesMap = {};
+            data.forEach(item => {
+                let cat = String(item.category || item.Category || '未分類').trim();
+                if (!categoriesMap[cat]) {
+                    categoriesMap[cat] = item; // 記錄該分類的第一個代表標誌
+                }
+            });
+
+            let cats = Object.keys(categoriesMap);
+            if (cats.length === 0) {
+                gridContainer.innerHTML = `<p style="color: #888;">目前無任何分類資料</p>`;
+                return;
+            }
+
+            cats.forEach(cat => {
+                let representativeItem = categoriesMap[cat];
+                let imgUrl = representativeItem.svg_url || representativeItem.image || '';
+                let repName = representativeItem.name || representativeItem.Name || cat;
+
+                let card = document.createElement('div');
+                card.className = 'category-card';
+                card.onclick = () => selectCategory(cat);
+                card.innerHTML = `
+                    <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/60?text=NoImg'">
+                    <h3>${cat}</h3>
+                    <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">代表：${repName}</p>
+                `;
+                gridContainer.appendChild(card);
+            });
+        }
+
+        function selectCategory(catName) {
+            currentCategory = catName;
+            document.getElementById('categoryView').classList.remove('active');
+            document.getElementById('detailView').classList.add('active');
+            document.getElementById('backBtn').style.display = 'inline-block';
+            document.getElementById('detailCategoryTitle').innerText = `📁 分類明細：${catName}`;
+
+            let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === catName);
+            renderDetailTable(filtered);
+        }
+
+        // 渲染第二層：分類明細列表
+        function renderDetailTable(data) {
             currentFilteredData = data;
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
@@ -200,7 +311,6 @@
             let adminElements = document.querySelectorAll('.admin-only');
             adminElements.forEach(el => {
                 if (el.id === 'controlView') return;
-
                 if (el.tagName === 'TR' || el.tagName === 'DIV') {
                     el.style.display = isAdmin ? 'block' : 'none';
                 } else {
@@ -219,9 +329,7 @@
                 let rawCategory = item.category || item.Category || '';
                 let isWarning = String(rawCategory).trim() === 'Warning sign';
                 
-                if (isWarning) {
-                    tr.classList.add('warning-sign');
-                }
+                if (isWarning) tr.classList.add('warning-sign');
                 
                 let imgUrl = item.svg_url || item.image || '';
                 let rowId = item.id || item.ID || '';
@@ -231,26 +339,28 @@
                 let actionHtml = '';
                 if (isAdmin) {
                     actionHtml = `<td>
-                        <button class="action-btn" style="background:#ffc107; color:#333;" onclick="openEditModal('${item.uniqueKey}')">編輯</button>
                         <button class="action-btn" style="background:#dc3545;" onclick="deleteRow('${rowId}', '${rowRisk}')">刪除</button>
                     </td>`;
                 }
-
-                // 針對 W 類別的風險等級框格套用雙擊送審互動（一般類別則維持普通顯示）
-                let riskCellHtml = `<strong>${rowRisk}</strong>`;
-                if (isWarning) {
-                    riskCellHtml = `<strong class="dblclick-risk-cell" ondblclick="submitRowAudit('${item.uniqueKey}')" title="雙擊此處可將此危害控制等級資料送審">${rowRisk} (可送審)</strong>`;
-                }
                 
+                // 點擊明細列表列時，若為 Warning sign 則開啟第三層風險評估 Modal
+                tr.style.cursor = isWarning ? 'pointer' : 'default';
+                if (isWarning) {
+                    tr.onclick = (e) => {
+                        if (e.target.tagName === 'BUTTON') return; // 避免點到刪除按鈕
+                        openEvalModal(item.uniqueKey);
+                    };
+                    tr.title = "點擊以檢視/編輯 7 大危害風險評估";
+                }
+
                 tr.innerHTML = `
                     <td>
                         ${imgUrl ? `<img src="${imgUrl}" width="35" height="35" style="object-fit:contain;" onerror="this.src='https://via.placeholder.com/35?text=NoImg'">` : '無'}
-                        <div style="font-size: 11px; color: #555; margin-top: 3px; font-weight: bold;">${rowRisk}</div>
                     </td>
                     <td>${rowId}</td>
                     <td>${rawCategory}</td>
                     <td>${rowName}</td>
-                    <td>${riskCellHtml}</td>
+                    <td><strong>${rowRisk}</strong></td>
                     <td><small style="color: #666;">${item.uniqueKey}</small></td>
                     ${actionHtml}
                 `;
@@ -258,48 +368,119 @@
             });
         }
 
-        // W 類別風險等級框格雙擊送審動作
-        async function submitRowAudit(uniqueKey) {
+        // 開啟第三層：單一標誌詳情與 7 大評估 Modal
+        function openEvalModal(uniqueKey) {
+            let item = masterData.find(d => d.uniqueKey === uniqueKey);
+            if (!item) return;
+
+            document.getElementById('evalUniqueKey').value = uniqueKey;
+            document.getElementById('evalModalImg.src') = item.svg_url || item.image || '';
+            document.getElementById('evalModalImg').src = item.svg_url || item.image || '';
+            document.getElementById('evalModalTitle').innerText = item.name || item.Name || '安全標誌';
+            document.getElementById('evalModalSub').innerText = `ID: ${item.id || item.ID} | Category: ${item.category || item.Category}`;
+
+            // 對應 7 大欄位 (freq, elim, sub, eng, admin, ppe, risk)
+            document.getElementById('cell_freq').innerText = item.freq || item.Freq || '-';
+            document.getElementById('cell_elim').innerText = item.elim || item.Elim || '-';
+            document.getElementById('cell_sub').innerText = item.sub || item.Sub || '-';
+            document.getElementById('cell_eng').innerText = item.eng || item.Eng || '-';
+            document.getElementById('cell_admin').innerText = item.admin || item.Admin || '-';
+            document.getElementById('cell_ppe').innerText = item.ppe || item.Ppe || '-';
+            document.getElementById('cell_risk').innerText = item.risk || item.Risk || '-';
+
+            document.getElementById('evalModal').style.display = 'block';
+        }
+
+        // 雙擊前 6 大危害控制框格進行互動輸入
+        function enableCellEdit(fieldKey) {
+            let cell = document.getElementById(`cell_${fieldKey}`);
+            if (cell.querySelector('input')) return; // 已經在編輯中
+
+            let currentVal = cell.innerText === '-' ? '' : cell.innerText;
+            cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="${currentVal}" style="width: 90%; padding: 4px;" autofocus>`;
+            
+            let inputEl = document.getElementById(`input_${fieldKey}`);
+            inputEl.onblur = function() {
+                cell.innerText = inputEl.value.trim() || '-';
+            };
+            inputEl.onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    cell.innerText = inputEl.value.trim() || '-';
+                }
+            };
+        }
+
+        async function saveEvaluation() {
+            let uniqueKey = document.getElementById('evalUniqueKey').value;
             let item = masterData.find(d => d.uniqueKey === uniqueKey);
             if (!item) return;
 
             let rowId = item.id || item.ID || '';
-            let rowName = item.name || item.Name || '';
             let rowRisk = item.risk || item.Risk || '';
 
-            let confirmAudit = confirm(`【W類別危害控制送審】\n您確定要將以下風險等級資料送出審核嗎？\n\n・ID: ${rowId}\n・名稱: ${rowName}\n・風險等級: ${rowRisk}`);
-            if (!confirmAudit) return;
+            // 收集 6 大控制欄位資料
+            let updatedData = {
+                action: 'updateEvaluation',
+                id: rowId,
+                risk: rowRisk,
+                freq: document.getElementById('cell_freq').innerText === '-' ? '' : document.getElementById('cell_freq').innerText,
+                elim: document.getElementById('cell_elim').innerText === '-' ? '' : document.getElementById('cell_elim').innerText,
+                sub: document.getElementById('cell_sub').innerText === '-' ? '' : document.getElementById('cell_sub').innerText,
+                eng: document.getElementById('cell_eng').innerText === '-' ? '' : document.getElementById('cell_eng').innerText,
+                admin: document.getElementById('cell_admin').innerText === '-' ? '' : document.getElementById('cell_admin').innerText,
+                ppe: document.getElementById('cell_ppe').innerText === '-' ? '' : document.getElementById('cell_ppe').innerText
+            };
 
-            document.getElementById('status').innerText = `⏳ 正在將 ID [${rowId}] (${rowRisk}) 送審中...`;
+            // 同步更新至本地記憶體
+            item.freq = updatedData.freq;
+            item.elim = updatedData.elim;
+            item.sub = updatedData.sub;
+            item.eng = updatedData.eng;
+            item.admin = updatedData.admin;
+            item.ppe = updatedData.ppe;
 
             try {
+                document.getElementById('status').innerText = "正在儲存風險評估變更至雲端...";
                 let response = await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify({ 
-                        action: 'auditRecord', 
-                        id: rowId, 
-                        risk: rowRisk,
-                        name: rowName 
-                    })
+                    body: JSON.stringify(updatedData)
                 });
 
-                alert(`✅ ID [${rowId}] (${rowRisk}) 危害控制資料已成功送審！`);
-                document.getElementById('status').innerText = `✅ 系統就緒 | 上次送審：ID ${rowId} (${rowRisk})`;
+                alert("✅ 7 大危害風險評估已成功儲存！");
+                document.getElementById('evalModal').style.display = 'none';
+                document.getElementById('status').innerText = `✅ 系統就緒 | 上次更新：ID ${rowId} (${rowRisk})`;
             } catch (e) {
-                console.error("送審失敗：", e);
-                alert("❌ 網路連線異常，送審失敗。");
-                document.getElementById('status').innerText = "❌ 送審同步失敗";
+                console.error("儲存失敗：", e);
+                alert("❌ 網路連線異常，儲存失敗。");
+                document.getElementById('status').innerText = "❌ 評估同步失敗";
             }
         }
 
         function handleSearch() {
             let keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+            if (!keyword) {
+                if (currentCategory) {
+                    let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
+                    renderDetailTable(filtered);
+                } else {
+                    renderCategoryGrid(masterData);
+                }
+                return;
+            }
+
+            // 若在搜尋時，自動切換至明細檢視顯示所有符合的結果
+            document.getElementById('categoryView').classList.remove('active');
+            document.getElementById('detailView').classList.add('active');
+            document.getElementById('backBtn').style.display = 'inline-block';
+            document.getElementById('detailCategoryTitle').innerText = `🔍 搜尋結果：「${keyword}」`;
+
             let filtered = masterData.filter(item => 
                 String(item.id || item.ID || '').toLowerCase().includes(keyword) || 
-                String(item.name || item.Name || '').toLowerCase().includes(keyword)
+                String(item.name || item.Name || '').toLowerCase().includes(keyword) ||
+                String(item.category || item.Category || '').toLowerCase().includes(keyword)
             );
-            renderUI(filtered);
+            renderDetailTable(filtered);
         }
 
         async function startQRScanner() {
@@ -335,27 +516,18 @@
 
         function updateAdminUI() {
             let adminBadge = document.getElementById('adminBadge');
-            if (adminBadge) {
-                adminBadge.style.display = isAdmin ? 'inline' : 'none';
-            }
+            if (adminBadge) adminBadge.style.display = isAdmin ? 'inline' : 'none';
 
             let loginView = document.getElementById('loginView');
             let controlView = document.getElementById('controlView');
-            
             if (loginView && controlView) {
-                if (isAdmin) {
-                    loginView.style.display = 'none';
-                    controlView.style.display = 'block';
-                } else {
-                    loginView.style.display = 'block';
-                    controlView.style.display = 'none';
-                }
+                loginView.style.display = isAdmin ? 'none' : 'block';
+                controlView.style.display = isAdmin ? 'block' : 'none';
             }
 
             let adminElements = document.querySelectorAll('.admin-only');
             adminElements.forEach(el => {
                 if (el.id === 'controlView') return;
-
                 if (el.tagName === 'TR' || el.tagName === 'DIV') {
                     el.style.display = isAdmin ? 'block' : 'none';
                 } else {
@@ -363,8 +535,9 @@
                 }
             });
 
-            if (typeof renderUI === 'function' && typeof masterData !== 'undefined') {
-                renderUI(masterData);
+            if (currentCategory) {
+                let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
+                renderDetailTable(filtered);
             }
         }
 
@@ -373,12 +546,9 @@
             if (inputPwd === '0') {
                 isAdmin = true;
                 sessionStorage.setItem('isAdmin', 'true');
-                
                 alert("管理員登入成功！");
-                
                 document.getElementById('adminModal').style.display = 'none';
                 document.getElementById('pwdInput').value = '';
-
                 updateAdminUI();
             } else {
                 alert("密碼錯誤！");
@@ -390,7 +560,7 @@
             let newP = document.getElementById('newPwd').value;
             if (!oldP || !newP) { alert("請完整輸入舊密碼與新密碼"); return; }
             try {
-                let response = await fetch(GAS_URL, {
+                await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify({ action: 'updatePassword', oldPwd: oldP, newPwd: newP })
@@ -410,49 +580,12 @@
             document.getElementById('adminModal').style.display = 'none';
         }
 
-        function openEditModal(uniqueKey) {
-            let item = masterData.find(d => d.uniqueKey === uniqueKey);
-            if (!item) return;
-
-            document.getElementById('editUniqueKey').value = uniqueKey;
-            document.getElementById('editId').value = item.id || item.ID || '';
-            document.getElementById('editName').value = item.name || item.Name || '';
-            document.getElementById('editRisk').value = item.risk || item.Risk || '';
-            document.getElementById('editModal').style.display = 'block';
-        }
-
-        async function saveEdit() {
-            let uniqueKey = document.getElementById('editUniqueKey').value;
-            let newName = document.getElementById('editName').value;
-            let newRisk = document.getElementById('editRisk').value;
-            let item = masterData.find(d => d.uniqueKey === uniqueKey);
-            if (!item) return;
-
-            let rowId = item.id || item.ID || '';
-
-            try {
-                document.getElementById('status').innerText = "正在儲存變更至試算表...";
-                let response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ action: 'updateRecord', id: rowId, name: newName, risk: newRisk })
-                });
-
-                alert("已送出修改請求，請稍候重新整理以同步試算表資料。");
-                document.getElementById('editModal').style.display = 'none';
-                setTimeout(() => initPhase5(), 2000);
-            } catch (e) {
-                alert("連線錯誤，無法儲存");
-                document.getElementById('status').innerText = "❌ 網路異常";
-            }
-        }
-
         async function deleteRow(id, risk) {
             if (!confirm(`確定要刪除 ID: ${id} (${risk}) 嗎？此動作無法復原！`)) return;
 
             try {
                 document.getElementById('status').innerText = "正在刪除資料...";
-                let response = await fetch(GAS_URL, {
+                await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify({ action: 'deleteRecord', id: id, risk: risk })
@@ -485,63 +618,58 @@
                 return;
             }
 
-            let rawItem = {
-                id: newId,
-                category: newCat,
-                name: newName,
-                svg_url: newImg
-            };
-
+            let rawItem = { id: newId, category: newCat, name: newName, svg_url: newImg };
             let newExpandedItems = expandWSigns([rawItem]);
-
             masterData.push(...newExpandedItems);
-            renderUI(masterData);
 
             document.getElementById('addModal').style.display = 'none';
+            if (currentCategory === newCat) {
+                let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
+                renderDetailTable(filtered);
+            } else {
+                renderCategoryGrid(masterData);
+            }
+
             document.getElementById('status').innerText = `⏳ 正在將新標誌 [${newId}] 寫入 Google 試算表...`;
 
             try {
                 await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify({ 
-                        action: 'addRecord', 
-                        id: newId, 
-                        category: newCat, 
-                        name: newName, 
-                        svg_url: newImg 
-                    })
+                    body: JSON.stringify({ action: 'addRecord', id: newId, category: newCat, name: newName, svg_url: newImg })
                 });
-
                 alert(`✅ 標誌 [${newId}] 已成功新增並同步至雲端！`);
-                document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數（含展開）：${masterData.length} 筆`;
-
+                document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
             } catch (e) {
-                console.error("新增失敗：", e);
-                alert("❌ 網路連線失敗，無法寫入雲端試算表");
-                document.getElementById('status').innerText = "❌ 新增同步失敗，請檢查網路連線";
+                alert("❌ 網路連線失敗，無法寫入雲端");
             }
         }
 
         function exportToExcel() {
-            if (currentFilteredData.length === 0) {
+            if (masterData.length === 0) {
                 alert("目前沒有可匯出的資料！");
                 return;
             }
 
-            let exportData = currentFilteredData.map(item => ({
+            let exportData = masterData.map(item => ({
                 "ID": item.id || item.ID || '',
                 "Category": item.category || item.Category || '',
                 "Name": item.name || item.Name || '',
+                "Freq": item.freq || item.Freq || '',
+                "Elim": item.elim || item.Elim || '',
+                "Sub": item.sub || item.Sub || '',
+                "Eng": item.eng || item.Eng || '',
+                "Admin": item.admin || item.Admin || '',
+                "Ppe": item.ppe || item.Ppe || '',
                 "Risk Level": item.risk || item.Risk || '',
                 "UniqueKey": item.uniqueKey || ''
             }));
 
             let worksheet = XLSX.utils.json_to_sheet(exportData);
             let workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "ISO7010_Signs");
+            XLSX.utils.book_append_sheet(workbook, worksheet, "ISO7010_Evaluation");
 
-            let fileName = `ISO7010_Export_${new Date().toISOString().slice(0,10)}.xlsx`;
+            let fileName = `ISO7010_RiskEval_${new Date().toISOString().slice(0,10)}.xlsx`;
             XLSX.writeFile(workbook, fileName);
         }
     </script>
