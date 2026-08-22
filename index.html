@@ -93,7 +93,7 @@
     <div id="evalModal" class="modal">
         <div class="modal-content">
             <div style="text-align: center;">
-                <img id="evalModalImg" src="" width="70" height="70" style="object-fit:contain; margin-bottom:5px;" onerror="this.src='https://via.placeholder.com/70?text=NoImg'">
+                <img id="evalModalImg" src="" width="70" height="70" style="object-fit:contain; margin-bottom:5px;">
                 <h3 id="evalModalTitle" style="margin: 5px 0;">標誌風險評估詳情</h3>
                 <p id="evalModalSub" style="font-size: 13px; color: #666; margin-bottom: 10px;"></p>
             </div>
@@ -283,7 +283,7 @@
                 card.className = 'category-card';
                 card.onclick = () => selectCategory(cat);
                 card.innerHTML = `
-                    <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/60?text=NoImg'">
+                    <img src="${imgUrl}" >
                     <h3>${cat}</h3>
                     <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">代表：${repName}</p>
                 `;
@@ -355,7 +355,7 @@
 
                 tr.innerHTML = `
                     <td>
-                        ${imgUrl ? `<img src="${imgUrl}" width="35" height="35" style="object-fit:contain;" onerror="this.src='https://via.placeholder.com/35?text=NoImg'">` : '無'}
+                        ${imgUrl ? `<img src="${imgUrl}" width="35" height="35" style="object-fit:contain;" >` : '無'}
                     </td>
                     <td>${rowId}</td>
                     <td>${rawCategory}</td>
