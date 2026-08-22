@@ -1,417 +1,473 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO 7010 安全標誌與風險評估系統</title>
+    <title>ISO 7010 風險評估與 QR Code 系統</title>
+    <!-- 引入必要的外部套件：SheetJS, jsQR, qrcode-generator -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/qrcode.min.js"></script>
+
     <style>
-        :root {
-            --primary-color: #2c3e50;
-            --accent-color: #e74c3c;
-            --bg-color: #f8f9fa;
-            --card-bg: #ffffff;
-            --text-color: #333333;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
-        }
-        header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 1rem;
-            text-align: center;
-            position: relative;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 1rem;
-        }
-        .view-section { display: none; }
-        .view-section.active { display: block; }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-        .card {
-            background: var(--card-bg);
-            border-radius: 8px;
-            padding: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            cursor: pointer;
-            text-align: center;
-            transition: transform 0.2s;
-        }
-        .card:hover { transform: translateY(-3px); }
-        .card img {
-            max-width: 100px;
-            height: 100px;
-            object-fit: contain;
-            margin-bottom: 0.5rem;
-        }
-        .btn {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9rem;
-        }
-        .btn-danger { background-color: var(--accent-color); }
-        .btn:hover { opacity: 0.9; }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        /* 標誌與 QR Code 緊密並排設計 */
-        .flex-row-tight {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .eval-panel {
-            background: #fff;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .eval-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 10px;
-            margin: 1rem 0;
-        }
-        .eval-item {
-            background: #f1f2f6;
-            padding: 8px;
-            border-radius: 4px;
-            text-align: center;
-        }
-        .admin-only { display: none; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .btn { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+        .btn:hover { background: #0056b3; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        
+        /* 視圖切換 */
+        .app-view { display: none; }
+        .app-view.active { display: block; }
+        
+        /* 卡片網格佈局 */
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
+        .risk-card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+        .risk-card:hover { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,0,0,0.1); }
+        
+        /* Modal 視窗設計 */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 10px; width: 90%; max-width: 500px; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .close-btn { position: absolute; top: 15px; right: 20px; font-size: 20px; cursor: pointer; color: #aaa; }
+        .close-btn:hover { color: #000; }
+        
+        /* 搜尋列與控制列 */
+        .controls-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .search-input { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; min-width: 200px; }
     </style>
 </head>
 <body>
-    <header>
-        <h1>ISO 7010 安全標誌與風險評估系統</h1>
-        <div id="status" style="font-size: 0.85rem; margin-top: 0.5rem;">⏳ 系統初始化中...</div>
-        <div style="position: absolute; top: 1rem; right: 1rem;">
-            <button class="btn" onclick="openAdminModal()">管理員登入</button>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h2>🛡️ ISO 7010 風險評估系統</h2>
+            <span id="status" style="font-size: 12px; color: #666;">系統初始化中...</span>
         </div>
-    </header>
-
-    <div class="container">
-        <div id="breadcrumb" style="margin-bottom: 1rem; font-size: 0.9rem;"></div>
-
-        <!-- 第一層：分類首頁 -->
-        <div id="categoryView" class="view-section active">
-            <h2>安全標誌分類</h2>
-            <div id="categoryGrid" class="grid"></div>
-        </div>
-
-        <!-- 第二層：標誌列表 (Warning sign 專用) -->
-        <div id="subCategoryView" class="view-section">
-            <h2 id="subCategoryTitle">標誌列表</h2>
-            <button class="btn" onclick="backToCategory()" style="margin-bottom: 1rem;">← 返回分類</button>
-            <div id="subCategoryGrid" class="grid"></div>
-        </div>
-
-        <!-- 第三層 / 一般第二層：7 大風險評估詳情畫面 -->
-        <div id="detailView" class="view-section">
-            <button class="btn" onclick="goBack()" style="margin-bottom: 1rem;">← 返回上一層</button>
-            <div id="detailContent"></div>
+        <div>
+            <button class="btn btn-secondary" onclick="startQRScanner()">📷 掃描 QR Code</button>
+            <button class="btn" onclick="openAdminModal()">⚙️ 管理員專區</button>
+            <button class="btn btn-secondary" onclick="exportToExcel()">📊 匯出 Excel</button>
         </div>
     </div>
 
-    <!-- 管理員 Modal -->
-    <div id="adminModal" class="modal">
-        <div class="modal-content">
-            <h3>管理員控制台</h3>
-            <div id="loginView">
-                <p>請輸入管理員密碼：</p>
-                <input type="password" id="pwdInput" class="btn" style="width: 100%; margin-bottom: 1rem; background: #fff; color: #333; border: 1px solid #ccc;" placeholder="預設密碼為 0">
-                <button class="btn" onclick="verifyLogin()">登入</button>
-            </div>
-            <div id="controlView" style="display:none;">
-                <p>✅ 目前已登入管理員</p>
-                <button class="btn" onclick="openAddModal()">新增標誌</button>
-                <button class="btn" onclick="exportToExcel()">匯出 Excel</button>
-                <button class="btn btn-danger" onclick="adminLogout()">登出管理員</button>
-            </div>
-            <br>
-            <button class="btn" onclick="document.getElementById('adminModal').style.display='none'" style="background: #7f8c8d;">關閉</button>
-        </div>
+    <!-- 搜尋與返回列 -->
+    <div class="controls-bar">
+        <button id="backBtn" class="btn btn-secondary" style="display:none;" onclick="renderCategoryGrid(masterData)">⬅ 返回分類</button>
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 輸入 ID、名稱或類別進行搜尋..." oninput="handleSearch()">
     </div>
 
-    <!-- 新增標誌 Modal -->
-    <div id="addModal" class="modal">
-        <div class="modal-content">
-            <h3>新增安全標誌</h3>
-            <label>ID 代號:</label><input type="text" id="addId" class="btn" style="width:100%; margin-bottom:10px; background:#fff; color:#333; border:1px solid #ccc;"><br>
-            <label>分類 (Category):</label><input type="text" id="addCategory" class="btn" style="width:100%; margin-bottom:10px; background:#fff; color:#333; border:1px solid #ccc;"><br>
-            <label>名稱 (Name):</label><input type="text" id="addName" class="btn" style="width:100%; margin-bottom:10px; background:#fff; color:#333; border:1px solid #ccc;"><br>
-            <label>圖片網址 (SVG URL):</label><input type="text" id="addImg" class="btn" style="width:100%; margin-bottom:20px; background:#fff; color:#333; border:1px solid #ccc;"><br>
+    <!-- 視圖 1：分類檢視 / 主畫面 -->
+    <div id="categoryView" class="app-view active">
+        <p id="categoryHint" style="color: #666; margin-bottom: 15px;">💡 請選擇下方類別，或直接使用上方搜尋與相機掃描功能。</p>
+        <div id="categoryGridContainer" class="grid-container"></div>
+    </div>
+
+    <!-- 視圖 2：清單/搜尋結果細節檢視 -->
+    <div id="detailView" class="app-view">
+        <h3 id="detailCategoryTitle" style="margin-top: 0;"></h3>
+        <p id="detailHint" style="color: #666; margin-bottom: 15px;"></p>
+        <div id="detailGridContainer" class="grid-container"></div>
+    </div>
+</div>
+
+<!-- ================= 互動 Modal 視窗區塊 ================= -->
+
+<!-- 最後一層詳細資料 Modal (包含左右並排的圖形與專屬 QR Code) -->
+<div id="detailModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeDetailModal()">&times;</span>
+        <h3 id="modalTitle" style="margin-top: 0; color: #007bff;">標誌詳情</h3>
+        
+        <!-- 標誌圖形與專屬 QR Code 左右並排區塊 -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="text-align: center;">
+                <div id="modalImgContainer"></div>
+                <div style="font-size: 11px; color: #666; margin-top: 4px;">標誌圖形</div>
+            </div>
+            <div style="width: 1px; height: 80px; background: #dee2e6;"></div>
+            <div style="text-align: center;">
+                <div id="itemUniqueQRCode"></div>
+                <div style="font-size: 11px; color: #666; margin-top: 4px;">專屬 QR Code</div>
+            </div>
+        </div>
+
+        <div id="modalBodyContent" style="font-size: 14px; line-height: 1.6;">
+            <!-- 動態填入評估細節 -->
+        </div>
+    </div>
+</div>
+
+<!-- 相機 QR Code 掃描器 Modal -->
+<div id="qrModal" class="modal">
+    <div class="modal-content" style="text-align: center; max-width: 400px;">
+        <span class="close-btn" onclick="closeQRScanner()">&times;</span>
+        <h3>📷 相機 QR Code 掃描</h3>
+        <div style="position: relative; width: 100%; max-width: 300px; margin: 0 auto; background: #000; border-radius: 8px; overflow: hidden;">
+            <video id="qrVideo" style="width: 100%; display: block;"></video>
+        </div>
+        <p style="font-size: 12px; color: #666; margin-top: 10px;">請將相機對準標誌的專屬 QR Code 進行掃描。</p>
+        <button class="btn btn-danger" onclick="closeQRScanner()" style="margin-top: 10px;">關閉相機</button>
+    </div>
+</div>
+
+<!-- 管理員登入/控制 Modal -->
+<div id="adminModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="document.getElementById('adminModal').style.display='none'">&times;</span>
+        <h3>⚙️ 管理員控制台</h3>
+        <div id="loginView">
+            <p>請輸入管理員密碼：</p>
+            <input type="password" id="pwdInput" class="search-input" style="width: 100%; margin-bottom: 10px;" placeholder="預設密碼: 0">
+            <button class="btn" onclick="verifyLogin()" style="width: 100%;">登入</button>
+        </div>
+        <div id="controlView" style="display:none;">
+            <p style="color: green; font-weight: bold;">✔ 目前已登入管理員身分</p>
+            <button class="btn" onclick="openAddModal()" style="width: 100%; margin-bottom: 8px;">➕ 新增標誌資料</button>
+            <button class="btn btn-secondary" onclick="openPendingModal()" style="width: 100%; margin-bottom: 8px;">📋 審批變更請求</button>
+            <button class="btn btn-danger" onclick="adminLogout()" style="width: 100%;">登出管理員</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新增資料 Modal -->
+<div id="addModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="document.getElementById('addModal').style.display='none'">&times;</span>
+        <h3>➕ 新增 ISO 7010 標誌</h3>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <input type="text" id="addId" class="search-input" placeholder="標誌 ID (例如: W001)">
+            <input type="text" id="addCategory" class="search-input" placeholder="類別 (例如: Warning sign)">
+            <input type="text" id="addName" class="search-input" placeholder="標誌名稱">
+            <input type="text" id="addImg" class="search-input" placeholder="圖片 SVG URL 網址">
             <button class="btn" onclick="submitAdd()">確認新增</button>
-            <button class="btn" style="background:#7f8c8d;" onclick="document.getElementById('addModal').style.display='none'">取消</button>
         </div>
     </div>
+</div>
 
-    <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; // 請替換您的 GAS 網址
-        let masterData = [];
-        let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
-        let currentCategory = '';
-        let currentWarningId = '';
+<!-- 審批請求 Modal -->
+<div id="pendingModal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+        <span class="close-btn" onclick="closePendingModal()">&times;</span>
+        <h3>📋 審批管理</h3>
+        <div id="pendingListContainer" style="max-height: 350px; overflow-y: auto;">
+            <p>載入中...</p>
+        </div>
+    </div>
+</div>
 
-        window.onload = function() {
-            initPhase5();
-        };
+<!-- ================= JavaScript 核心邏輯 ================= -->
+<script>
+    // 請替換為您的 Google Apps Script 網頁應用程式 URL
+    const GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE"; 
+    
+    let masterData = [];
+    let currentCategory = null;
+    let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
+    let mediaStream = null;
+    let scanCanvas = document.createElement('canvas');
 
-        async function initPhase5() {
-            try {
-                let res = await fetch(GAS_URL + "?action=getData");
-                let json = await res.json();
-                masterData = json.data || json;
-                document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
-                renderCategoryGrid(masterData);
-                checkDeepLink();
-            } catch (e) {
-                document.getElementById('status').innerText = "⚠️ 載入遠端資料失敗";
-            }
+    // 頁面載入時初始化
+    window.onload = function() {
+        // 模擬測試資料（若未連線 GAS 時可展示效果）
+        masterData = [
+            { id: "W001", category: "Warning sign", name: "當心觸電", svg_url: "https://upload.wikimedia.org/wikipedia/commons/3/3b/ISO_7010_W012.svg", risk: "High", uniqueKey: "W001-High" },
+            { id: "W002", category: "Warning sign", name: "當心高溫", svg_url: "https://upload.wikimedia.org/wikipedia/commons/7/77/ISO_7010_W017.svg", risk: "Medium", uniqueKey: "W002-Medium" },
+            { id: "M001", category: "Mandatory", name: "必須戴安全帽", svg_url: "https://upload.wikimedia.org/wikipedia/commons/3/3f/ISO_7010_M014.svg", risk: "Normal", uniqueKey: "M001-Normal" }
+        ];
+        renderCategoryGrid(masterData);
+        updateAdminUI();
+        document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
+    };
+
+    // 1. 渲染分類主畫面
+    function renderCategoryGrid(dataList) {
+        currentCategory = null;
+        showView('categoryView');
+        document.getElementById('backBtn').style.display = 'none';
+        
+        let container = document.getElementById('categoryGridContainer');
+        container.innerHTML = '';
+
+        // 依 category 分組
+        let categories = [...new Set(dataList.map(item => String(item.category || item.Category || 'Uncategorized').trim()))];
+        
+        categories.forEach(cat => {
+            let sampleItem = dataList.find(item => String(item.category || item.Category || '').trim() === cat);
+            let card = document.createElement('div');
+            card.className = 'risk-card';
+            card.innerHTML = `
+                <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px; color: #007bff;">${cat}</div>
+                <div style="height: 80px; display: flex; align-items: center; justify-content: center; background: #f8f9fa; border-radius: 6px; margin-bottom: 8px;">
+                    <img src="${sampleItem ? (sampleItem.svg_url || sampleItem.SVG_URL || '') : ''}" style="max-height: 70px; max-width: 70px; object-fit: contain;" onerror="this.src='https://via.placeholder.com/70?text=Category'">
+                </div>
+                <div style="font-size: 12px; color: #666;">點擊查看清單</div>
+            `;
+            card.onclick = () => {
+                let filtered = dataList.filter(item => String(item.category || item.Category || '').trim() === cat);
+                renderDetailGrid(filtered, cat);
+            };
+            container.appendChild(card);
+        });
+    }
+
+    // 2. 渲染特定類別或搜尋結果的卡片清單
+    function renderDetailGrid(dataList, categoryName) {
+        currentCategory = categoryName;
+        showView('detailView');
+        
+        document.getElementById('backBtn').style.display = 'inline-block';
+        document.getElementById('detailCategoryTitle').innerText = categoryName === 'Search Result' ? `🔍 搜尋結果` : `${categoryName} 評估清單`;
+        document.getElementById('detailHint').innerText = "💡 點擊卡片可檢視詳細 ISO 7010 資料與專屬 QR Code。";
+
+        let container = document.getElementById('detailGridContainer');
+        container.innerHTML = '';
+
+        if (!dataList || dataList.length === 0) {
+            container.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color:#6c757d; padding:40px;">目前此類別沒有資料。</p>`;
+            return;
         }
 
-        function renderCategoryGrid(data) {
-            let categories = [...new Set(data.map(item => String(item.category || item.Category || '').trim()))].filter(Boolean);
-            let grid = document.getElementById('categoryGrid');
-            grid.innerHTML = '';
+        dataList.forEach(item => {
+            let card = document.createElement('div');
+            card.className = 'risk-card';
             
-            categories.forEach(cat => {
-                let sample = data.find(i => String(i.category || i.Category || '').trim() === cat);
-                let card = document.createElement('div');
-                card.className = 'card';
-                card.onclick = () => selectCategory(cat);
-                card.innerHTML = `
-                    <img src="${sample?.svg_url || ''}" alt="${cat}" onerror="this.src='https://via.placeholder.com/100'">
-                    <h3>${cat}</h3>
-                    <p>${data.filter(i => String(i.category || i.Category || '').trim() === cat).length} 筆資料</p>
-                `;
-                grid.appendChild(card);
-            });
-            switchView('categoryView');
-            document.getElementById('breadcrumb').innerText = '首頁 > 分類';
-        }
-
-        function selectCategory(cat) {
-            currentCategory = cat;
-            if (cat.toLowerCase().includes('warning')) {
-                renderWarningSubList(cat);
-            } else {
-                renderDetailGrid(masterData.filter(i => String(i.category || i.Category || '').trim() === cat), cat);
-            }
-        }
-
-        function renderWarningSubList(cat) {
-            let items = masterData.filter(i => String(i.category || i.Category || '').trim() === cat);
-            let uniqueItems = [];
-            let seenIds = new Set();
-            items.forEach(item => {
-                let id = item.id || item.ID;
-                if (!seenIds.has(id)) {
-                    seenIds.add(id);
-                    uniqueItems.push(item);
-                }
-            });
-
-            let grid = document.getElementById('subCategoryGrid');
-            grid.innerHTML = '';
-            uniqueItems.forEach(item => {
-                let id = item.id || item.ID;
-                let name = item.name || item.Name || '';
-                let card = document.createElement('div');
-                card.className = 'card';
-                card.onclick = () => renderWarningTier3(id, cat);
-                card.innerHTML = `
-                    <img src="${item.svg_url || ''}" alt="${id}" onerror="this.src='https://via.placeholder.com/100'">
-                    <h3>${id}</h3>
-                    <p>${name}</p>
-                `;
-                grid.appendChild(card);
-            });
-            document.getElementById('subCategoryTitle').innerText = `${cat} - 標誌列表`;
-            switchView('subCategoryView');
-            document.getElementById('breadcrumb').innerText = `首頁 > ${cat}`;
-        }
-
-        function renderWarningTier3(id, cat) {
-            currentWarningId = id;
-            let filtered = masterData.filter(i => (String(i.category || i.Category || '').trim() === cat) && (String(i.id || i.ID || '').trim() === id));
-            renderDetailGrid(filtered, `${cat} > ${id}`);
-        }
-
-        // 核心：呈現 7 大風險評估窗格與「緊密並排的單一 QR Code」
-        function renderDetailGrid(data, titlePath) {
-            let container = document.getElementById('detailContent');
-            container.innerHTML = `<h2>7 大風險評估詳情：${titlePath}</h2>`;
+            let catStr = String(item.category || item.Category || '').trim();
+            let isWarningSign = catStr.toLowerCase() === 'warning sign';
+            let riskVal = item.risk || item.Risk || 'Normal';
             
-            data.forEach(item => {
-                let id = item.id || item.ID || '';
-                let name = item.name || item.Name || '';
-                let risk = item.risk || item.Risk || 'Normal';
-                let svg = item.svg_url || '';
+            let riskBadgeHTML = '';
+            if (isWarningSign) {
+                let badgeColor = '#ffc107';
+                if (riskVal === 'High') badgeColor = '#dc3545';
+                else if (riskVal === 'Medium') badgeColor = '#fd7e14';
+                else if (riskVal === 'Low') badgeColor = '#28a745';
                 
-                // 產生指向該標誌深層連結的單一 QR Code
-                let deepLinkUrl = window.location.origin + window.location.pathname + '#' + id;
-                let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(deepLinkUrl)}`;
-
-                let panel = document.createElement('div');
-                panel.className = 'eval-panel';
-                panel.innerHTML = `
-                    <div class="flex-row-tight" style="margin-bottom: 1rem;">
-                        <img src="${svg}" style="width: 80px; height: 80px; object-fit: contain;" onerror="this.src='https://via.placeholder.com/80'">
-                        <img src="${qrUrl}" alt="QR Code" style="width: 80px; height: 80px; border: 1px solid #ddd; padding: 2px; background: #fff;" title="掃描連結至此標誌">
-                        <div style="margin-left: 10px;">
-                            <h3 style="margin: 0 0 5px 0;">[${id}] ${name}</h3>
-                            <p style="margin: 0;"><strong>當前風險等級 (Risk):</strong> <span style="color: var(--accent-color);">${risk}</span></p>
-                        </div>
-                    </div>
-                    <h4>7 大危害 / 風險評估參數</h4>
-                    <div class="eval-grid">
-                        <div class="eval-item"><strong>Freq (頻率)</strong><br>${item.freq || item.Freq || '-'}</div>
-                        <div class="eval-item"><strong>Elim (消除)</strong><br>${item.elim || item.Elim || '-'}</div>
-                        <div class="eval-item"><strong>Sub (替代)</strong><br>${item.sub || item.Sub || '-'}</div>
-                        <div class="eval-item"><strong>Eng (工程)</strong><br>${item.eng || item.Eng || '-'}</div>
-                        <div class="eval-item"><strong>Admin (管理)</strong><br>${item.admin || item.Admin || '-'}</div>
-                        <div class="eval-item"><strong>Ppe (防護)</strong><br>${item.ppe || item.Ppe || '-'}</div>
-                        <div class="eval-item" style="background:#dfe4ea;"><strong>Risk Level</strong><br>${risk}</div>
-                    </div>
-                `;
-                container.appendChild(panel);
-            });
-
-            switchView('detailView');
-            document.getElementById('breadcrumb').innerText = `首頁 > ${titlePath}`;
-        }
-
-        function switchView(viewId) {
-            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-            document.getElementById(viewId).classList.add('active');
-        }
-
-        function backToCategory() {
-            switchView('categoryView');
-            document.getElementById('breadcrumb').innerText = '首頁 > 分類';
-        }
-
-        function goBack() {
-            if (currentCategory.toLowerCase().includes('warning') && currentWarningId) {
-                currentWarningId = '';
-                renderWarningSubList(currentCategory);
-            } else {
-                switchView('categoryView');
-                document.getElementById('breadcrumb').innerText = '首頁 > 分類';
+                riskBadgeHTML = `<div style="margin-top: 6px; font-size: 12px; font-weight: bold; background: ${badgeColor}; color: ${riskVal === 'High' ? '#fff' : '#000'}; padding: 2px 6px; border-radius: 4px; display: inline-block;">風險等級: ${riskVal}</div>`;
             }
-        }
 
-        function checkDeepLink() {
-            let hash = window.location.hash.replace('#', '');
-            if (!hash || masterData.length === 0) return;
-            let found = masterData.find(item => String(item.id || item.ID) === hash);
-            if (found) {
-                let cat = String(found.category || found.Category || '').trim();
-                currentCategory = cat;
-                if (cat.toLowerCase().includes('warning')) {
-                    renderWarningTier3(hash, cat);
-                } else {
-                    renderDetailGrid(masterData.filter(i => String(i.category || i.Category || '').trim() === cat), cat);
+            card.innerHTML = `
+                <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px; color: #333;">ID: ${item.id || item.ID}</div>
+                <div style="font-size: 13px; color: #666; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name || item.Name || ''}</div>
+                <div style="height: 90px; display: flex; align-items: center; justify-content: center; background: #f8f9fa; border-radius: 6px; margin-bottom: 5px;">
+                    <img src="${item.svg_url || item.SVG_URL || ''}" style="max-height: 80px; max-width: 80px; object-fit: contain;" onerror="this.src='https://via.placeholder.com/80?text=No+Image'">
+                </div>
+                ${riskBadgeHTML}
+            `;
+
+            card.onclick = () => openDetailModal(item);
+            container.appendChild(card);
+        });
+    }
+
+    function showView(viewId) {
+        document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+    }
+
+    // 3. 最後一層詳情 Modal (左右並排顯示圖形與專屬 QR Code)
+    function openDetailModal(item) {
+        let modal = document.getElementById('detailModal');
+        let itemId = item.id || item.ID || '';
+        let itemName = item.name || item.Name || '';
+        let itemSvg = item.svg_url || item.SVG_URL || '';
+        let itemRisk = item.risk || item.Risk || 'Normal';
+
+        document.getElementById('modalTitle').innerText = `[${itemId}] ${itemName}`;
+        
+        // 渲染圖形
+        document.getElementById('modalImgContainer').innerHTML = `
+            <img src="${itemSvg}" style="max-height: 90px; max-width: 90px; object-fit: contain;" onerror="this.src='https://via.placeholder.com/90?text=No+Image'">
+        `;
+
+        // 自動動態產生該標誌專屬的 QR Code（內容為該標誌 ID）
+        try {
+            if (typeof qrcode === 'function') {
+                let qr = qrcode(4, 'M');
+                qr.addData(itemId);
+                qr.make();
+                document.getElementById('itemUniqueQRCode').innerHTML = qr.createImgTag(4, 4);
+                let qrImg = document.getElementById('itemUniqueQRCode').querySelector('img');
+                if (qrImg) {
+                    qrImg.style.width = '85px';
+                    qrImg.style.height = '85px';
                 }
             }
+        } catch (e) {
+            console.error("產生專屬 QR Code 失敗", e);
         }
 
-        function openAdminModal() {
-            document.getElementById('adminModal').style.display = 'flex';
-            updateAdminUI();
-        }
+        // 填入其他詳細內容
+        document.getElementById('modalBodyContent').innerHTML = `
+            <div><b>類別：</b> ${item.category || item.Category || '-'}</div>
+            <div><b>風險等級：</b> ${itemRisk}</div>
+            <div><b>頻率 (Freq)：</b> ${item.freq || item.Freq || '-'}</div>
+            <div><b>消除 (Elim)：</b> ${item.elim || item.Elim || '-'}</div>
+            <div><b>替代 (Sub)：</b> ${item.sub || item.Sub || '-'}</div>
+            <div><b>工程控制 (Eng)：</b> ${item.eng || item.Eng || '-'}</div>
+        `;
 
-        function verifyLogin() {
-            let inputPwd = document.getElementById('pwdInput').value;
-            if (inputPwd === '0') {
-                isAdmin = true;
-                sessionStorage.setItem('isAdmin', 'true');
-                alert("管理員登入成功！");
-                document.getElementById('adminModal').style.display = 'none';
-                document.getElementById('pwdInput').value = '';
-                updateAdminUI();
+        modal.style.display = 'flex';
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detailModal').style.display = 'none';
+    }
+
+    // 4. 搜尋與相機 QR Code 掃描解析
+    function handleSearch() {
+        let keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+        if (!keyword) {
+            if (currentCategory) {
+                let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
+                renderDetailGrid(filtered, currentCategory);
             } else {
-                alert("密碼錯誤！");
+                renderCategoryGrid(masterData);
             }
+            return;
         }
 
-        function adminLogout() {
-            isAdmin = false;
-            sessionStorage.removeItem('isAdmin');
-            updateAdminUI();
-            alert("已登出管理員");
+        let filtered = masterData.filter(item => 
+            String(item.id || item.ID || '').toLowerCase().includes(keyword) || 
+            String(item.name || item.Name || '').toLowerCase().includes(keyword) ||
+            String(item.category || item.Category || '').toLowerCase().includes(keyword)
+        );
+        renderDetailGrid(filtered, 'Search Result');
+    }
+
+    async function startQRScanner() {
+        let modal = document.getElementById('qrModal');
+        let video = document.getElementById('qrVideo');
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert("您的瀏覽器不支援相機存取功能。");
+            return;
+        }
+        try {
+            modal.style.display = 'flex';
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = mediaStream;
+            video.setAttribute("playsinline", true);
+            video.play();
+            requestAnimationFrame(scanQRCodeFrame);
+        } catch (error) {
+            alert("無法開啟相機：您可能拒絕了權限或無相機裝置。");
+            closeQRScanner();
+        }
+    }
+
+    function scanQRCodeFrame() {
+        let video = document.getElementById('qrVideo');
+        if (!mediaStream || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+            if (mediaStream) requestAnimationFrame(scanQRCodeFrame);
+            return;
+        }
+
+        let canvas = scanCanvas;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        let ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        if (typeof jsQR === 'function') {
+            let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+            if (code && code.data) {
+                let scannedText = code.data.trim();
+                closeQRScanner();
+                
+                // 自動帶入搜尋並嘗試直接開啟該標誌的最後一層頁面
+                let searchInput = document.getElementById('searchInput');
+                if (searchInput) searchInput.value = scannedText;
+
+                let matchedItem = masterData.find(item => String(item.id || item.ID || '').trim().toLowerCase() === scannedText.toLowerCase());
+                if (matchedItem) {
+                    openDetailModal(matchedItem);
+                } else {
+                    handleSearch();
+                }
+                return;
+            }
+        }
+        if (mediaStream) requestAnimationFrame(scanQRCodeFrame);
+    }
+
+    function closeQRScanner() {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
+        }
+        let video = document.getElementById('qrVideo');
+        if (video) video.srcObject = null;
+        document.getElementById('qrModal').style.display = 'none';
+    }
+
+    // 5. 管理員與匯出功能
+    function openAdminModal() { document.getElementById('adminModal').style.display = 'flex'; }
+    function openPendingModal() { document.getElementById('pendingModal').style.display = 'flex'; }
+    function closePendingModal() { document.getElementById('pendingModal').style.display = 'none'; }
+    function openAddModal() { document.getElementById('addModal').style.display = 'flex'; }
+
+    function verifyLogin() {
+        if (document.getElementById('pwdInput').value === '0') {
+            isAdmin = true;
+            sessionStorage.setItem('isAdmin', 'true');
+            alert("管理員登入成功！");
             document.getElementById('adminModal').style.display = 'none';
+            document.getElementById('pwdInput').value = '';
+            updateAdminUI();
+            openPendingModal();
+        } else {
+            alert("密碼錯誤！");
+        }
+    }
+
+    function adminLogout() {
+        isAdmin = false;
+        sessionStorage.removeItem('isAdmin');
+        updateAdminUI();
+        alert("已登出");
+        document.getElementById('adminModal').style.display = 'none';
+    }
+
+    function updateAdminUI() {
+        let controlView = document.getElementById('controlView');
+        let loginView = document.getElementById('loginView');
+        if (controlView && loginView) {
+            controlView.style.display = isAdmin ? 'block' : 'none';
+            loginView.style.display = isAdmin ? 'none' : 'block';
+        }
+    }
+
+    function submitAdd() {
+        let newId = document.getElementById('addId').value.trim();
+        let newCat = document.getElementById('addCategory').value.trim();
+        let newName = document.getElementById('addName').value.trim();
+        let newImg = document.getElementById('addImg').value.trim();
+
+        if (!newId || !newCat || !newName) {
+            alert("請完整填寫 ID、Category 與 Name！");
+            return;
         }
 
-        function updateAdminUI() {
-            let loginView = document.getElementById('loginView');
-            let controlView = document.getElementById('controlView');
-            if (loginView && controlView) {
-                loginView.style.display = isAdmin ? 'none' : 'block';
-                controlView.style.display = isAdmin ? 'block' : 'none';
-            }
-        }
+        masterData.push({ id: newId, category: newCat, name: newName, svg_url: newImg, risk: 'Normal', uniqueKey: `${newId}-Normal` });
+        document.getElementById('addModal').style.display = 'none';
+        renderCategoryGrid(masterData);
+        alert(`✅ 標誌 [${newId}] 新增成功！`);
+    }
 
-        function openAddModal() {
-            document.getElementById('addModal').style.display = 'flex';
-        }
+    function exportToExcel() {
+        if (masterData.length === 0) { alert("無資料可匯出"); return; }
+        let worksheet = XLSX.utils.json_to_sheet(masterData);
+        let workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "ISO7010");
+        XLSX.writeFile(workbook, `ISO7010_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+</script>
 
-        async function submitAdd() {
-            let newId = document.getElementById('addId').value.trim();
-            let newCat = document.getElementById('addCategory').value.trim();
-            let newName = document.getElementById('addName').value.trim();
-            let newImg = document.getElementById('addImg').value.trim();
-            if (!newId || !newCat || !newName) { alert("請填寫必要欄位"); return; }
-            alert(`已準備新增代號: ${newId}`);
-            document.getElementById('addModal').style.display = 'none';
-        }
-
-        function exportToExcel() {
-            if (masterData.length === 0) { alert("無資料可匯出"); return; }
-            let exportData = masterData.map(item => ({
-                "ID": item.id || item.ID || '',
-                "Category": item.category || item.Category || '',
-                "Name": item.name || item.Name || '',
-                "Risk Level": item.risk || item.Risk || ''
-            }));
-            let worksheet = XLSX.utils.json_to_sheet(exportData);
-            let workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "ISO7010_Evaluation");
-            XLSX.writeFile(workbook, `ISO7010_RiskEval_${new Date().toISOString().slice(0,10)}.xlsx`);
-        }
-    </script>
 </body>
 </html>
