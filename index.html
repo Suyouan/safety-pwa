@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO 7010 安全標誌與風險評估 PWA</title>
-    <!-- SheetJS 用於 Excel 匯出 -->
+    <title>ISO 7010 安全標誌與風險評估系統</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -15,7 +14,7 @@
             --text-color: #333333;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
@@ -33,15 +32,11 @@
             margin: 0 auto;
             padding: 1rem;
         }
-        .view-section {
-            display: none;
-        }
-        .view-section.active {
-            display: block;
-        }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 1rem;
             margin-top: 1rem;
         }
@@ -54,10 +49,7 @@
             text-align: center;
             transition: transform 0.2s;
         }
-        .card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
+        .card:hover { transform: translateY(-3px); }
         .card img {
             max-width: 100px;
             height: 100px;
@@ -89,19 +81,34 @@
             padding: 2rem;
             border-radius: 8px;
             width: 90%;
-            max-width: 500px;
+            max-width: 600px;
             max-height: 90vh;
             overflow-y: auto;
         }
-        .qr-container {
+        /* 標誌與 QR Code 緊密並排設計 */
+        .flex-row-tight {
             display: flex;
-            justify-content: center;
-            gap: 1rem;
+            align-items: center;
+            gap: 8px;
+        }
+        .eval-panel {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .eval-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
             margin: 1rem 0;
         }
-        .qr-box {
+        .eval-item {
+            background: #f1f2f6;
+            padding: 8px;
+            border-radius: 4px;
             text-align: center;
-            font-size: 0.8rem;
         }
         .admin-only { display: none; }
     </style>
@@ -116,7 +123,6 @@
     </header>
 
     <div class="container">
-        <!-- 導航麵包屑 -->
         <div id="breadcrumb" style="margin-bottom: 1rem; font-size: 0.9rem;"></div>
 
         <!-- 第一層：分類首頁 -->
@@ -125,14 +131,14 @@
             <div id="categoryGrid" class="grid"></div>
         </div>
 
-        <!-- 第二層：標誌列表 (特別針對 Warning sign 專用) -->
+        <!-- 第二層：標誌列表 (Warning sign 專用) -->
         <div id="subCategoryView" class="view-section">
             <h2 id="subCategoryTitle">標誌列表</h2>
             <button class="btn" onclick="backToCategory()" style="margin-bottom: 1rem;">← 返回分類</button>
             <div id="subCategoryGrid" class="grid"></div>
         </div>
 
-        <!-- 第三層 / 一般第二層：明細與 7 大風險評估詳情 -->
+        <!-- 第三層 / 一般第二層：7 大風險評估詳情畫面 -->
         <div id="detailView" class="view-section">
             <button class="btn" onclick="goBack()" style="margin-bottom: 1rem;">← 返回上一層</button>
             <div id="detailContent"></div>
@@ -159,8 +165,21 @@
         </div>
     </div>
 
+    <!-- 新增標誌 Modal -->
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <h3>新增安全標誌</h3>
+            <label>ID 代號:</label><input type="text" id="addId" class="btn" style="width:100%; margin-bottom:10px; background:#fff; color:#333; border:1px solid #ccc;"><br>
+            <label>分類 (Category):</label><input type="text" id="addCategory" class="btn" style="width:100%; margin-bottom:10px; background:#fff; color:#333; border:1px solid #ccc;"><br>
+            <label>名稱 (Name):</label><input type="text" id="addName" class="btn" style="width:100%; margin-bottom:10px; background:#fff; color:#333; border:1px solid #ccc;"><br>
+            <label>圖片網址 (SVG URL):</label><input type="text" id="addImg" class="btn" style="width:100%; margin-bottom:20px; background:#fff; color:#333; border:1px solid #ccc;"><br>
+            <button class="btn" onclick="submitAdd()">確認新增</button>
+            <button class="btn" style="background:#7f8c8d;" onclick="document.getElementById('addModal').style.display='none'">取消</button>
+        </div>
+    </div>
+
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; // 請替換您的 GAS 網址
+        const GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE"; // 請替換您的 GAS 網址
         let masterData = [];
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
         let currentCategory = '';
@@ -179,8 +198,7 @@
                 renderCategoryGrid(masterData);
                 checkDeepLink();
             } catch (e) {
-                document.getElementById('status').innerText = "⚠️ 載入遠端資料失敗，使用離線或模擬模式";
-                // 這裡可加入預設測試資料避免畫面空白
+                document.getElementById('status').innerText = "⚠️ 載入遠端資料失敗";
             }
         }
 
@@ -207,7 +225,6 @@
 
         function selectCategory(cat) {
             currentCategory = cat;
-            // 判斷是否為 Warning sign (三層架構)
             if (cat.toLowerCase().includes('warning')) {
                 renderWarningSubList(cat);
             } else {
@@ -217,7 +234,6 @@
 
         function renderWarningSubList(cat) {
             let items = masterData.filter(i => String(i.category || i.Category || '').trim() === cat);
-            // 依據 ID 過濾出不重複的標誌清單
             let uniqueItems = [];
             let seenIds = new Set();
             items.forEach(item => {
@@ -254,9 +270,10 @@
             renderDetailGrid(filtered, `${cat} > ${id}`);
         }
 
+        // 核心：呈現 7 大風險評估窗格與「緊密並排的單一 QR Code」
         function renderDetailGrid(data, titlePath) {
             let container = document.getElementById('detailContent');
-            container.innerHTML = `<h2>詳情與風險評估：${titlePath}</h2>`;
+            container.innerHTML = `<h2>7 大風險評估詳情：${titlePath}</h2>`;
             
             data.forEach(item => {
                 let id = item.id || item.ID || '';
@@ -264,32 +281,33 @@
                 let risk = item.risk || item.Risk || 'Normal';
                 let svg = item.svg_url || '';
                 
-                let card = document.createElement('div');
-                card.style.background = '#fff';
-                card.style.padding = '1rem';
-                card.style.marginBottom = '1rem';
-                card.style.borderRadius = '8px';
-                card.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                // 產生指向該標誌深層連結的單一 QR Code
+                let deepLinkUrl = window.location.origin + window.location.pathname + '#' + id;
+                let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(deepLinkUrl)}`;
 
-                // 產生兩個並排的 QR Code (分別帶入代號與深層連結)
-                let qrUrl1 = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(id)}`;
-                let qrUrl2 = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(window.location.origin + window.location.pathname + '#' + id)}`;
-
-                card.innerHTML = `
-                    <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                let panel = document.createElement('div');
+                panel.className = 'eval-panel';
+                panel.innerHTML = `
+                    <div class="flex-row-tight" style="margin-bottom: 1rem;">
                         <img src="${svg}" style="width: 80px; height: 80px; object-fit: contain;" onerror="this.src='https://via.placeholder.com/80'">
-                        <div style="flex-grow: 1;">
-                            <h4>[${id}] ${name}</h4>
-                            <p><strong>風險等級 (Risk):</strong> ${risk}</p>
-                            <p><strong>評估參數:</strong> Freq: ${item.freq||'-'} | Elim: ${item.elim||'-'} | Sub: ${item.sub||'-'} | Eng: ${item.eng||'-'} | Admin: ${item.admin||'-'} | Ppe: ${item.ppe||'-'}</p>
-                        </div>
-                        <div class="qr-container">
-                            <div class="qr-box"><img src="${qrUrl1}"><br>代號 QR</div>
-                            <div class="qr-box"><img src="${qrUrl2}"><br>深層連結</div>
+                        <img src="${qrUrl}" alt="QR Code" style="width: 80px; height: 80px; border: 1px solid #ddd; padding: 2px; background: #fff;" title="掃描連結至此標誌">
+                        <div style="margin-left: 10px;">
+                            <h3 style="margin: 0 0 5px 0;">[${id}] ${name}</h3>
+                            <p style="margin: 0;"><strong>當前風險等級 (Risk):</strong> <span style="color: var(--accent-color);">${risk}</span></p>
                         </div>
                     </div>
+                    <h4>7 大危害 / 風險評估參數</h4>
+                    <div class="eval-grid">
+                        <div class="eval-item"><strong>Freq (頻率)</strong><br>${item.freq || item.Freq || '-'}</div>
+                        <div class="eval-item"><strong>Elim (消除)</strong><br>${item.elim || item.Elim || '-'}</div>
+                        <div class="eval-item"><strong>Sub (替代)</strong><br>${item.sub || item.Sub || '-'}</div>
+                        <div class="eval-item"><strong>Eng (工程)</strong><br>${item.eng || item.Eng || '-'}</div>
+                        <div class="eval-item"><strong>Admin (管理)</strong><br>${item.admin || item.Admin || '-'}</div>
+                        <div class="eval-item"><strong>Ppe (防護)</strong><br>${item.ppe || item.Ppe || '-'}</div>
+                        <div class="eval-item" style="background:#dfe4ea;"><strong>Risk Level</strong><br>${risk}</div>
+                    </div>
                 `;
-                container.appendChild(card);
+                container.appendChild(panel);
             });
 
             switchView('detailView');
@@ -330,11 +348,7 @@
                 }
             }
         }
-    </script>
 
-
-
-    <script>
         function openAdminModal() {
             document.getElementById('adminModal').style.display = 'flex';
             updateAdminUI();
@@ -372,34 +386,31 @@
         }
 
         function openAddModal() {
-            alert("點擊了新增標誌功能 (可根據需求擴充表單)");
+            document.getElementById('addModal').style.display = 'flex';
+        }
+
+        async function submitAdd() {
+            let newId = document.getElementById('addId').value.trim();
+            let newCat = document.getElementById('addCategory').value.trim();
+            let newName = document.getElementById('addName').value.trim();
+            let newImg = document.getElementById('addImg').value.trim();
+            if (!newId || !newCat || !newName) { alert("請填寫必要欄位"); return; }
+            alert(`已準備新增代號: ${newId}`);
+            document.getElementById('addModal').style.display = 'none';
         }
 
         function exportToExcel() {
-            if (masterData.length === 0) {
-                alert("目前沒有可匯出的資料！");
-                return;
-            }
-
+            if (masterData.length === 0) { alert("無資料可匯出"); return; }
             let exportData = masterData.map(item => ({
                 "ID": item.id || item.ID || '',
                 "Category": item.category || item.Category || '',
                 "Name": item.name || item.Name || '',
-                "Freq": item.freq || item.Freq || '',
-                "Elim": item.elim || item.Elim || '',
-                "Sub": item.sub || item.Sub || '',
-                "Eng": item.eng || item.Eng || '',
-                "Admin": item.admin || item.Admin || '',
-                "Ppe": item.ppe || item.Ppe || '',
                 "Risk Level": item.risk || item.Risk || ''
             }));
-
             let worksheet = XLSX.utils.json_to_sheet(exportData);
             let workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "ISO7010_Evaluation");
-
-            let fileName = `ISO7010_RiskEval_${new Date().toISOString().slice(0,10)}.xlsx`;
-            XLSX.writeFile(workbook, fileName);
+            XLSX.writeFile(workbook, `ISO7010_RiskEval_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
     </script>
 </body>
