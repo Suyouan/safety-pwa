@@ -162,6 +162,8 @@
                 <input type="password" id="newPwd" placeholder="請輸入新密碼" style="width: 93%; padding: 6px; margin-bottom: 10px;">
                 <button onclick="changePassword()" style="width: 100%; margin-bottom: 8px; background: #ffc107; color: #333;">確認修改密碼</button>
                 <button onclick="adminLogout()" style="width: 100%; margin-bottom: 8px; background: #dc3545;">登出管理員</button>
+                <button onclick="getPendingList()" style="margin-bottom: 10px;">重新整理待審批清單</button>
+    <div id="pendingListContainer"></div>
             </div>
             <button onclick="document.getElementById('adminModal').style.display='none'" style="width: 100%; background: #6c757d; margin-top: 5px;">關閉視窗</button>
         </div>
@@ -451,6 +453,92 @@
             };
         }
 
+        // 1. 取得並渲染待審批清單
+async function getPendingList() {
+    try {
+        document.getElementById('status').innerText = "正在取得待審批清單...";
+        
+        let response = await fetch(`${GAS_URL}?action=getPendingList`);
+        let result = await response.json();
+        
+        let container = document.getElementById('pendingListContainer'); 
+        if (!container) return;
+        
+        if (result.status !== "success" || !result.data || result.data.length === 0) {
+            container.innerHTML = "<p>目前沒有待審批的資料。</p>";
+            document.getElementById('status').innerText = "✅ 系統就緒 | 無待審批項目";
+            return;
+        }
+        
+        // 2. DOM 渲染邏輯
+        let html = `
+            <table class="table" style="width:100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                    <tr style="background: #f2f2f2; border-bottom: 1px solid #ddd;">
+                        <th style="padding: 8px;">ID</th>
+                        <th style="padding: 8px;">風險項目</th>
+                        <th style="padding: 8px;">欄位</th>
+                        <th style="padding: 8px;">變更值</th>
+                        <th style="padding: 8px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        result.data.forEach(item => {
+            html += `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 8px;">${item.id}</td>
+                    <td style="padding: 8px;">${item.risk || '-'}</td>
+                    <td style="padding: 8px;">${item.field}</td>
+                    <td style="padding: 8px;">${item.value}</td>
+                    <td style="padding: 8px;">
+                        <button onclick="approvePendingItem('${item.id}', '${item.risk}', '${item.field}', '${item.value}')" 
+                                style="background: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">
+                            核准
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        document.getElementById('status').innerText = "✅ 待審批清單載入完成";
+    } catch (e) {
+        console.error("取得待審批清單失敗：", e);
+        document.getElementById('status').innerText = "❌ 載入待審批清單失敗";
+    }
+}
+
+// 3. 管理者核准單一審批項目
+async function approvePendingItem(id, risk, field, value) {
+    if (!confirm(`確定要核准 ID: ${id} (${field} -> ${value}) 的變更嗎？`)) return;
+
+    try {
+        document.getElementById('status').innerText = "正在送出核准並更新雲端...";
+        await fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: 'approvePending',
+                id: id,
+                risk: risk,
+                field: field,
+                value: value
+            })
+        });
+
+        alert("✅ 審批已核准並同步！");
+        // 重新整理待審批清單與主資料
+        getPendingList();
+        setTimeout(() => initPhase5(), 2000); // 假設您的初始化會重新抓取主表資料
+    } catch (e) {
+        console.error("核准失敗：", e);
+        alert("❌ 網路連線異常，核准失敗。");
+    }
+}
+        
         // 管理者專用：直接儲存評估變更
         async function saveEvaluation() {
             let uniqueKey = document.getElementById('evalUniqueKey').value;
@@ -589,6 +677,8 @@
                 document.getElementById('adminModal').style.display = 'none';
                 document.getElementById('pwdInput').value = '';
                 updateAdminUI();
+                // 👇 在這裡加入這行，登入成功後自動載入待審批清單
+        getPendingList();
             } else {
                 alert("密碼錯誤！");
             }
