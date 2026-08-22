@@ -52,6 +52,22 @@
 </head>
 <body>
 
+    <!-- 待審批清單彈跳視窗 -->
+<div id="pendingModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow:auto;">
+    <div style="background:white; width:90%; max-width:750px; margin:50px auto; padding:20px; border-radius:8px; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px;">
+            <h3 style="margin:0;">📋 待審批變更清單</h3>
+            <button onclick="closePendingModal()" style="background:none; border:none; font-size:18px; cursor:pointer;">&times;</button>
+        </div>
+        <div id="pendingListContainer" style="max-height:400px; overflow-y:auto; margin:15px 0;">
+            <!-- 動態載入表格 -->
+        </div>
+        <div style="text-align:right;">
+            <button onclick="closePendingModal()" style="background:#6c757d; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">關閉</button>
+        </div>
+    </div>
+</div>
+
     <!-- Header -->
     <div>
         <h2 id="mainHeader">ISO7010 安全標誌管理系統</h2>
@@ -640,7 +656,109 @@ async function approvePendingItem(id, risk, field, value) {
             document.getElementById('adminModal').style.display = 'block';
             updateAdminUI();
         }
+        // 1. 開啟與關閉待審批彈跳視窗
+function openPendingModal() {
+    document.getElementById('pendingModal').style.display = 'block';
+    getPendingList(); // 開啟時自動抓取待審批資料
+}
 
+function closePendingModal() {
+    document.getElementById('pendingModal').style.display = 'none';
+}
+
+// 2. 取得並渲染待審批清單（包含核准與拒絕按鈕）
+async function getPendingList() {
+    try {
+        let container = document.getElementById('pendingListContainer');
+        container.innerHTML = "<p>正在載入待審批清單...</p>";
+        
+        let response = await fetch(`${GAS_URL}?action=getPendingList`);
+        let result = await response.json();
+        
+        if (result.status !== "success" || !result.data || result.data.length === 0) {
+            container.innerHTML = "<p>目前沒有需要審批的變更資料。</p>";
+            return;
+        }
+        
+        let html = `
+            <table style="width:100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 10px;">ID</th>
+                        <th style="padding: 10px;">風險項目</th>
+                        <th style="padding: 10px;">欄位</th>
+                        <th style="padding: 10px;">變更值</th>
+                        <th style="padding: 10px; text-align: center;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        result.data.forEach(item => {
+            html += `
+                <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td style="padding: 10px;">${item.id}</td>
+                    <td style="padding: 10px;">${item.risk || '-'}</td>
+                    <td style="padding: 10px;">${item.field}</td>
+                    <td style="padding: 10px;">${item.value}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <button onclick="approvePendingItem('${item.id}', '${item.risk}', '${item.field}', '${item.value}')" 
+                                style="background: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; margin-right: 5px;">
+                            核准
+                        </button>
+                        <button onclick="rejectPendingItem('${item.id}', '${item.risk}', '${item.field}')" 
+                                style="background: #dc3545; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">
+                            拒絕
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch (e) {
+        console.error("取得待審批清單失敗：", e);
+        document.getElementById('pendingListContainer').innerHTML = "<p style='color:red;'>❌ 載入失敗，請檢查網路連線。</p>";
+    }
+}
+
+// 3. 核准審批項目（寫入主表並更新）
+async function approvePendingItem(id, risk, field, value) {
+    if (!confirm(`確定要核准 ID: ${id} (${field} -> ${value}) 嗎？`)) return;
+
+    try {
+        await fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({ action: 'approvePending', id, risk, field, value })
+        });
+
+        alert("✅ 已核准並寫入主表！");
+        getPendingList();
+        if (typeof initPhase5 === 'function') setTimeout(() => initPhase5(), 2000);
+    } catch (e) {
+        alert("❌ 網路連線異常，核准失敗。");
+    }
+}
+
+// 4. 拒絕審批項目（不寫入主表，後台標記為 Rejected）
+async function rejectPendingItem(id, risk, field) {
+    if (!confirm(`確定要拒絕 ID: ${id} (${field}) 的變更請求嗎？此變更將被忽略。`)) return;
+
+    try {
+        await fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({ action: 'rejectPending', id, risk, field })
+        });
+
+        alert("🚫 已拒絕該變更請求（未寫入資料庫）。");
+        getPendingList(); // 重新整理清單
+    } catch (e) {
+        alert("❌ 網路連線異常，操作失敗。");
+    }
+}
         function updateAdminUI() {
             let adminBadge = document.getElementById('adminBadge');
             if (adminBadge) adminBadge.style.display = isAdmin ? 'inline' : 'none';
@@ -678,7 +796,7 @@ async function approvePendingItem(id, risk, field, value) {
                 document.getElementById('pwdInput').value = '';
                 updateAdminUI();
                 // 👇 在這裡加入這行，登入成功後自動載入待審批清單
-        getPendingList();
+        openPendingModal();
             } else {
                 alert("密碼錯誤！");
             }
