@@ -275,32 +275,53 @@
         }
 
         function updateAdminUI() {
-            document.getElementById('adminBadge').style.display = isAdmin ? 'inline' : 'none';
-            if (isAdmin) {
-                document.getElementById('loginView').style.display = 'none';
-                document.getElementById('controlView').style.display = 'block';
-            } else {
-                document.getElementById('loginView').style.display = 'block';
-                document.getElementById('controlView').style.display = 'none';
-            }
-            renderUI(masterData);
+    // 1. 控制登入/控制視圖的切換
+    let adminBadge = document.getElementById('adminBadge');
+    if (adminBadge) {
+        adminBadge.style.display = isAdmin ? 'inline' : 'none';
+    }
+
+    let loginView = document.getElementById('loginView');
+    let controlView = document.getElementById('controlView');
+    
+    if (loginView && controlView) {
+        if (isAdmin) {
+            loginView.style.display = 'none';
+            controlView.style.display = 'block';
+        } else {
+            loginView.style.display = 'block';
+            controlView.style.display = 'none';
         }
+    }
+
+    // 2. 【最重要】統一控制所有帶有 .admin-only 的元素（包含新增按鈕、修改、刪除等）
+    let adminElements = document.querySelectorAll('.admin-only');
+    adminElements.forEach(el => {
+        // 如果是按鈕或行，依據 isAdmin 決定是否顯示
+        el.style.display = isAdmin ? '' : 'none'; 
+    });
+
+    // 3. 重新渲染畫面（帶入資料）
+    if (typeof renderUI === 'function' && typeof masterData !== 'undefined') {
+        renderUI(masterData);
+    }
+}
 
         function verifyLogin() {
     let inputPwd = document.getElementById('pwdInput').value;
-    if (inputPwd === '0') { // 假設您的預設密碼是 0
+    if (inputPwd === '0') { // 假設您的密碼是 0
         isAdmin = true;
         sessionStorage.setItem('isAdmin', 'true');
         
-        // 🔹【修正重點】強制讓所有 admin-only 顯示出來
-        let elements = document.querySelectorAll('.admin-only');
-        elements.forEach(function(el) {
-            el.style.display = 'inline-block'; // 或者是 'block'
-        });
-
         alert("管理員登入成功！");
+        
+        // 【關鍵】登入成功後，立刻關閉彈跳視窗
         document.getElementById('adminModal').style.display = 'none';
         document.getElementById('pwdInput').value = '';
+
+        // 【最重要的一行】立刻觸發畫面更新，不需要按 F5！
+        updateAdminUI(); // 或者您的渲染函式名稱
+        
     } else {
         alert("密碼錯誤！");
     }
@@ -387,6 +408,9 @@
             }
         }
 
+
+
+        
         function openAddModal() {
             document.getElementById('addId').value = '';
             document.getElementById('addCategory').value = '';
