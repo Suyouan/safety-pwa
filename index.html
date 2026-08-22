@@ -3,21 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO7010 - Phase 1 驗證</title>
+    <title>ISO7010 - Phase 2 驗證</title>
     <style>
         body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
+        input[type="text"] { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background: #28a745; color: white; }
+        button:hover { opacity: 0.9; }
         table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; vertical-align: middle; }
         th { background: #007bff; color: white; }
         .warning-sign { background: #fff3cd; }
-        #status { font-weight: bold; padding: 10px; background: #e2e3e5; border-radius: 4px; }
+        #status { font-weight: bold; padding: 10px; background: #e2e3e5; border-radius: 4px; margin-bottom: 15px; }
+        /* QR 掃描 Modal 樣式 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 300px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
 
-    <h2>ISO7010 安全標誌管理系統 (Phase 1 驗證)</h2>
-    <div id="status">正在初始化系統，準備連線 GAS...</div>
+    <h2>ISO7010 安全標誌管理系統 (Phase 2 驗證)</h2>
+    <div id="status">正在初始化系統...</div>
     
+    <!-- 工具列：文字搜尋與 QR 掃描按鈕 -->
+    <div class="toolbar">
+        <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
+        <button onclick="startQRScanner()">開啟 QR 掃描</button>
+    </div>
+
+    <!-- 主資料表格 -->
     <table id="signTable">
         <thead>
             <tr>
@@ -32,46 +46,49 @@
         <tbody id="tableBody"></tbody>
     </table>
 
-    <script>
-        // ⚠️ 請將此處換成您實際部署的 GAS 網頁應用程式網址
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
-        let masterData = [];
+    <!-- QR 掃描互動視窗 (內含硬體防呆) -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <h3>請對準 QR Code</h3>
+            <video id="qrVideo" width="260" height="200" autoplay style="background:#000; border-radius:4px;"></video>
+            <br><br>
+            <button onclick="closeQRScanner()" style="background: #dc3545; width: 100%;">關閉相機</button>
+        </div>
+    </div>
 
-        // 頁面載入時執行初始化
+    <script>
+        // ⚠️ 請確認這裡維持您正確的 GAS 網址
+        const GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE"; 
+        let masterData = [];
+        let mediaStream = null;
+
         window.onload = function() {
-            initPhase1();
+            initPhase2();
         };
 
-        async function initPhase1() {
+        async function initPhase2() {
             try {
                 document.getElementById('status').innerText = "正在向 GAS 發送請求...";
                 let response = await fetch(GAS_URL);
                 let result = await response.json();
                 
                 if (result.status === "success") {
-                    console.log("GAS 原始資料載入成功：", result.data);
-                    
-                    // 執行 W 類標誌動態展開 (1變4)
                     masterData = expandWSigns(result.data);
-                    
-                    // 渲染畫面
-                    renderPhase1UI(masterData);
-                    
-                    document.getElementById('status').innerText = `✅ Phase 1 驗證成功！原始筆數：${result.data.length} 筆 | 展開後總筆數：${masterData.length} 筆`;
+                    renderUI(masterData);
+                    document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數（含展開）：${masterData.length} 筆`;
                 } else {
                     document.getElementById('status').innerText = "❌ 載入失敗：" + result.message;
                 }
             } catch (error) {
                 console.error("連線錯誤：", error);
-                document.getElementById('status').innerText = "❌ 網路連線異常，請按 F12 打開 Console 查看詳細錯誤。";
+                document.getElementById('status').innerText = "❌ 網路連線異常，請按 F12 查看主控台。";
             }
         }
 
-        // W 類標誌展開邏輯
+        // W 類標誌動態展開 (1變4)
         function expandWSigns(rawData) {
             let expanded = [];
             rawData.forEach(item => {
-                // 檢查 category 是否為 Warning sign (注意大小寫與字串吻合)
                 if (item.category && item.category.trim() === 'Warning sign') {
                     for (let r = 1; r <= 4; r++) {
                         let cloneItem = Object.assign({}, item);
@@ -87,11 +104,16 @@
             return expanded;
         }
 
-        // 渲染 UI 函數
-        function renderPhase1UI(data) {
+        // 畫面渲染函數
+        function renderUI(data) {
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
             
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="color: #888;">找不到符合條件的資料</td></tr>`;
+                return;
+            }
+
             data.forEach(item => {
                 let tr = document.createElement('tr');
                 if (item.category && item.category.trim() === 'Warning sign') {
@@ -110,6 +132,49 @@
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // 1. 文字搜尋即時過濾邏輯
+        function handleSearch() {
+            let keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+            let filtered = masterData.filter(item => 
+                String(item.id).toLowerCase().includes(keyword) || 
+                String(item.name).toLowerCase().includes(keyword)
+            );
+            renderUI(filtered);
+        }
+
+        // 2. QR 掃描與權限防呆機制
+        async function startQRScanner() {
+            let modal = document.getElementById('qrModal');
+            let video = document.getElementById('qrVideo');
+            
+            // 防呆檢查：瀏覽器是否支援多媒體 API
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("您的瀏覽器不支援相機存取功能。");
+                return;
+            }
+
+            try {
+                modal.style.display = 'block';
+                // 請求相機權限
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = mediaStream;
+            } catch (error) {
+                // 【重要防呆】捕捉使用者的「拒絕權限 (NotAllowedError)」或無硬體狀況，絕不崩潰
+                console.warn("相機權限被拒絕或發生錯誤：", error);
+                alert("無法開啟相機：您可能拒絕了相機權限，或您的裝置沒有相機硬體。");
+                closeQRScanner();
+            }
+        }
+
+        function closeQRScanner() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop()); // 關閉相機串流釋放硬體
+                mediaStream = null;
+            }
+            document.getElementById('qrVideo').srcObject = null;
+            document.getElementById('qrModal').style.display = 'none';
         }
     </script>
 </body>
