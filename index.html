@@ -391,31 +391,48 @@
             if (cell.querySelector('input')) return;
 
             let originalVal = cell.innerText === '-' ? '' : cell.innerText;
-            cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="" placeholder="請輸入新資訊..." style="width: 90%; padding: 4px;" autofocus>`;
+            // 【管理者模式】直接帶入原值方便修改；【一般使用者】預設空白以便輸入新意見
+            let defaultInputVal = isAdmin ? originalVal : '';
+            cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="${defaultInputVal}" placeholder="請輸入新資訊..." style="width: 90%; padding: 4px;" autofocus>`;
             
             let inputEl = document.getElementById(`input_${fieldKey}`);
-            // 建立一個旗標防止 commitEdit 被重複呼叫
-    let isCommitted = false;
+            let isCommitted = false;
             
             async function commitEdit() {
-                if (isCommitted) return; // 避免 blur 和 enter 同時觸發兩次
-        isCommitted = true;
+                if (isCommitted) return;
+                isCommitted = true;
                 let newVal = inputEl.value.trim();
-                if (!newVal) {
+
+                if (!newVal && !isAdmin) {
                     cell.innerText = originalVal || '-';
                     return;
                 }
 
-                let combinedVal = originalVal ? `${originalVal} ; ${newVal}` : newVal;
-                cell.innerText = combinedVal;
+                let finalVal = '';
+                if (isAdmin) {
+                    // 【管理者模式】直接覆寫新值（不加分號），並僅更新前端畫面與暫存資料
+                    finalVal = newVal;
+                    cell.innerText = finalVal || '-';
 
-                let uniqueKey = document.getElementById('evalUniqueKey').value;
-                let item = masterData.find(d => d.uniqueKey === uniqueKey);
-                if (item) {
-                    item[fieldKey] = combinedVal;
-                }
+                    let uniqueKey = document.getElementById('evalUniqueKey').value;
+                    let item = masterData.find(d => d.uniqueKey === uniqueKey);
+                    if (item) {
+                        item[fieldKey] = finalVal; // 僅更新前端暫存
+                    }
+                    
+                    document.getElementById('status').innerText = `💡 [管理者] 欄位 [${fieldKey}] 已暫存修改，請記得點擊右上角「儲存評估變更」以寫入資料庫！`;
 
-                if (!isAdmin) {
+                } else {
+                    // 【一般使用者模式】與原資訊以「 ; 」合併，並立即送出待審批
+                    finalVal = originalVal ? `${originalVal} ; ${newVal}` : newVal;
+                    cell.innerText = finalVal || '-';
+
+                    let uniqueKey = document.getElementById('evalUniqueKey').value;
+                    let item = masterData.find(d => d.uniqueKey === uniqueKey);
+                    if (item) {
+                        item[fieldKey] = finalVal;
+                    }
+
                     document.getElementById('status').innerText = `⏳ 資訊已更新，欄位 [${fieldKey}] 已進入後台等待審批...`;
                     try {
                         let rowId = item.id || item.ID || '';
@@ -425,7 +442,7 @@
                             id: rowId,
                             risk: rowRisk,
                             field: fieldKey,
-                            value: combinedVal
+                            value: finalVal
                         };
                         await fetch(GAS_URL, {
                             method: 'POST',
