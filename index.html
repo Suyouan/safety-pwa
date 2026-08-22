@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO7010 - Phase 4 驗證</title>
+    <title>ISO7010 - 完整安全標誌管理系統 (Phase 5)</title>
+    <!-- 引入 SheetJS (xlsx.js) 用於直接產生 Excel 檔案 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
         h2 { cursor: pointer; user-select: none; display: inline-block; }
@@ -20,6 +22,7 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
         .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .action-btn { padding: 4px 8px; font-size: 12px; margin: 2px; }
+        .admin-only { display: none; }
     </style>
 </head>
 <body>
@@ -35,6 +38,8 @@
     <div class="toolbar">
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
         <button onclick="startQRScanner()">開啟 QR 掃描</button>
+        <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
+        <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
     </div>
 
     <!-- 主資料表格 -->
@@ -47,7 +52,7 @@
                 <th>Name</th>
                 <th>Risk Level</th>
                 <th>唯一鍵 (uniqueKey)</th>
-                <th id="actionHeader" style="display: none;">管理者操作</th>
+                <th id="actionHeader" class="admin-only">管理者操作</th>
             </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -103,19 +108,37 @@
         </div>
     </div>
 
+    <!-- 新增標誌 Modal -->
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <h3>新增安全標誌</h3>
+            <label style="font-size:12px; color:#666;">ID (例如: P050)</label>
+            <input type="text" id="addId" placeholder="輸入標誌代號" style="width: 93%; padding: 6px; margin-bottom: 8px;">
+            <label style="font-size:12px; color:#666;">Category</label>
+            <input type="text" id="addCategory" placeholder="例如: Warning sign / Prohibition" style="width: 93%; padding: 6px; margin-bottom: 8px;">
+            <label style="font-size:12px; color:#666;">Name</label>
+            <input type="text" id="addName" placeholder="輸入名稱說明" style="width: 93%; padding: 6px; margin-bottom: 8px;">
+            <label style="font-size:12px; color:#666;">圖片網址 (svg_url)</label>
+            <input type="text" id="addImg" placeholder="輸入圖片連結 (選填)" style="width: 93%; padding: 6px; margin-bottom: 15px;">
+            <button onclick="submitAdd()" style="width: 100%; margin-bottom: 8px; background: #28a745;">確認新增</button>
+            <button onclick="document.getElementById('addModal').style.display='none'" style="width: 100%; background: #6c757d;">取消</button>
+        </div>
+    </div>
+
     <script>
         const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
         let masterData = [];
+        let currentFilteredData = [];
         let mediaStream = null;
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
 
         window.onload = function() {
-            initPhase4();
+            initPhase5();
             updateAdminUI();
             setupHeaderLongPress();
         };
 
-        async function initPhase4() {
+        async function initPhase5() {
             try {
                 document.getElementById('status').innerText = "正在向 GAS 發送請求...";
                 let response = await fetch(GAS_URL);
@@ -158,11 +181,14 @@
         }
 
         function renderUI(data) {
+            currentFilteredData = data;
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
             
-            // 控制操作欄位標題顯示與否
-            document.getElementById('actionHeader').style.display = isAdmin ? '' : 'none';
+            let adminElements = document.querySelectorAll('.admin-only');
+            adminElements.forEach(el => {
+                el.style.display = isAdmin ? '' : 'none';
+            });
 
             if (data.length === 0) {
                 let colSpanCount = isAdmin ? 7 : 6;
@@ -238,7 +264,6 @@
             document.getElementById('qrModal').style.display = 'none';
         }
 
-        // 管理者長按與登入邏輯
         function setupHeaderLongPress() {
             let timer = null;
             let header = document.getElementById('mainHeader');
@@ -258,7 +283,7 @@
                 document.getElementById('loginView').style.display = 'block';
                 document.getElementById('controlView').style.display = 'none';
             }
-            renderUI(masterData); // 重新渲染以顯示或隱藏操作按鈕
+            renderUI(masterData);
         }
 
         function verifyLogin() {
@@ -282,15 +307,13 @@
             try {
                 let response = await fetch(GAS_URL, {
                     method: 'POST',
+                    mode: 'no-cors',
                     body: JSON.stringify({ action: 'updatePassword', oldPwd: oldP, newPwd: newP })
                 });
-                let res = await response.json();
-                alert(res.message);
-                if (res.status === 'success') {
-                    document.getElementById('adminModal').style.display = 'none';
-                    document.getElementById('oldPwd').value = '';
-                    document.getElementById('newPwd').value = '';
-                }
+                alert("密碼變更請求已送出！");
+                document.getElementById('adminModal').style.display = 'none';
+                document.getElementById('oldPwd').value = '';
+                document.getElementById('newPwd').value = '';
             } catch (e) { alert("修改失敗，請檢查網路連線"); }
         }
 
@@ -302,7 +325,6 @@
             document.getElementById('adminModal').style.display = 'none';
         }
 
-        // ==================== Phase 4：動態編輯與刪除 ====================
         function openEditModal(uniqueKey) {
             let item = masterData.find(d => d.uniqueKey === uniqueKey);
             if (!item) return;
@@ -325,24 +347,15 @@
 
             try {
                 document.getElementById('status').innerText = "正在儲存變更至試算表...";
-                
-                // 改用明碼或確保跨域通暢的呼叫方式
                 let response = await fetch(GAS_URL, {
                     method: 'POST',
-                    mode: 'no-cors', // 💡 加入這行可直接繞過瀏覽器 CORS 封鎖
-                    body: JSON.stringify({ 
-                        action: 'updateRecord', 
-                        id: rowId, 
-                        name: newName, 
-                        risk: newRisk 
-                    })
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'updateRecord', id: rowId, name: newName, risk: newRisk })
                 });
 
-                // 因為 no-cors 無法讀取內容，我們直接假設送出成功並重新整理畫面
                 alert("已送出修改請求，請稍候重新整理以同步試算表資料。");
                 document.getElementById('editModal').style.display = 'none';
-                setTimeout(() => initPhase4(), 2000); // 延遲 2 秒後重新撈取最新資料
-
+                setTimeout(() => initPhase5(), 2000);
             } catch (e) {
                 alert("連線錯誤，無法儲存");
                 document.getElementById('status').innerText = "❌ 網路異常";
@@ -350,31 +363,90 @@
         }
 
         async function deleteRow(id, risk) {
-            if (!confirm(`確定要刪除 ID: ${id} (${risk}) 嗎？此動作無法復原！`)) {
-                return;
-            }
+            if (!confirm(`確定要刪除 ID: ${id} (${risk}) 嗎？此動作無法復原！`)) return;
 
             try {
                 document.getElementById('status').innerText = "正在刪除資料...";
                 let response = await fetch(GAS_URL, {
                     method: 'POST',
-                    body: JSON.stringify({ 
-                        action: 'deleteRecord', 
-                        id: id, 
-                        risk: risk 
-                    })
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'deleteRecord', id: id, risk: risk })
                 });
-                let res = await response.json();
-                alert(res.message);
-                if (res.status === 'success') {
-                    initPhase4(); // 重新載入最新資料
-                } else {
-                    document.getElementById('status').innerText = "❌ 刪除失敗";
-                }
+
+                alert("已送出刪除請求，請稍候重新整理以同步試算表資料。");
+                setTimeout(() => initPhase5(), 2000);
             } catch (e) {
                 alert("連線錯誤，無法刪除");
                 document.getElementById('status').innerText = "❌ 網路異常";
             }
+        }
+
+        function openAddModal() {
+            document.getElementById('addId').value = '';
+            document.getElementById('addCategory').value = '';
+            document.getElementById('addName').value = '';
+            document.getElementById('addImg').value = '';
+            document.getElementById('addModal').style.display = 'block';
+        }
+
+        async function submitAdd() {
+            let newId = document.getElementById('addId').value.trim();
+            let newCat = document.getElementById('addCategory').value.trim();
+            let newName = document.getElementById('addName').value.trim();
+            let newImg = document.getElementById('addImg').value.trim();
+
+            if (!newId || !newCat || !newName) {
+                alert("請至少填寫 ID、Category 與 Name！");
+                return;
+            }
+
+            try {
+                document.getElementById('status').innerText = "正在新增資料至試算表...";
+                let response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ 
+                        action: 'addRecord', 
+                        id: newId, 
+                        category: newCat, 
+                        name: newName, 
+                        svg_url: newImg 
+                    })
+                });
+
+                alert("已送出新增請求，請稍候重新整理同步資料。");
+                document.getElementById('addModal').style.display = 'none';
+                setTimeout(() => initPhase5(), 2000);
+            } catch (e) {
+                alert("連線錯誤，無法新增");
+                document.getElementById('status').innerText = "❌ 網路異常";
+            }
+        }
+
+        // ==================== 批次匯出 Excel 格式 ====================
+        function exportToExcel() {
+            if (currentFilteredData.length === 0) {
+                alert("目前沒有可匯出的資料！");
+                return;
+            }
+
+            // 整理要匯出的資料結構
+            let exportData = currentFilteredData.map(item => ({
+                "ID": item.id || item.ID || '',
+                "Category": item.category || item.Category || '',
+                "Name": item.name || item.Name || '',
+                "Risk Level": item.risk || item.Risk || '',
+                "UniqueKey": item.uniqueKey || ''
+            }));
+
+            // 建立工作表與活頁簿
+            let worksheet = XLSX.utils.json_to_sheet(exportData);
+            let workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "ISO7010_Signs");
+
+            // 產生 Excel 檔案並觸發下載 (.xlsx)
+            let fileName = `ISO7010_Export_${new Date().toISOString().slice(0,10)}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
         }
     </script>
 </body>
