@@ -5,6 +5,8 @@ let approvedData = {};
 let isExpanded = false;
 let isAdmin = false;
 let currentViewPath = { level: 'categories', category: null, name: null, id: null, risk: null };
+let scannerStream = null;
+let scanningAnimationId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     initI18n();
@@ -12,7 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
     fetchSignsFromSheet();
     setupHeaderLongPress();
     
-    // 背景定時同步
     setInterval(fetchGASData, 10000);
     setInterval(fetchPendingCount, 15000);
 });
@@ -20,7 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
 function initI18n() {}
 
 function setupEventListeners() {
-    // 網址參數帶 ?id=P001 偵測
     const urlParams = new URLSearchParams(window.location.search);
     const qid = urlParams.get('id');
     if (qid) {
@@ -33,9 +33,6 @@ function setupEventListeners() {
         }, 1000);
     }
 
-    // 綁定「資料庫模式」按鈕點擊事件（對應截圖中的按鈕）
-    const dbBtn = document.querySelector('button:nth-of-type(1)') || document.getElementById('db-mode-btn');
-    // 如果您的按鈕沒有 ID，我們直接透過文字或選擇器綁定
     document.querySelectorAll('button').forEach(btn => {
         if (btn.innerText.includes('資料庫模式')) {
             btn.onclick = () => {
@@ -45,7 +42,6 @@ function setupEventListeners() {
         }
     });
 
-    // 綁定「QR 掃描模式」按鈕
     document.querySelectorAll('button').forEach(btn => {
         if (btn.innerText.includes('QR')) {
             btn.onclick = startQRCodeScanner;
@@ -53,7 +49,6 @@ function setupEventListeners() {
     });
 }
 
-// 取得主表與已核准資料
 async function fetchSignsFromSheet() {
     try {
         let res = await fetch(`${GAS_URL}?action=getData`);
@@ -80,7 +75,6 @@ async function fetchSignsFromSheet() {
     }
 }
 
-// W類前端動態展開
 function expandWSigns(signs) {
     let expandedList = [];
     signs.forEach(sign => {
@@ -123,7 +117,6 @@ async function fetchPendingCount() {
     try {
         let res = await fetch(`${GAS_URL}?action=getPendingCount`);
         let json = await res.json();
-        // 假設畫面上有名為 pending-badge 的元素
         let badge = document.getElementById('pending-badge');
         if (badge && json.count > 0) {
             badge.innerText = `待審批: ${json.count}`;
@@ -134,7 +127,6 @@ async function fetchPendingCount() {
     } catch (e) { console.error(e); }
 }
 
-// 檢視層級切換渲染
 function renderCurrentView() {
     const container = document.getElementById('app-container');
     if (!container) return;
@@ -169,7 +161,7 @@ window.navigateToCategory = (cat) => {
 
 function renderSignsView(container, cat) {
     let signs = rawSigns.filter(s => s.category === cat);
-    let html = `<button onclick="backToCategories()" style="margin-bottom:15px; padding:6px 12px;">⬅ 返回分類</button><h2>${cat} 標誌列表</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
+    let html = `<button onclick="backToCategories()" style="margin-bottom:15px; padding:6px 12px; cursor:pointer;">⬅ 返回分類</button><h2>${cat} 標誌列表</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     signs.forEach(s => {
         html += `
             <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="handleSignClick('${s.id}', '${s.category}', '${s.name}')">
@@ -199,7 +191,7 @@ window.handleSignClick = (id, category, name) => {
 function renderNamesView(container, cat) {
     let wSigns = rawSigns.filter(s => s.category === cat);
     let uniqueNames = [...new Set(wSigns.map(s => s.name))];
-    let html = `<button onclick="navigateToCategory('${cat}')" style="margin-bottom:15px; padding:6px 12px;">⬅ 返回 ${cat}</button><h2>注意標誌群組</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
+    let html = `<button onclick="navigateToCategory('${cat}')" style="margin-bottom:15px; padding:6px 12px; cursor:pointer;">⬅ 返回 ${cat}</button><h2>注意標誌群組</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     uniqueNames.forEach(name => {
         let sample = wSigns.find(s => s.name === name);
         html += `
@@ -220,7 +212,7 @@ window.navigateToRisks = (name) => {
 function renderRisksView(container, name) {
     let variants = rawSigns.filter(s => s.name === name);
     let sample = variants[0];
-    let html = `<button onclick="currentViewPath.level='names'; renderCurrentView();" style="margin-bottom:15px; padding:6px 12px;">⬅ 返回群組</button><h2>${name} - 風險等級選擇</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
+    let html = `<button onclick="currentViewPath.level='names'; renderCurrentView();" style="margin-bottom:15px; padding:6px 12px; cursor:pointer;">⬅ 返回群組</button><h2>${name} - 風險等級選擇</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     
     for (let i = 1; i <= 4; i++) {
         let variant = variants.find(v => Number(v.risk) === i) || sample;
@@ -232,7 +224,7 @@ function renderRisksView(container, name) {
         `;
     }
     container.innerHTML = html + `</div>`;
-}
+};
 
 window.navigateToDetail = (id, risk) => {
     currentViewPath = { level: 'detail', id: id, risk: risk };
@@ -245,12 +237,11 @@ function renderDetailView(container, id, risk) {
     let currentData = approvedData[uniqueKey] || approvedData[`${sign.id}_Normal`] || sign;
 
     let html = `
-        <button onclick="currentViewPath.level='signs'; renderCurrentView();" style="margin-bottom:15px; padding:6px 12px;">⬅ 返回列表</button>
+        <button onclick="currentViewPath.level='signs'; renderCurrentView();" style="margin-bottom:15px; padding:6px 12px; cursor:pointer;">⬅ 返回列表</button>
         <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
             <h2>${sign.name} (ID: ${sign.id})</h2>
             <img src="${sign.svg_url || sign.image}" style="max-width:120px; height:120px; object-fit:contain; display:block; margin: 0 auto 1rem auto;">
             <p><strong>風險等級 (Risk Level):</strong> ${risk} <span style="font-size:0.8rem; color:gray;">(唯讀不可編輯)</span></p>
-            <p style="color: #64748b; font-size: 0.9rem;">提示：一般雙擊送審；管理員模式下雙擊可直接修改或清空刪除資料。</p>
             
             <table style="width:100%; border-collapse:collapse; margin-top:15px;">
                 <tr><th style="border:1px solid #cbd5e1; padding:10px; background:#e2e8f0;">控制項欄位</th><th style="border:1px solid #cbd5e1; padding:10px; background:#e2e8f0;">內容值</th></tr>
@@ -345,19 +336,23 @@ function setupHeaderLongPress() {
     }
 }
 
-// 修正後的相機掃描模組（帶有完整的錯誤防呆與畫面提示）
+// 【真・QR 掃描與解碼相機模組】結合 jsQR 即時辨識
 async function startQRCodeScanner() {
     let container = document.getElementById('qr-scanner-modal');
     if (!container) {
         container = document.createElement('div');
         container.id = 'qr-scanner-modal';
-        container.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:9999;";
+        container.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:9999;";
         container.innerHTML = `
-            <div style="background:white; padding:20px; border-radius:8px; text-align:center; max-width:90%;">
-                <h3>請對準 QR Code 進行掃描</h3>
-                <video id="preview-video" autoplay playsinline style="width:100%; max-width:300px; height:auto; background:#000;"></video>
-                <br><br>
-                <button id="close-scanner-btn" style="padding:8px 16px; background:red; color:white; border:none; border-radius:4px; cursor:pointer;">關閉相機</button>
+            <div style="background:white; padding:20px; border-radius:8px; text-align:center; max-width:90%; position:relative;">
+                <h3>請將鏡頭對準 QR Code</h3>
+                <div style="position:relative; width:300px; height:300px; margin:0 auto; background:#000;">
+                    <video id="preview-video" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+                    <canvas id="qr-canvas" style="display:none;"></canvas>
+                </div>
+                <p id="scanner-status" style="font-size:0.9rem; color:#007bff; margin-top:10px;">正在尋找 QR Code...</p>
+                <br>
+                <button id="close-scanner-btn" style="padding:8px 20px; background:red; color:white; border:none; border-radius:4px; cursor:pointer;">關閉相機</button>
             </div>
         `;
         document.body.appendChild(container);
@@ -365,23 +360,78 @@ async function startQRCodeScanner() {
     container.style.display = 'flex';
 
     try {
-        // 請求相機權限 (注意：部分舊版瀏覽器或非 https 環境下 navigator.mediaDevices 可能為 undefined)
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error("您的瀏覽器不支援相機存取，或目前不是安全連線 (HTTPS)。");
+            throw new Error("您的瀏覽器不支援相機存取，或目前非安全連線 (HTTPS)。");
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         const videoElement = document.getElementById('preview-video');
-        videoElement.srcObject = stream;
+        videoElement.srcObject = scannerStream;
         videoElement.play();
 
+        const canvasElement = document.getElementById('qr-canvas');
+        const canvasContext = canvasElement.getContext('2d', { willReadFrequently: true });
+        const statusText = document.getElementById('scanner-status');
+
+        // 即時每格掃描迴圈
+        const scanTick = () => {
+            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+                canvasContext.drawImage(videoElement, 0, canvasElement.width, canvasElement.height);
+                
+                const imageData = canvasContext.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+                if (code) {
+                    // 成功掃描到 QR Code！
+                    statusText.innerHTML = `<span style="color:green;">成功識別：${code.data}</span>`;
+                    stopScannerCamera();
+                    container.style.display = 'none';
+
+                    // 依照規格解析 id (支援直接是代碼如 P001 或網址帶有 ?id=P001)
+                    let targetId = code.data;
+                    if (code.data.includes('?id=')) {
+                        const urlParams = new URLSearchParams(code.data.split('?')[1]);
+                        targetId = urlParams.get('id');
+                    }
+
+                    let target = rawSigns.find(s => s.id === targetId);
+                    if (target) {
+                        currentViewPath = { level: 'detail', id: target.id, risk: '1' };
+                        renderCurrentView();
+                    } else {
+                        alert(`掃描成功，但在資料庫中找不到 ID: ${targetId}`);
+                    }
+                    return;
+                }
+            }
+            if (scannerStream) {
+                scanningAnimationId = requestAnimationFrame(scanTick);
+            }
+        };
+
+        scanningAnimationId = requestAnimationFrame(scanTick);
+
         document.getElementById('close-scanner-btn').onclick = () => {
-            stream.getTracks().forEach(track => track.stop());
+            stopScannerCamera();
             container.style.display = 'none';
         };
+
     } catch (error) {
         console.warn("相機啟用失敗：", error);
-        alert("無法開啟相機： " + error.message + "\n(請確認已授權相機權限，且網址為 HTTPS)");
+        alert("無法開啟相機： " + error.message);
         container.style.display = 'none';
+    }
+}
+
+function stopScannerCamera() {
+    if (scanningAnimationId) {
+        cancelAnimationFrame(scanningAnimationId);
+        scanningAnimationId = null;
+    }
+    if (scannerStream) {
+        scannerStream.getTracks().forEach(track => track.stop());
+        scannerStream = null;
     }
 }
