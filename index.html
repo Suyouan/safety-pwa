@@ -299,12 +299,18 @@
         }
     }
 
-    // 2. 【最重要】統一控制所有帶有 .admin-only 的元素（包含新增按鈕、修改、刪除等）
-    let adminElements = document.querySelectorAll('.admin-only');
-    adminElements.forEach(el => {
-        // 如果是按鈕或行，依據 isAdmin 決定是否顯示
-        el.style.display = isAdmin ? '' : 'none'; 
-    });
+    // 2. 統一控制所有帶有 .admin-only 的元素
+let adminElements = document.querySelectorAll('.admin-only');
+adminElements.forEach(el => {
+    // 💡 排除掉已經由前半段邏輯精準控制的 #controlView，避免被空字串 '' 覆蓋而失效
+    if (el.id === 'controlView') return;
+
+    if (el.tagName === 'TR' || el.tagName === 'DIV') {
+        el.style.display = isAdmin ? 'block' : 'none';
+    } else {
+        el.style.display = isAdmin ? 'inline-block' : 'none';
+    }
+});
 
     // 3. 重新渲染畫面（帶入資料）
     if (typeof renderUI === 'function' && typeof masterData !== 'undefined') {
