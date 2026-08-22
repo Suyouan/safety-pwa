@@ -374,7 +374,6 @@
             if (!item) return;
 
             document.getElementById('evalUniqueKey').value = uniqueKey;
-            document.getElementById('evalModalImg.src') = item.svg_url || item.image || '';
             document.getElementById('evalModalImg').src = item.svg_url || item.image || '';
             document.getElementById('evalModalTitle').innerText = item.name || item.Name || '安全標誌';
             document.getElementById('evalModalSub').innerText = `ID: ${item.id || item.ID} | Category: ${item.category || item.Category}`;
