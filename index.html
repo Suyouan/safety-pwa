@@ -39,7 +39,7 @@
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
         <button onclick="startQRScanner()">開啟 QR 掃描</button>
         <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
-        <button id="addBtn" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
+        <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
     </div>
 
     <!-- 主資料表格 -->
