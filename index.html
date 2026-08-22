@@ -2,37 +2,97 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO7010 Safety PWA</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- 引入 jsQR 輕量解碼庫 -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <title>ISO7010 安全標誌管理系統</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background: #f4f7f6; }
+        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #007bff; color: white; }
+        .warning-sign { background: #fff3cd; }
+    </style>
 </head>
 <body>
-    <!-- 頂部 Header (支援長按 3 秒開啟審批) -->
-    <header id="main-header">
-        <h1>ISO7010 安全標誌與危害控制系統</h1>
-        <div id="header-controls">
-            <span id="pending-badge" style="display:none; background:red; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;"></span>
-            <button id="scan-qr-btn">掃描 QR Code</button>
-        </div>
-    </header>
 
-    <!-- 主畫面容器 -->
-    <main id="app-container">
-        <!-- 動態渲染區域 -->
-    </main>
+    <h2>ISO7010 安全標誌管理系統 (Phase 1 驗證)</h2>
+    <div id="status">正在載入系統資料...</div>
+    
+    <table id="signTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Category</th>
+                <th>Name</th>
+                <th>Risk Level</th>
+                <th>Freq</th>
+                <th>Elim</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
 
-    <!-- 管理員審批 Modal -->
-    <div id="approval-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
-        <div style="background:white; padding:20px; width:80%; max-width:600px; border-radius:8px; max-height:80vh; overflow-y:auto;">
-            <h2>管理員審批清單</h2>
-            <div id="approval-list">載入中...</div>
-            <button id="close-modal-btn" style="margin-top:15px; padding:6px 12px;">關閉視窗</button>
-        </div>
-    </div>
+    <script>
+        const GAS_URL = "YOUR_GAS_WEB_APP_URL_HERE"; // 請替換您的 GAS 部署網址
+        let masterData = [];
 
-    <!-- 引入前端邏輯 -->
-    <script src="app.js"></script>
+        async function initSystem() {
+            try {
+                document.getElementById('status').innerText = "正在連線 GAS 讀取資料...";
+                let response = await fetch(GAS_URL);
+                let result = await response.json();
+                
+                if (result.status === "success") {
+                    // 1. 執行 W 類標誌動態展開 (1變4)
+                    masterData = expandWSigns(result.data);
+                    renderUI(masterData);
+                    document.getElementById('status').innerText = `載入成功！總筆數（含展開）：${masterData.length}`;
+                } else {
+                    document.getElementById('status').innerText = "載入失敗：" + result.message;
+                }
+            } catch (error) {
+                console.error(error);
+                document.getElementById('status').innerText = "網路連線異常，請檢查主控台";
+            }
+        }
+
+        // W類標誌規則：Category='Warning sign' 展開為 Risk 1~4，唯一鍵 = ID + Risk
+        function expandWSigns(rawData) {
+            let expanded = [];
+            rawData.forEach(item => {
+                if (item.category === 'Warning sign') {
+                    for (let r = 1; r <= 4; r++) {
+                        let cloneItem = Object.assign({}, item);
+                        cloneItem.risk = `Risk ${r}`;
+                        cloneItem.uniqueKey = `${cloneItem.id}-Risk${r}`;
+                        expanded.push(cloneItem);
+                    }
+                } else {
+                    item.uniqueKey = `${item.id}-${item.risk || 'Normal'}`;
+                    expanded.push(item);
+                }
+            });
+            return expanded;
+        }
+
+        function renderUI(data) {
+            let tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            data.forEach(item => {
+                let tr = document.createElement('tr');
+                if (item.category === 'Warning sign') tr.classList.add('warning-sign');
+                
+                tr.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.category}</td>
+                    <td>${item.name}</td>
+                    <td><strong>${item.risk || '-'}</strong></td>
+                    <td>${item.freq || ''}</td>
+                    <td>${item.elim || ''}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.onload = initSystem;
+    </script>
 </body>
 </html>
