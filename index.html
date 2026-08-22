@@ -13,32 +13,37 @@
         input[type="text"], input[type="password"] { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px; }
         button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background: #28a745; color: white; }
         button:hover { opacity: 0.9; }
-        table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; vertical-align: middle; }
-        th { background: #007bff; color: white; }
-        .warning-sign { background: #fff3cd; }
+        
         #status { font-weight: bold; padding: 10px; background: #e2e3e5; border-radius: 4px; margin-bottom: 15px; }
         
         /* 導覽層級狀態 */
         .view-section { display: none; }
         .view-section.active { display: block; }
 
-        /* 首頁極簡卡片網格樣式 */
+        /* 卡片網格通用樣式 */
         .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
-        .category-card { background: white; border-radius: 8px; padding: 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .category-card { background: white; border-radius: 8px; padding: 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
         .category-card:hover { transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
         .category-card img { width: 60px; height: 60px; object-fit: contain; margin-bottom: 10px; }
         .category-card h3 { margin: 5px 0 0 0; font-size: 16px; color: #007bff; }
+        
+        /* 第二層專屬標誌卡片樣式 */
+        .sign-card { background: white; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+        .sign-card.clickable { cursor: pointer; border: 2px solid #ffc107; background: #fffdf0; }
+        .sign-card.clickable:hover { transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .sign-card img { width: 50px; height: 50px; object-fit: contain; margin-bottom: 8px; }
+        .sign-badge { display: inline-block; background: #ffc107; color: #333; font-size: 12px; font-weight: bold; padding: 2px 8px; border-radius: 12px; margin-top: 6px; }
 
-        /* Modal 樣式 */
+        /* Modal 與區塊通用 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
         .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 450px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .action-btn { padding: 4px 8px; font-size: 12px; margin: 2px; }
         .admin-only { display: none; }
 
-        /* 第三層評估表單與雙擊編輯框格 */
-        .eval-table { width: 100%; margin-top: 10px; border-collapse: collapse; }
-        .eval-table td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        /* 第三層獨立頁面樣式 */
+        .eval-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
+        .eval-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
+        .eval-table td { padding: 10px; border: 1px solid #ddd; text-align: left; }
         .eval-table td.label-col { background: #f8f9fa; font-weight: bold; width: 35%; }
         .editable-cell { cursor: pointer; background: #fffdf0; }
         .editable-cell:hover { background-color: #fff3cd; }
@@ -70,35 +75,28 @@
         <div id="categoryGridContainer" class="category-grid"></div>
     </div>
 
-    <!-- 第二層：分類明細列表檢視 -->
+    <!-- 第二層：分類明細列表檢視 (簡約卡片流，非傳統表格) -->
     <div id="detailView" class="view-section">
         <h3 id="detailCategoryTitle">分類明細</h3>
-        <table id="signTable">
-            <thead>
-                <tr>
-                    <th>圖示預覽</th>
-                    <th>ID</th>
-                    <th>Category</th>
-                    <th>Name</th>
-                    <th>Risk Level</th>
-                    <th>唯一鍵 (uniqueKey)</th>
-                    <th id="actionHeader" class="admin-only">管理者操作</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-        </table>
+        <p id="detailHint" style="font-size: 13px; color: #666; margin-bottom: 10px;"></p>
+        <div id="signGridContainer" class="category-grid"></div>
     </div>
 
-    <!-- 第三層：單一標誌詳情與 7 大危害評估 Modal -->
-    <div id="evalModal" class="modal">
-        <div class="modal-content">
-            <div style="text-align: center;">
-                <img id="evalModalImg" src="" width="70" height="70" style="object-fit:contain; margin-bottom:5px;">
-                <h3 id="evalModalTitle" style="margin: 5px 0;">標誌風險評估詳情</h3>
-                <p id="evalModalSub" style="font-size: 13px; color: #666; margin-bottom: 10px;"></p>
+    <!-- 第三層：單一標誌詳情與 7 大危害評估獨立頁面 -->
+    <div id="evalView" class="view-section">
+        <div class="eval-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <button onclick="goBackToDetail()" style="background: #6c757d;">⬅️ 返回上一層</button>
+                <button onclick="saveEvaluation()" style="background: #28a745;">💾 儲存評估變更</button>
             </div>
             
-            <p style="font-size: 12px; color: #d9534f; margin-bottom: 5px;">💡 提示：前 6 項危害控制欄位可直接**雙擊**進行編輯修改！</p>
+            <div style="text-align: center; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+                <img id="evalPageImg" src="" width="70" height="70" style="object-fit:contain; margin-bottom:5px;">
+                <h3 id="evalPageTitle" style="margin: 5px 0;">標誌風險評估詳情</h3>
+                <p id="evalPageSub" style="font-size: 13px; color: #666; margin: 0;"></p>
+            </div>
+            
+            <p style="font-size: 12px; color: #d9534f; margin: 15px 0 5px 0;">💡 提示：前 6 項危害控制欄位可直接**雙擊**進行編輯修改！</p>
             
             <input type="hidden" id="evalUniqueKey">
             <table class="eval-table">
@@ -131,10 +129,6 @@
                     <td id="cell_risk" class="readonly-cell">唯讀</td>
                 </tr>
             </table>
-
-            <br>
-            <button onclick="saveEvaluation()" style="width: 100%; margin-bottom: 8px; background: #28a745;">💾 儲存評估變更</button>
-            <button onclick="document.getElementById('evalModal').style.display='none'" style="width: 100%; background: #6c757d;">❌ 關閉視窗</button>
         </div>
     </div>
 
@@ -202,14 +196,28 @@
             updateAdminUI();
         };
 
+        function showView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
         function goBackToCategory() {
             currentCategory = null;
-            document.getElementById('categoryView').classList.add('active');
-            document.getElementById('detailView').classList.remove('active');
+            showView('categoryView');
             document.getElementById('backBtn').style.display = 'none';
             document.getElementById('searchInput').value = '';
             renderCategoryGrid(masterData);
             document.getElementById('status').innerText = `✅ 系統就緒 | 請選擇分類`;
+        }
+
+        function goBackToDetail() {
+            if (currentCategory) {
+                showView('detailView');
+                let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
+                renderDetailGrid(filtered, currentCategory);
+            } else {
+                goBackToCategory();
+            }
         }
 
         async function initPhase5() {
@@ -259,12 +267,11 @@
             let gridContainer = document.getElementById('categoryGridContainer');
             gridContainer.innerHTML = '';
 
-            // 依 Category 分群
             let categoriesMap = {};
             data.forEach(item => {
                 let cat = String(item.category || item.Category || '未分類').trim();
                 if (!categoriesMap[cat]) {
-                    categoriesMap[cat] = item; // 記錄該分類的第一個代表標誌
+                    categoriesMap[cat] = item;
                 }
             });
 
@@ -293,92 +300,75 @@
 
         function selectCategory(catName) {
             currentCategory = catName;
-            document.getElementById('categoryView').classList.remove('active');
-            document.getElementById('detailView').classList.add('active');
+            showView('detailView');
             document.getElementById('backBtn').style.display = 'inline-block';
             document.getElementById('detailCategoryTitle').innerText = `📁 分類明細：${catName}`;
 
             let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === catName);
-            renderDetailTable(filtered);
+            renderDetailGrid(filtered, catName);
         }
 
-        // 渲染第二層：分類明細列表
-        function renderDetailTable(data) {
+        // 渲染第二層：簡約卡片明細列表（非表格）
+        function renderDetailGrid(data, catName) {
             currentFilteredData = data;
-            let tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
+            let gridContainer = document.getElementById('signGridContainer');
+            gridContainer.innerHTML = '';
             
-            let adminElements = document.querySelectorAll('.admin-only');
-            adminElements.forEach(el => {
-                if (el.id === 'controlView') return;
-                if (el.tagName === 'TR' || el.tagName === 'DIV') {
-                    el.style.display = isAdmin ? 'block' : 'none';
-                } else {
-                    el.style.display = isAdmin ? 'inline-block' : 'none';
-                }
-            });
+            let hintEl = document.getElementById('detailHint');
+            let isWarning = (String(catName).trim() === 'Warning sign');
+
+            if (isWarning) {
+                hintEl.innerText = "💡 此分類為「Warning sign」，圖形下方已顯示 Risk Level，點擊卡片即可進入第三層進行 7 大風險評估。";
+            } else {
+                hintEl.innerText = "ℹ️ 此分類為一般標誌，僅提供圖示與名稱檢視（不需進入第三層風險評估）。";
+            }
 
             if (data.length === 0) {
-                let colSpanCount = isAdmin ? 7 : 6;
-                tbody.innerHTML = `<tr><td colspan="${colSpanCount}" style="color: #888;">找不到符合條件的資料</td></tr>`;
+                gridContainer.innerHTML = `<p style="color: #888;">找不到符合條件的資料</p>`;
                 return;
             }
 
             data.forEach(item => {
-                let tr = document.createElement('tr');
+                let card = document.createElement('div');
                 let rawCategory = item.category || item.Category || '';
-                let isWarning = String(rawCategory).trim() === 'Warning sign';
-                
-                if (isWarning) tr.classList.add('warning-sign');
-                
-                let imgUrl = item.svg_url || item.image || '';
                 let rowId = item.id || item.ID || '';
                 let rowName = item.name || item.Name || '';
-                let rowRisk = item.risk || item.Risk || '-';
+                let rowRisk = item.risk || item.Risk || '';
+                let imgUrl = item.svg_url || item.image || '';
 
-                let actionHtml = '';
-                if (isAdmin) {
-                    actionHtml = `<td>
-                        <button class="action-btn" style="background:#dc3545;" onclick="deleteRow('${rowId}', '${rowRisk}')">刪除</button>
-                    </td>`;
-                }
-                
-                // 點擊明細列表列時，若為 Warning sign 則開啟第三層風險評估 Modal
-                tr.style.cursor = isWarning ? 'pointer' : 'default';
                 if (isWarning) {
-                    tr.onclick = (e) => {
-                        if (e.target.tagName === 'BUTTON') return; // 避免點到刪除按鈕
-                        openEvalModal(item.uniqueKey);
-                    };
-                    tr.title = "點擊以檢視/編輯 7 大危害風險評估";
+                    card.className = 'sign-card clickable';
+                    card.onclick = () => openEvalView(item.uniqueKey);
+                    card.title = "點擊進入 7 大危害風險評估頁面";
+                } else {
+                    card.className = 'sign-card';
                 }
 
-                tr.innerHTML = `
-                    <td>
-                        ${imgUrl ? `<img src="${imgUrl}" width="35" height="35" style="object-fit:contain;" >` : '無'}
-                    </td>
-                    <td>${rowId}</td>
-                    <td>${rawCategory}</td>
-                    <td>${rowName}</td>
-                    <td><strong>${rowRisk}</strong></td>
-                    <td><small style="color: #666;">${item.uniqueKey}</small></td>
-                    ${actionHtml}
+                let badgeHtml = (isWarning && rowRisk) ? `<div class="sign-badge">${rowRisk}</div>` : '';
+                let deleteBtnHtml = isAdmin ? `<br><button class="action-btn" style="background:#dc3545; margin-top:8px;" onclick="event.stopPropagation(); deleteRow('${rowId}', '${rowRisk}')">刪除</button>` : '';
+
+                card.innerHTML = `
+                    ${imgUrl ? `<img src="${imgUrl}">` : '<div style="height:50px;">無圖示</div>'}
+                    <div style="font-weight: bold; font-size: 14px; color: #007bff;">${rowId}</div>
+                    <div style="font-size: 13px; color: #333; margin: 4px 0;">${rowName}</div>
+                    ${badgeHtml}
+                    ${deleteBtnHtml}
                 `;
-                tbody.appendChild(tr);
+                gridContainer.appendChild(card);
             });
         }
 
-        // 開啟第三層：單一標誌詳情與 7 大評估 Modal
-        function openEvalModal(uniqueKey) {
+        // 開啟第三層：單一標誌 7 大危害評估獨立頁面
+        function openEvalView(uniqueKey) {
             let item = masterData.find(d => d.uniqueKey === uniqueKey);
             if (!item) return;
 
             document.getElementById('evalUniqueKey').value = uniqueKey;
-            document.getElementById('evalModalImg').src = item.svg_url || item.image || '';
-            document.getElementById('evalModalTitle').innerText = item.name || item.Name || '安全標誌';
-            document.getElementById('evalModalSub').innerText = `ID: ${item.id || item.ID} | Category: ${item.category || item.Category}`;
+            document.getElementById('evalPageImg').src = item.svg_url || item.image || '';
+            document.getElementById('evalPageTitle').innerText = item.name || item.Name || '安全標誌';
+            document.getElementById('evalPageSub').innerText = `ID: ${item.id || item.ID} | Category: ${item.category || item.Category} | 等級: ${item.risk || item.Risk}`;
 
-            // 對應 7 大欄位 (freq, elim, sub, eng, admin, ppe, risk)
+            // 對應 7 大欄位
             document.getElementById('cell_freq').innerText = item.freq || item.Freq || '-';
             document.getElementById('cell_elim').innerText = item.elim || item.Elim || '-';
             document.getElementById('cell_sub').innerText = item.sub || item.Sub || '-';
@@ -387,13 +377,14 @@
             document.getElementById('cell_ppe').innerText = item.ppe || item.Ppe || '-';
             document.getElementById('cell_risk').innerText = item.risk || item.Risk || '-';
 
-            document.getElementById('evalModal').style.display = 'block';
+            showView('evalView');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         // 雙擊前 6 大危害控制框格進行互動輸入
         function enableCellEdit(fieldKey) {
             let cell = document.getElementById(`cell_${fieldKey}`);
-            if (cell.querySelector('input')) return; // 已經在編輯中
+            if (cell.querySelector('input')) return;
 
             let currentVal = cell.innerText === '-' ? '' : cell.innerText;
             cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="${currentVal}" style="width: 90%; padding: 4px;" autofocus>`;
@@ -417,7 +408,6 @@
             let rowId = item.id || item.ID || '';
             let rowRisk = item.risk || item.Risk || '';
 
-            // 收集 6 大控制欄位資料
             let updatedData = {
                 action: 'updateEvaluation',
                 id: rowId,
@@ -430,7 +420,6 @@
                 ppe: document.getElementById('cell_ppe').innerText === '-' ? '' : document.getElementById('cell_ppe').innerText
             };
 
-            // 同步更新至本地記憶體
             item.freq = updatedData.freq;
             item.elim = updatedData.elim;
             item.sub = updatedData.sub;
@@ -440,15 +429,15 @@
 
             try {
                 document.getElementById('status').innerText = "正在儲存風險評估變更至雲端...";
-                let response = await fetch(GAS_URL, {
+                await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify(updatedData)
                 });
 
                 alert("✅ 7 大危害風險評估已成功儲存！");
-                document.getElementById('evalModal').style.display = 'none';
                 document.getElementById('status').innerText = `✅ 系統就緒 | 上次更新：ID ${rowId} (${rowRisk})`;
+                goBackToDetail();
             } catch (e) {
                 console.error("儲存失敗：", e);
                 alert("❌ 網路連線異常，儲存失敗。");
@@ -461,25 +450,24 @@
             if (!keyword) {
                 if (currentCategory) {
                     let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
-                    renderDetailTable(filtered);
+                    renderDetailGrid(filtered, currentCategory);
                 } else {
                     renderCategoryGrid(masterData);
                 }
                 return;
             }
 
-            // 若在搜尋時，自動切換至明細檢視顯示所有符合的結果
-            document.getElementById('categoryView').classList.remove('active');
-            document.getElementById('detailView').classList.add('active');
+            showView('detailView');
             document.getElementById('backBtn').style.display = 'inline-block';
             document.getElementById('detailCategoryTitle').innerText = `🔍 搜尋結果：「${keyword}」`;
+            document.getElementById('detailHint').innerText = "💡 搜尋結果展示。";
 
             let filtered = masterData.filter(item => 
                 String(item.id || item.ID || '').toLowerCase().includes(keyword) || 
                 String(item.name || item.Name || '').toLowerCase().includes(keyword) ||
                 String(item.category || item.Category || '').toLowerCase().includes(keyword)
             );
-            renderDetailTable(filtered);
+            renderDetailGrid(filtered, 'Search Result');
         }
 
         async function startQRScanner() {
@@ -534,9 +522,9 @@
                 }
             });
 
-            if (currentCategory) {
+            if (currentCategory && document.getElementById('detailView').classList.contains('active')) {
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
-                renderDetailTable(filtered);
+                renderDetailGrid(filtered, currentCategory);
             }
         }
 
@@ -624,7 +612,7 @@
             document.getElementById('addModal').style.display = 'none';
             if (currentCategory === newCat) {
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
-                renderDetailTable(filtered);
+                renderDetailGrid(filtered, currentCategory);
             } else {
                 renderCategoryGrid(masterData);
             }
