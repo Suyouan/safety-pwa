@@ -408,8 +408,12 @@
             cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="" placeholder="請輸入新資訊..." style="width: 90%; padding: 4px;" autofocus>`;
             
             let inputEl = document.getElementById(`input_${fieldKey}`);
+            // 建立一個旗標防止 commitEdit 被重複呼叫
+    let isCommitted = false;
             
             async function commitEdit() {
+                if (isCommitted) return; // 避免 blur 和 enter 同時觸發兩次
+        isCommitted = true;
                 let newVal = inputEl.value.trim();
                 if (!newVal) {
                     cell.innerText = originalVal || '-';
