@@ -25,7 +25,7 @@ function setupEventListeners() {
     const qid = urlParams.get('id');
     if (qid) {
         setTimeout(() => {
-            let target = rawSigns.find(s => s.id === qid);
+            let target = rawSigns.find(s => s && s.id === qid);
             if (target) {
                 currentViewPath = { level: 'detail', id: target.id, risk: '1' };
                 renderCurrentView();
@@ -42,42 +42,59 @@ function setupEventListeners() {
         }
     });
 
-    document.querySelectorAll('button').forEach(btn => {
-        if (btn.innerText.includes('QR')) {
-            btn.onclick = startQRCodeScanner;
-        }
-    });
+    const scanBtn = document.getElementById('scan-qr-btn');
+    if (scanBtn) {
+        scanBtn.onclick = startQRCodeScanner;
+    }
 }
 
+// 取得主表與已核准資料
 async function fetchSignsFromSheet() {
     try {
         let res = await fetch(`${GAS_URL}?action=getData`);
         let json = await res.json();
-        let fetchedSigns = json.signs || [];
-        approvedData = json.approved || {};
+        
+        // 安全解析：確保 fetchedSigns 絕對是陣列
+        let fetchedSigns = [];
+        if (Array.isArray(json)) {
+            fetchedSigns = json;
+        } else if (json && Array.isArray(json.signs)) {
+            fetchedSigns = json.signs;
+        } else if (json && json.signs) {
+            fetchedSigns = [json.signs];
+        }
+
+        approvedData = (json && json.approved) ? json.approved : {};
 
         if (fetchedSigns.length === 0) {
-            document.getElementById('app-container').innerHTML = `<p style="text-align:center; color:red;">警告：從 Google 試算表抓到的資料為空，請檢查 GAS 部署或工作表名稱！</p>`;
+            document.getElementById('app-container').innerHTML = `<p style="text-align:center; color:red;">警告：從 Google 試算表抓到的資料為空或格式不符！</p>`;
             return;
         }
 
-        if (!isExpanded) {
-            rawSigns = expandWSigns(fetchedSigns);
-            isExpanded = true;
-        } else {
-            rawSigns = updateExistingSigns(fetchedSigns);
-        }
-        
-        renderCurrentView();
+        processAndRender(fetchedSigns);
     } catch (e) {
-        console.error("資料載入失敗", e);
+        console.error("fetchSignsFromSheet error:", e);
         document.getElementById('app-container').innerHTML = `<p style="text-align:center; color:red;">連線至 GAS 失敗: ${e.message}</p>`;
     }
 }
 
+function processAndRender(fetchedSigns) {
+    if (!isExpanded) {
+        rawSigns = expandWSigns(fetchedSigns);
+        isExpanded = true;
+    } else {
+        rawSigns = updateExistingSigns(fetchedSigns);
+    }
+    renderCurrentView();
+}
+
 function expandWSigns(signs) {
+    // 嚴格防呆：確保傳入的是陣列
+    let safeSigns = Array.isArray(signs) ? signs : (signs ? [signs] : []);
     let expandedList = [];
-    signs.forEach(sign => {
+
+    safeSigns.forEach(sign => {
+        if (!sign) return;
         if (sign.category === 'Warning sign') {
             for (let i = 1; i <= 4; i++) {
                 expandedList.push({
@@ -98,8 +115,9 @@ function expandWSigns(signs) {
 }
 
 function updateExistingSigns(fetchedSigns) {
+    let safeSigns = Array.isArray(fetchedSigns) ? fetchedSigns : (fetchedSigns ? [fetchedSigns] : []);
     return rawSigns.map(existing => {
-        let match = fetchedSigns.find(s => s.id === existing.id);
+        let match = safeSigns.find(s => s && s.id === existing.id);
         return match ? { ...match, risk: existing.risk, uniqueKey: existing.uniqueKey } : existing;
     });
 }
@@ -108,9 +126,22 @@ async function fetchGASData() {
     try {
         let res = await fetch(`${GAS_URL}?action=getData`);
         let json = await res.json();
-        approvedData = json.approved || {};
-        if (currentViewPath.level === 'detail') renderCurrentView();
-    } catch (e) { console.error(e); }
+        
+        let fetchedSigns = [];
+        if (Array.isArray(json)) {
+            fetchedSigns = json;
+        } else if (json && Array.isArray(json.signs)) {
+            fetchedSigns = json.signs;
+        }
+
+        approvedData = (json && json.approved) ? json.approved : {};
+        
+        if (fetchedSigns.length > 0) {
+            processAndRender(fetchedSigns);
+        }
+    } catch (e) { 
+        console.error("fetchGASData error:", e); 
+    }
 }
 
 async function fetchPendingCount() {
@@ -118,7 +149,7 @@ async function fetchPendingCount() {
         let res = await fetch(`${GAS_URL}?action=getPendingCount`);
         let json = await res.json();
         let badge = document.getElementById('pending-badge');
-        if (badge && json.count > 0) {
+        if (badge && json && json.count > 0) {
             badge.innerText = `待審批: ${json.count}`;
             badge.style.display = 'inline-block';
         } else if (badge) {
@@ -140,10 +171,10 @@ function renderCurrentView() {
 }
 
 function renderCategoryView(container) {
-    let categories = [...new Set(rawSigns.map(s => s.category))];
+    let categories = [...new Set(rawSigns.map(s => s.category).filter(Boolean))];
     let html = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     categories.forEach(cat => {
-        let firstSign = rawSigns.find(s => s.category === cat);
+        let firstSign = rawSigns.find(s => s && s.category === cat);
         html += `
             <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="navigateToCategory('${cat}')">
                 <img src="${firstSign?.svg_url || firstSign?.image || ''}" alt="${cat}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
@@ -160,12 +191,12 @@ window.navigateToCategory = (cat) => {
 };
 
 function renderSignsView(container, cat) {
-    let signs = rawSigns.filter(s => s.category === cat);
+    let signs = rawSigns.filter(s => s && s.category === cat);
     let html = `<button onclick="backToCategories()" style="margin-bottom:15px; padding:6px 12px; cursor:pointer;">⬅ 返回分類</button><h2>${cat} 標誌列表</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     signs.forEach(s => {
         html += `
             <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="handleSignClick('${s.id}', '${s.category}', '${s.name}')">
-                <img src="${s.svg_url || s.image}" alt="${s.name}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
+                <img src="${s.svg_url || s.image || ''}" alt="${s.name || ''}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
                 <p><strong>${s.id}</strong><br>${s.name}</p>
             </div>
         `;
@@ -189,14 +220,14 @@ window.handleSignClick = (id, category, name) => {
 };
 
 function renderNamesView(container, cat) {
-    let wSigns = rawSigns.filter(s => s.category === cat);
-    let uniqueNames = [...new Set(wSigns.map(s => s.name))];
+    let wSigns = rawSigns.filter(s => s && s.category === cat);
+    let uniqueNames = [...new Set(wSigns.map(s => s.name).filter(Boolean))];
     let html = `<button onclick="navigateToCategory('${cat}')" style="margin-bottom:15px; padding:6px 12px; cursor:pointer;">⬅ 返回 ${cat}</button><h2>注意標誌群組</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     uniqueNames.forEach(name => {
-        let sample = wSigns.find(s => s.name === name);
+        let sample = wSigns.find(s => s && s.name === name);
         html += `
             <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="navigateToRisks('${name}')">
-                <img src="${sample.svg_url || sample.image}" alt="${name}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
+                <img src="${sample?.svg_url || sample?.image || ''}" alt="${name}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
                 <p>${name}</p>
             </div>
         `;
@@ -210,15 +241,15 @@ window.navigateToRisks = (name) => {
 };
 
 function renderRisksView(container, name) {
-    let variants = rawSigns.filter(s => s.name === name);
-    let sample = variants[0];
+    let variants = rawSigns.filter(s => s && s.name === name);
+    let sample = variants[0] || {};
     let html = `<button onclick="currentViewPath.level='names'; renderCurrentView();" style="margin-bottom:15px; padding:6px 12px; cursor:pointer;">⬅ 返回群組</button><h2>${name} - 風險等級選擇</h2><div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">`;
     
     for (let i = 1; i <= 4; i++) {
-        let variant = variants.find(v => Number(v.risk) === i) || sample;
+        let variant = variants.find(v => v && Number(v.risk) === i) || sample;
         html += `
-            <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="navigateToDetail('${variant.id}', '${i}')">
-                <img src="${variant.svg_url || variant.image}" alt="Risk ${i}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
+            <div style="background:white; border-radius:8px; padding:16px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:pointer;" onclick="navigateToDetail('${variant.id || ''}', '${i}')">
+                <img src="${variant?.svg_url || variant?.image || ''}" alt="Risk ${i}" style="max-width:100px; height:100px; object-fit:contain; margin-bottom:8px;">
                 <p><strong>Risk Level: ${i}</strong></p>
             </div>
         `;
@@ -232,7 +263,8 @@ window.navigateToDetail = (id, risk) => {
 };
 
 function renderDetailView(container, id, risk) {
-    let sign = rawSigns.find(s => s.id === id);
+    let sign = rawSigns.find(s => s && s.id === id);
+    if (!sign) return;
     let uniqueKey = `${sign.id}_Risk${risk}`;
     let currentData = approvedData[uniqueKey] || approvedData[`${sign.id}_Normal`] || sign;
 
@@ -240,7 +272,7 @@ function renderDetailView(container, id, risk) {
         <button onclick="currentViewPath.level='signs'; renderCurrentView();" style="margin-bottom:15px; padding:6px 12px; cursor:pointer;">⬅ 返回列表</button>
         <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
             <h2>${sign.name} (ID: ${sign.id})</h2>
-            <img src="${sign.svg_url || sign.image}" style="max-width:120px; height:120px; object-fit:contain; display:block; margin: 0 auto 1rem auto;">
+            <img src="${sign.svg_url || sign.image || ''}" style="max-width:120px; height:120px; object-fit:contain; display:block; margin: 0 auto 1rem auto;">
             <p><strong>風險等級 (Risk Level):</strong> ${risk} <span style="font-size:0.8rem; color:gray;">(唯讀不可編輯)</span></p>
             
             <table style="width:100%; border-collapse:collapse; margin-top:15px;">
@@ -336,7 +368,7 @@ function setupHeaderLongPress() {
     }
 }
 
-// 【真・QR 掃描與解碼相機模組】結合 jsQR 即時辨識
+// QR Code 掃描模組
 async function startQRCodeScanner() {
     let container = document.getElementById('qr-scanner-modal');
     if (!container) {
@@ -373,30 +405,27 @@ async function startQRCodeScanner() {
         const canvasContext = canvasElement.getContext('2d', { willReadFrequently: true });
         const statusText = document.getElementById('scanner-status');
 
-        // 即時每格掃描迴圈
         const scanTick = () => {
             if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
                 canvasElement.width = videoElement.videoWidth;
                 canvasElement.height = videoElement.videoHeight;
-                canvasContext.drawImage(videoElement, 0, canvasElement.width, canvasElement.height);
+                canvasContext.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
                 
                 const imageData = canvasContext.getImageData(0, 0, canvasElement.width, canvasElement.height);
                 const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
                 if (code) {
-                    // 成功掃描到 QR Code！
                     statusText.innerHTML = `<span style="color:green;">成功識別：${code.data}</span>`;
                     stopScannerCamera();
                     container.style.display = 'none';
 
-                    // 依照規格解析 id (支援直接是代碼如 P001 或網址帶有 ?id=P001)
                     let targetId = code.data;
                     if (code.data.includes('?id=')) {
                         const urlParams = new URLSearchParams(code.data.split('?')[1]);
                         targetId = urlParams.get('id');
                     }
 
-                    let target = rawSigns.find(s => s.id === targetId);
+                    let target = rawSigns.find(s => s && s.id === targetId);
                     if (target) {
                         currentViewPath = { level: 'detail', id: target.id, risk: '1' };
                         renderCurrentView();
