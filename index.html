@@ -87,7 +87,8 @@
         <div class="eval-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <button onclick="goBackToDetail()" style="background: #6c757d;">⬅️ 返回上一層</button>
-                <button onclick="saveEvaluation()" style="background: #28a745;">💾 儲存評估變更</button>
+                <!-- 只有管理者登入時才會顯示儲存變更按鈕 -->
+                <button id="saveEvalBtn" class="admin-only" onclick="saveEvaluation()" style="background: #28a745;">💾 儲存評估變更</button>
             </div>
             
             <div style="text-align: center; border-bottom: 1px solid #eee; padding-bottom: 15px;">
@@ -96,7 +97,7 @@
                 <p id="evalPageSub" style="font-size: 13px; color: #666; margin: 0;"></p>
             </div>
             
-            <p style="font-size: 12px; color: #d9534f; margin: 15px 0 5px 0;">💡 提示：前 6 項危害控制欄位可直接**雙擊**進行編輯修改！</p>
+            <p id="evalHintText" style="font-size: 12px; color: #d9534f; margin: 15px 0 5px 0;">💡 提示：前 6 項危害控制欄位可直接**雙擊**進行編輯修改！</p>
             
             <input type="hidden" id="evalUniqueKey">
             <table class="eval-table">
@@ -377,29 +378,80 @@
             document.getElementById('cell_ppe').innerText = item.ppe || item.Ppe || '-';
             document.getElementById('cell_risk').innerText = item.risk || item.Risk || '-';
 
+            // 根據是否登入動態調整提示文字
+            let hintText = document.getElementById('evalHintText');
+            if (isAdmin) {
+                hintText.innerText = "💡 [管理者模式] 點擊儲存按鈕可直接將變更寫入雲端試算表。";
+            } else {
+                hintText.innerText = "💡 [一般檢視] 雙擊欄位可輸入新資訊（輸入後與原資訊以「 ; 」合併，並自動進入後台等待審批）。";
+            }
+
             showView('evalView');
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // 雙擊前 6 大危害控制框格進行互動輸入
+        // 雙擊前 6 大危害控制框格進行互動輸入（支援以 " ; " 結合新舊資訊與待審批機制）
         function enableCellEdit(fieldKey) {
             let cell = document.getElementById(`cell_${fieldKey}`);
             if (cell.querySelector('input')) return;
 
-            let currentVal = cell.innerText === '-' ? '' : cell.innerText;
-            cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="${currentVal}" style="width: 90%; padding: 4px;" autofocus>`;
+            let originalVal = cell.innerText === '-' ? '' : cell.innerText;
+            cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="" placeholder="請輸入新資訊..." style="width: 90%; padding: 4px;" autofocus>`;
             
             let inputEl = document.getElementById(`input_${fieldKey}`);
-            inputEl.onblur = function() {
-                cell.innerText = inputEl.value.trim() || '-';
-            };
+            
+            async function commitEdit() {
+                let newVal = inputEl.value.trim();
+                if (!newVal) {
+                    cell.innerText = originalVal || '-';
+                    return;
+                }
+
+                // 需求 2：以 " ; " 的方式將新資訊跟舊資訊顯示在同一框格
+                let combinedVal = originalVal ? `${originalVal} ; ${newVal}` : newVal;
+                cell.innerText = combinedVal;
+
+                // 更新記憶體資料
+                let uniqueKey = document.getElementById('evalUniqueKey').value;
+                let item = masterData.find(d => d.uniqueKey === uniqueKey);
+                if (item) {
+                    item[fieldKey] = combinedVal;
+                }
+
+                // 若非管理者登入，直接將此異動記錄提交至後台等待審批
+                if (!isAdmin) {
+                    document.getElementById('status').innerText = `⏳ 資訊已更新，欄位 [${fieldKey}] 已進入後台等待審批...`;
+                    try {
+                        let rowId = item.id || item.ID || '';
+                        let rowRisk = item.risk || item.Risk || '';
+                        let updatePayload = {
+                            action: 'submitPendingApproval',
+                            id: rowId,
+                            risk: rowRisk,
+                            field: fieldKey,
+                            value: combinedVal
+                        };
+                        await fetch(GAS_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify(updatePayload)
+                        });
+                        alert("✅ 您的修改已送出，目前已進入後台等待審批！");
+                    } catch (e) {
+                        console.error("審批傳送異常：", e);
+                    }
+                }
+            }
+
+            inputEl.onblur = commitEdit;
             inputEl.onkeydown = function(e) {
                 if (e.key === 'Enter') {
-                    cell.innerText = inputEl.value.trim() || '-';
+                    commitEdit();
                 }
             };
         }
 
+        // 管理者專用：直接儲存評估變更
         async function saveEvaluation() {
             let uniqueKey = document.getElementById('evalUniqueKey').value;
             let item = masterData.find(d => d.uniqueKey === uniqueKey);
@@ -428,14 +480,14 @@
             item.ppe = updatedData.ppe;
 
             try {
-                document.getElementById('status').innerText = "正在儲存風險評估變更至雲端...";
+                document.getElementById('status').innerText = "正在由管理者權限儲存風險評估變更至雲端...";
                 await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify(updatedData)
                 });
 
-                alert("✅ 7 大危害風險評估已成功儲存！");
+                alert("✅ [管理者] 7 大危害風險評估已成功儲存並覆寫！");
                 document.getElementById('status').innerText = `✅ 系統就緒 | 上次更新：ID ${rowId} (${rowRisk})`;
                 goBackToDetail();
             } catch (e) {
