@@ -6,6 +6,8 @@
     <title>ISO7010 - 極簡分類與風險評估管理系統</title>
     <!-- 引入 SheetJS (xlsx.js) 用於直接產生 Excel 檔案 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- 引入 QRCode.js 用於動態產生標誌專屬 QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
         h2 { user-select: none; display: inline-block; }
@@ -21,17 +23,23 @@
         .view-section.active { display: block; }
 
         /* 卡片網格通用樣式 */
-        .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 15px; margin-top: 15px; }
         .category-card { background: white; border-radius: 8px; padding: 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
         .category-card:hover { transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
         .category-card img { width: 60px; height: 60px; object-fit: contain; margin-bottom: 10px; }
         .category-card h3 { margin: 5px 0 0 0; font-size: 16px; color: #007bff; }
         
-        /* 第二層專屬標誌卡片樣式 */
-        .sign-card { background: white; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+        /* 第二層專屬標誌卡片樣式與左右並排佈局 */
+        .sign-card { background: white; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s; position: relative; display: flex; flex-direction: column; align-items: center; }
         .sign-card.clickable { cursor: pointer; border: 2px solid #ffc107; background: #fffdf0; }
         .sign-card.clickable:hover { transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
-        .sign-card img { width: 50px; height: 50px; object-fit: contain; margin-bottom: 8px; }
+        
+        /* 圖形與 QR Code 左右並排容器 */
+        .sign-content-box { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px; width: 100%; }
+        .sign-img-wrap { display: flex; flex-direction: column; align-items: center; }
+        .sign-card img { width: 55px; height: 55px; object-fit: contain; }
+        .qr-code-wrap { background: #fff; padding: 4px; border: 1px solid #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+        
         .sign-badge { display: inline-block; background: #ffc107; color: #333; font-size: 12px; font-weight: bold; padding: 2px 8px; border-radius: 12px; margin-top: 6px; }
 
         /* Modal 與區塊通用 */
@@ -211,7 +219,17 @@
         window.onload = function() {
             initPhase5();
             updateAdminUI();
+            checkUrlDirectEvaluation();
         };
+
+        // 支援透過 QR Code 掃描後的網址參數直接導向該標誌的評估頁面
+        function checkUrlDirectEvaluation() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetKey = urlParams.get('evalKey');
+            if (targetKey && masterData.length > 0) {
+                openEvalView(targetKey);
+            }
+        }
 
         function showView(viewId) {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
@@ -244,7 +262,6 @@
                 let result = await response.json();
                 
                 if (result.status === "success") {
-                    // 直接使用後端傳過來的資料，並為每一筆資料賦予獨特的 uniqueKey
                     masterData = result.data.map(item => {
                         let rowId = item.id || item.ID || 'unknown';
                         let rowRisk = item.risk || item.Risk || 'Normal';
@@ -254,6 +271,7 @@
                     
                     renderCategoryGrid(masterData);
                     document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
+                    checkUrlDirectEvaluation();
                 } else {
                     document.getElementById('status').innerText = "❌ 載入失敗：" + result.message;
                 }
@@ -262,8 +280,6 @@
                 document.getElementById('status').innerText = "❌ 網路連線異常，請按 F12 查看主控台。";
             }
         }
-
-    
 
         function renderCategoryGrid(data) {
             let gridContainer = document.getElementById('categoryGridContainer');
@@ -319,9 +335,9 @@
             let isWarning = (String(catName).trim() === 'Warning sign');
 
             if (isWarning) {
-                hintEl.innerText = "💡 此分類為「Warning sign」，圖形下方已顯示 Risk Level，點擊卡片即可進入第三層進行 7 大風險評估。";
+                hintEl.innerText = "💡 此分類為「Warning sign」，圖形與專屬 QR Code 並排顯示，風險等級數字位於下方，點擊卡片即可進入第三層進行 7 大風險評估。";
             } else {
-                hintEl.innerText = "ℹ️ 此分類為一般標誌，僅提供圖示與名稱檢視（不需進入第三層風險評估）。";
+                hintEl.innerText = "ℹ️ 此分類為一般標誌，提供圖示、專屬 QR Code 與名稱檢視。";
             }
 
             if (data.length === 0) {
@@ -329,7 +345,7 @@
                 return;
             }
 
-            data.forEach(item => {
+            data.forEach((item, index) => {
                 let card = document.createElement('div');
                 let rowId = item.id || item.ID || '';
                 let rowName = item.name || item.Name || '';
@@ -344,17 +360,39 @@
                     card.className = 'sign-card';
                 }
 
-                let badgeHtml = (isWarning && rowRisk) ? `<div class="sign-badge">${rowRisk}</div>` : '';
+                let badgeHtml = rowRisk ? `<div class="sign-badge">${rowRisk}</div>` : '';
                 let deleteBtnHtml = isAdmin ? `<br><button class="action-btn" style="background:#dc3545; margin-top:8px;" onclick="event.stopPropagation(); deleteRow('${rowId}', '${rowRisk}')">刪除</button>` : '';
 
+                // 組合卡片內部 HTML，預留 qrcode 容器 div
                 card.innerHTML = `
-                    ${imgUrl ? `<img src="${imgUrl}">` : '<div style="height:50px;">無圖示</div>'}
+                    <div class="sign-content-box">
+                        <div class="sign-img-wrap">
+                            ${imgUrl ? `<img src="${imgUrl}">` : '<div style="height:55px; line-height:55px;">無圖示</div>'}
+                        </div>
+                        <div class="qr-code-wrap" id="qrcode_${index}_${rowId}"></div>
+                    </div>
                     <div style="font-weight: bold; font-size: 14px; color: #007bff;">${rowId}</div>
                     <div style="font-size: 13px; color: #333; margin: 4px 0;">${rowName}</div>
                     ${badgeHtml}
                     ${deleteBtnHtml}
                 `;
                 gridContainer.appendChild(card);
+
+                // 動態產生專屬 QR Code，讓使用者掃描後可直接連結回該標誌頁面
+                setTimeout(() => {
+                    let qrContainer = document.getElementById(`qrcode_${index}_${rowId}`);
+                    if (qrContainer && qrContainer.innerHTML === "") {
+                        let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
+                        new QRCode(qrContainer, {
+                            text: targetUrl,
+                            width: 50,
+                            height: 50,
+                            colorDark: "#000000",
+                            colorLight: "#ffffff",
+                            correctLevel: QRCode.CorrectLevel.L
+                        });
+                    }
+                }, 50);
             });
         }
 
@@ -391,7 +429,6 @@
             if (cell.querySelector('input')) return;
 
             let originalVal = cell.innerText === '-' ? '' : cell.innerText;
-            // 【管理者模式】直接帶入原值方便修改；【一般使用者】預設空白以便輸入新意見
             let defaultInputVal = isAdmin ? originalVal : '';
             cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="${defaultInputVal}" placeholder="請輸入新資訊..." style="width: 90%; padding: 4px;" autofocus>`;
             
@@ -403,7 +440,6 @@
                 isCommitted = true;
                 let newVal = inputEl.value.trim();
 
-                // 如果一般使用者沒輸入就失焦，恢復原狀
                 if (!newVal && !isAdmin) {
                     cell.innerText = originalVal || '-';
                     return;
@@ -413,17 +449,13 @@
                 let item = masterData.find(d => d.uniqueKey === uniqueKey);
 
                 if (isAdmin) {
-                    // 【管理者模式】直接覆寫新值，僅更新前端暫存，需按「儲存評估變更」才寫入資料庫
                     cell.innerText = newVal || '-';
                     if (item) {
                         item[fieldKey] = newVal;
                     }
                     document.getElementById('status').innerText = `💡 [管理者] 欄位 [${fieldKey}] 已暫存修改，請記得點擊右上角「儲存評估變更」！`;
-
                 } else {
-                    // 【一般使用者模式】畫面保持原本的內容（不擅自做 ; 合併），只將新輸入的內容送出待審批
                     cell.innerText = originalVal || '-';
-
                     document.getElementById('status').innerText = `⏳ 您的建議已送出，欄位 [${fieldKey}] 正等待管理員審批...`;
                     try {
                         let rowId = item ? (item.id || item.ID || '') : '';
@@ -433,7 +465,7 @@
                             id: rowId,
                             risk: rowRisk,
                             field: fieldKey,
-                            value: newVal // 只傳送新輸入的值，由後端審批流程決定何時與舊值以「;」合併
+                            value: newVal
                         };
                         await fetch(GAS_URL, {
                             method: 'POST',
@@ -762,7 +794,6 @@
                 return;
             }
 
-            // 建立新項目並賦予預設的 uniqueKey (若為 Warning sign 且後端會自動展開，前端先以預設 Normal 加入)
             let newItem = { 
                 id: newId, 
                 category: newCat, 
@@ -792,7 +823,6 @@
                 });
                 alert(`✅ 標誌 [${newId}] 已成功新增並同步至雲端！`);
                 document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
-                // 建議新增後重新載入以同步後端正確展開的 4 行資料
                 setTimeout(() => initPhase5(), 1500);
             } catch (e) {
                 alert("❌ 網路連線失敗，無法寫入雲端");
