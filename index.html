@@ -325,8 +325,11 @@
 
             try {
                 document.getElementById('status').innerText = "正在儲存變更至試算表...";
+                
+                // 改用明碼或確保跨域通暢的呼叫方式
                 let response = await fetch(GAS_URL, {
                     method: 'POST',
+                    mode: 'no-cors', // 💡 加入這行可直接繞過瀏覽器 CORS 封鎖
                     body: JSON.stringify({ 
                         action: 'updateRecord', 
                         id: rowId, 
@@ -334,14 +337,12 @@
                         risk: newRisk 
                     })
                 });
-                let res = await response.json();
-                alert(res.message);
-                if (res.status === 'success') {
-                    document.getElementById('editModal').style.display = 'none';
-                    initPhase4(); // 重新載入最新資料
-                } else {
-                    document.getElementById('status').innerText = "❌ 儲存失敗";
-                }
+
+                // 因為 no-cors 無法讀取內容，我們直接假設送出成功並重新整理畫面
+                alert("已送出修改請求，請稍候重新整理以同步試算表資料。");
+                document.getElementById('editModal').style.display = 'none';
+                setTimeout(() => initPhase4(), 2000); // 延遲 2 秒後重新撈取最新資料
+
             } catch (e) {
                 alert("連線錯誤，無法儲存");
                 document.getElementById('status').innerText = "❌ 網路異常";
