@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO7010 - Phase 3 驗證</title>
+    <title>ISO7010 - Phase 4 驗證</title>
     <style>
         body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
         h2 { cursor: pointer; user-select: none; display: inline-block; }
@@ -18,7 +18,8 @@
         #status { font-weight: bold; padding: 10px; background: #e2e3e5; border-radius: 4px; margin-bottom: 15px; }
         /* Modal 樣式 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
-        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 300px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .action-btn { padding: 4px 8px; font-size: 12px; margin: 2px; }
     </style>
 </head>
 <body>
@@ -46,6 +47,7 @@
                 <th>Name</th>
                 <th>Risk Level</th>
                 <th>唯一鍵 (uniqueKey)</th>
+                <th id="actionHeader" style="display: none;">管理者操作</th>
             </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -85,6 +87,22 @@
         </div>
     </div>
 
+    <!-- 資料編輯 Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h3>編輯標誌資料</h3>
+            <input type="hidden" id="editUniqueKey">
+            <label style="font-size:12px; color:#666;">ID (不可修改)</label>
+            <input type="text" id="editId" disabled style="width: 93%; padding: 6px; margin-bottom: 8px; background:#eee;">
+            <label style="font-size:12px; color:#666;">Name</label>
+            <input type="text" id="editName" style="width: 93%; padding: 6px; margin-bottom: 8px;">
+            <label style="font-size:12px; color:#666;">Risk Level</label>
+            <input type="text" id="editRisk" style="width: 93%; padding: 6px; margin-bottom: 15px;">
+            <button onclick="saveEdit()" style="width: 100%; margin-bottom: 8px; background: #28a745;">儲存變更</button>
+            <button onclick="document.getElementById('editModal').style.display='none'" style="width: 100%; background: #6c757d;">取消</button>
+        </div>
+    </div>
+
     <script>
         const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
         let masterData = [];
@@ -92,12 +110,12 @@
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
 
         window.onload = function() {
-            initPhase3();
+            initPhase4();
             updateAdminUI();
             setupHeaderLongPress();
         };
 
-        async function initPhase3() {
+        async function initPhase4() {
             try {
                 document.getElementById('status').innerText = "正在向 GAS 發送請求...";
                 let response = await fetch(GAS_URL);
@@ -143,8 +161,12 @@
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
             
+            // 控制操作欄位標題顯示與否
+            document.getElementById('actionHeader').style.display = isAdmin ? '' : 'none';
+
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" style="color: #888;">找不到符合條件的資料</td></tr>`;
+                let colSpanCount = isAdmin ? 7 : 6;
+                tbody.innerHTML = `<tr><td colspan="${colSpanCount}" style="color: #888;">找不到符合條件的資料</td></tr>`;
                 return;
             }
 
@@ -156,14 +178,26 @@
                 }
                 
                 let imgUrl = item.svg_url || item.image || '';
+                let rowId = item.id || item.ID || '';
+                let rowName = item.name || item.Name || '';
+                let rowRisk = item.risk || item.Risk || '-';
+
+                let actionHtml = '';
+                if (isAdmin) {
+                    actionHtml = `<td>
+                        <button class="action-btn" style="background:#ffc107; color:#333;" onclick="openEditModal('${item.uniqueKey}')">編輯</button>
+                        <button class="action-btn" style="background:#dc3545;" onclick="deleteRow('${rowId}', '${rowRisk}')">刪除</button>
+                    </td>`;
+                }
                 
                 tr.innerHTML = `
                     <td>${imgUrl ? `<img src="${imgUrl}" width="35" height="35" style="object-fit:contain;" onerror="this.src='https://via.placeholder.com/35?text=NoImg'">` : '無'}</td>
-                    <td>${item.id || item.ID || ''}</td>
+                    <td>${rowId}</td>
                     <td>${rawCategory}</td>
-                    <td>${item.name || item.Name || ''}</td>
-                    <td><strong>${item.risk || item.Risk || '-'}</strong></td>
+                    <td>${rowName}</td>
+                    <td><strong>${rowRisk}</strong></td>
                     <td><small style="color: #666;">${item.uniqueKey}</small></td>
+                    ${actionHtml}
                 `;
                 tbody.appendChild(tr);
             });
@@ -204,26 +238,14 @@
             document.getElementById('qrModal').style.display = 'none';
         }
 
-        // ==================== Phase 3：管理者長按與登入邏輯 ====================
+        // 管理者長按與登入邏輯
         function setupHeaderLongPress() {
             let timer = null;
             let header = document.getElementById('mainHeader');
-            
-            header.addEventListener('mousedown', () => {
-                timer = setTimeout(() => {
-                    document.getElementById('adminModal').style.display = 'block';
-                    updateAdminUI();
-                }, 3000);
-            });
+            header.addEventListener('mousedown', () => { timer = setTimeout(() => { document.getElementById('adminModal').style.display = 'block'; updateAdminUI(); }, 3000); });
             header.addEventListener('mouseup', () => clearTimeout(timer));
             header.addEventListener('mouseleave', () => clearTimeout(timer));
-            
-            header.addEventListener('touchstart', () => {
-                timer = setTimeout(() => {
-                    document.getElementById('adminModal').style.display = 'block';
-                    updateAdminUI();
-                }, 3000);
-            });
+            header.addEventListener('touchstart', () => { timer = setTimeout(() => { document.getElementById('adminModal').style.display = 'block'; updateAdminUI(); }, 3000); });
             header.addEventListener('touchend', () => clearTimeout(timer));
         }
 
@@ -236,6 +258,7 @@
                 document.getElementById('loginView').style.display = 'block';
                 document.getElementById('controlView').style.display = 'none';
             }
+            renderUI(masterData); // 重新渲染以顯示或隱藏操作按鈕
         }
 
         function verifyLogin() {
@@ -255,11 +278,7 @@
         async function changePassword() {
             let oldP = document.getElementById('oldPwd').value;
             let newP = document.getElementById('newPwd').value;
-            if (!oldP || !newP) {
-                alert("請完整輸入舊密碼與新密碼");
-                return;
-            }
-
+            if (!oldP || !newP) { alert("請完整輸入舊密碼與新密碼"); return; }
             try {
                 let response = await fetch(GAS_URL, {
                     method: 'POST',
@@ -272,9 +291,7 @@
                     document.getElementById('oldPwd').value = '';
                     document.getElementById('newPwd').value = '';
                 }
-            } catch (e) {
-                alert("修改失敗，請檢查網路連線");
-            }
+            } catch (e) { alert("修改失敗，請檢查網路連線"); }
         }
 
         function adminLogout() {
@@ -283,6 +300,80 @@
             updateAdminUI();
             alert("已登出管理員");
             document.getElementById('adminModal').style.display = 'none';
+        }
+
+        // ==================== Phase 4：動態編輯與刪除 ====================
+        function openEditModal(uniqueKey) {
+            let item = masterData.find(d => d.uniqueKey === uniqueKey);
+            if (!item) return;
+
+            document.getElementById('editUniqueKey').value = uniqueKey;
+            document.getElementById('editId').value = item.id || item.ID || '';
+            document.getElementById('editName').value = item.name || item.Name || '';
+            document.getElementById('editRisk').value = item.risk || item.Risk || '';
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        async function saveEdit() {
+            let uniqueKey = document.getElementById('editUniqueKey').value;
+            let newName = document.getElementById('editName').value;
+            let newRisk = document.getElementById('editRisk').value;
+            let item = masterData.find(d => d.uniqueKey === uniqueKey);
+            if (!item) return;
+
+            let rowId = item.id || item.ID || '';
+
+            try {
+                document.getElementById('status').innerText = "正在儲存變更至試算表...";
+                let response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        action: 'updateRecord', 
+                        id: rowId, 
+                        name: newName, 
+                        risk: newRisk 
+                    })
+                });
+                let res = await response.json();
+                alert(res.message);
+                if (res.status === 'success') {
+                    document.getElementById('editModal').style.display = 'none';
+                    initPhase4(); // 重新載入最新資料
+                } else {
+                    document.getElementById('status').innerText = "❌ 儲存失敗";
+                }
+            } catch (e) {
+                alert("連線錯誤，無法儲存");
+                document.getElementById('status').innerText = "❌ 網路異常";
+            }
+        }
+
+        async function deleteRow(id, risk) {
+            if (!confirm(`確定要刪除 ID: ${id} (${risk}) 嗎？此動作無法復原！`)) {
+                return;
+            }
+
+            try {
+                document.getElementById('status').innerText = "正在刪除資料...";
+                let response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        action: 'deleteRecord', 
+                        id: id, 
+                        risk: risk 
+                    })
+                });
+                let res = await response.json();
+                alert(res.message);
+                if (res.status === 'success') {
+                    initPhase4(); // 重新載入最新資料
+                } else {
+                    document.getElementById('status').innerText = "❌ 刪除失敗";
+                }
+            } catch (e) {
+                alert("連線錯誤，無法刪除");
+                document.getElementById('status').innerText = "❌ 網路異常";
+            }
         }
     </script>
 </body>
