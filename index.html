@@ -87,7 +87,7 @@
     <div class="toolbar">
         <button id="backBtn" onclick="goBackToCategory()" style="background: #6c757d; display: none;">⬅️ 返回分類首頁</button>
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
-        <button onclick="startQRScanner()">開啟 QR 掃描</button>
+        
         <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
@@ -156,15 +156,6 @@
         </div>
     </div>
 
-    <!-- QR 掃描 Modal -->
-    <div id="qrModal" class="modal">
-        <div class="modal-content" style="text-align: center;">
-            <h3>請對準 QR Code</h3>
-            <video id="qrVideo" width="260" height="200" autoplay style="background:#000; border-radius:4px;"></video>
-            <br><br>
-            <button onclick="closeQRScanner()" style="background: #dc3545; width: 100%;">關閉相機</button>
-        </div>
-    </div>
 
     <!-- 管理者登入/設定 Modal -->
     <div id="adminModal" class="modal">
@@ -213,7 +204,7 @@
         let masterData = [];
         let currentFilteredData = [];
         let currentCategory = null;
-        let mediaStream = null;
+        
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
 
         window.onload = function() {
@@ -560,31 +551,7 @@
             renderDetailGrid(filtered, 'Search Result');
         }
 
-        async function startQRScanner() {
-            let modal = document.getElementById('qrModal');
-            let video = document.getElementById('qrVideo');
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("您的瀏覽器不支援相機存取功能。");
-                return;
-            }
-            try {
-                modal.style.display = 'block';
-                mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                video.srcObject = mediaStream;
-            } catch (error) {
-                alert("無法開啟相機：您可能拒絕了相機權限，或裝置無相機。");
-                closeQRScanner();
-            }
-        }
-
-        function closeQRScanner() {
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop());
-                mediaStream = null;
-            }
-            document.getElementById('qrVideo').srcObject = null;
-            document.getElementById('qrModal').style.display = 'none';
-        }
+    
 
         function openAdminModal() {
             document.getElementById('adminModal').style.display = 'block';
