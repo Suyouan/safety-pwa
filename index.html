@@ -394,7 +394,8 @@
             document.getElementById('evalUniqueKey').value = uniqueKey;
             document.getElementById('evalPageImg').src = item.svg_url || item.image || '';
             document.getElementById('evalPageTitle').innerText = item.name || item.Name || '安全標誌';
-            document.getElementById('evalPageSub').innerText = `ID: ${item.id || item.ID} | Category: ${item.category || item.Category} | 等級: ${item.risk || item.Risk}`;
+            // 修改後（只顯示風險等級）
+document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk || item.Risk || 'Normal'}`;
 
             document.getElementById('cell_freq').innerText = item.freq || item.Freq || '-';
             document.getElementById('cell_elim').innerText = item.elim || item.Elim || '-';
