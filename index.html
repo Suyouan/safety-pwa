@@ -462,6 +462,7 @@
                         let rowRisk = item ? (item.risk || item.Risk || '') : '';
                         let updatePayload = {
                             action: 'submitPendingApproval',
+                            uniqueKey: uniqueKey, // 👈 加上這一行
                             id: rowId,
                             risk: rowRisk,
                             field: fieldKey,
@@ -497,16 +498,17 @@
             let rowRisk = item.risk || item.Risk || '';
 
             let updatedData = {
-                action: 'updateEvaluation',
-                id: rowId,
-                risk: rowRisk,
-                freq: document.getElementById('cell_freq').innerText === '-' ? '' : document.getElementById('cell_freq').innerText,
-                elim: document.getElementById('cell_elim').innerText === '-' ? '' : document.getElementById('cell_elim').innerText,
-                sub: document.getElementById('cell_sub').innerText === '-' ? '' : document.getElementById('cell_sub').innerText,
-                eng: document.getElementById('cell_eng').innerText === '-' ? '' : document.getElementById('cell_eng').innerText,
-                admin: document.getElementById('cell_admin').innerText === '-' ? '' : document.getElementById('cell_admin').innerText,
-                ppe: document.getElementById('cell_ppe').innerText === '-' ? '' : document.getElementById('cell_ppe').innerText
-            };
+    action: 'updateEvaluation',
+    uniqueKey: uniqueKey, // 👈 加上這一行
+    id: rowId,
+    risk: rowRisk,
+    freq: document.getElementById('cell_freq').innerText === '-' ? '' : document.getElementById('cell_freq').innerText,
+    elim: document.getElementById('cell_elim').innerText === '-' ? '' : document.getElementById('cell_elim').innerText,
+    sub: document.getElementById('cell_sub').innerText === '-' ? '' : document.getElementById('cell_sub').innerText,
+    eng: document.getElementById('cell_eng').innerText === '-' ? '' : document.getElementById('cell_eng').innerText,
+    admin: document.getElementById('cell_admin').innerText === '-' ? '' : document.getElementById('cell_admin').innerText,
+    ppe: document.getElementById('cell_ppe').innerText === '-' ? '' : document.getElementById('cell_ppe').innerText
+};
 
             item.freq = updatedData.freq;
             item.elim = updatedData.elim;
