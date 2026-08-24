@@ -258,20 +258,42 @@ async function exportAllQRCodesWord() {
             <title>ISO7010 QR Code 清冊</title>
             <style>
                 body { font-family: 'Microsoft JhengHei', Arial, sans-serif; }
-                .card-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; page-break-inside: avoid; }
-                .card-cell { border: 1px solid #ccc; padding: 15px; text-align: center; width: 33%; vertical-align: top; background: #fffdf0; }
-                .img-box { width: 60px; height: 60px; object-fit: contain; }
-                .qr-box { width: 75px; height: 75px; object-fit: contain; }
-                .badge { display: inline-block; background: #ffc107; color: #333; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; margin-top: 4px; }
+                .card-cell { 
+                    border: 1px solid #dcdcdc; 
+                    padding: 10px; 
+                    text-align: center; 
+                    width: 33.33%; 
+                    vertical-align: top; 
+                    background: #ffffff;
+                }
+                /* 強制鎖定圖片與 QR Code 尺寸完全一致 (例如 60px x 60px) */
+                .fixed-img { 
+                    width: 60px !important; 
+                    height: 60px !important; 
+                    max-width: 60px !important; 
+                    max-height: 60px !important; 
+                    object-fit: contain; 
+                    display: block;
+                    margin: 0 auto;
+                }
+                .badge { 
+                    display: inline-block; 
+                    background: #ffc107; 
+                    color: #333; 
+                    font-size: 9px; 
+                    font-weight: bold; 
+                    padding: 2px 5px; 
+                    border-radius: 8px; 
+                    margin-top: 4px; 
+                }
             </style>
         </head>
         <body>
-            <h2 style="text-align: center;">ISO7010 安全標誌與風險評估 QR Code 清冊</h2>
-            <p style="text-align: center; font-size: 12px; color: #666;">匯出日期：${new Date().toISOString().slice(0,10)} | 總計：${masterData.length} 筆</p>
+            <h2 style="text-align: center; font-size: 18px;">ISO7010 安全標誌與風險評估 QR Code 清冊</h2>
+            <p style="text-align: center; font-size: 11px; color: #666;">匯出日期：${new Date().toISOString().slice(0,10)} | 總計：${masterData.length} 筆</p>
     `;
 
-    // 採 3 欄式表格排版包裝每個標誌卡片
-    htmlContent += `<table style="width:100%; border-collapse: separate; border-spacing: 10px;">`;
+    htmlContent += `<table style="width:100%; border-collapse: separate; border-spacing: 8px;">`;
 
     for (let i = 0; i < masterData.length; i++) {
         let item = masterData[i];
@@ -279,7 +301,9 @@ async function exportAllQRCodesWord() {
         let rowName = item.name || item.Name || '';
         let rowCat = item.category || item.Category || '';
         let rowRisk = item.risk || item.Risk || '';
-        let imgUrl = item.svg_url || item.image || '';
+        
+        // 兼容多種可能的圖片欄位名稱，避免抓不到變成驚嘆號
+        let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
         
         let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
         let qrBase64 = await generateQRCodeBase64(targetUrl);
@@ -288,28 +312,27 @@ async function exportAllQRCodesWord() {
 
         htmlContent += `
             <td class="card-cell">
-                <table style="width:100%; border:none;">
+                <table style="width:100%; border:none; margin-bottom: 5px;">
                     <tr>
-                        <td style="text-align:center; border:none; padding:0 5px;">
-                            ${imgUrl ? `<img src="${imgUrl}" class="img-box">` : '<span style="font-size:10px;">無圖示</span>'}
+                        <td style="text-align:center; border:none; padding:0; width:50%;">
+                            ${imgUrl ? `<img src="${imgUrl}" class="fixed-img" alt="標誌">` : '<span style="font-size:9px; color:#999;">無圖示</span>'}
                         </td>
-                        <td style="text-align:center; border:none; padding:0 5px;">
-                            ${qrBase64 ? `<img src="${qrBase64}" class="qr-box">` : ''}
+                        <td style="text-align:center; border:none; padding:0; width:50%;">
+                            ${qrBase64 ? `<img src="${qrBase64}" class="fixed-img" alt="QR">` : ''}
                         </td>
                     </tr>
                 </table>
-                <div style="font-weight: bold; font-size: 13px; color: #007bff; margin-top: 6px;">${rowId}</div>
-                <div style="font-size: 11px; color: #333; margin: 2px 0;">${rowName}</div>
-                <div style="font-size: 10px; color: #666;">分類: ${rowCat}</div>
+                <div style="font-weight: bold; font-size: 12px; color: #0056b3; margin-top: 4px;">${rowId}</div>
+                <div style="font-size: 10px; color: #333; margin: 2px 0; height: 24px; overflow: hidden;">${rowName}</div>
+                <div style="font-size: 9px; color: #666;">分類: ${rowCat}</div>
                 ${rowRisk ? `<div class="badge">風險: ${rowRisk}</div>` : ''}
             </td>
         `;
 
         if (i % 3 === 2 || i === masterData.length - 1) {
-            // 補齊結尾格，確保表格版型不跑版
             let remainder = 2 - (i % 3);
             for (let r = 0; r < remainder; r++) {
-                htmlContent += `<td style="border:none; width: 33%;"></td>`;
+                htmlContent += `<td style="border:none; width: 33.33%;"></td>`;
             }
             htmlContent += `</tr>`;
         }
@@ -317,7 +340,6 @@ async function exportAllQRCodesWord() {
 
     htmlContent += `</table></body></html>`;
 
-    // 建立 Blob 並觸發 Word (.doc) 檔案下載
     let blob = new Blob(['\ufeff' + htmlContent], {
         type: 'application/msword'
     });
