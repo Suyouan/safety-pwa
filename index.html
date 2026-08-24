@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISO7010 - 極簡分類與風險評估管理系統</title>
+    <title>安全意識與安全文化</title>
     <!-- 引入 SheetJS (xlsx.js) 用於直接產生 Excel 檔案 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- 引入 QRCode.js 用於動態產生標誌專屬 QR Code -->
@@ -87,7 +87,7 @@
     <div class="toolbar">
         <button id="backBtn" onclick="goBackToCategory()" style="background: #6c757d; display: none;">⬅️ 返回分類首頁</button>
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
-        <button class="action-btn" style="background: #20c997;" onclick="exportFilteredGridToWord()">📥 匯出搜尋結果 QR Code (Word)</button>
+        
         <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
         <button onclick="exportAllQRCodesWord()" style="background: #6610f2; color: white;">📑 匯出全部 QRcode (Word)</button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
@@ -1054,139 +1054,6 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
             let fileName = `ISO7010_RiskEval_${new Date().toISOString().slice(0,10)}.xlsx`;
             XLSX.writeFile(workbook, fileName);
         }
-
-        async function exportFilteredGridToWord() {
-            // 抓取目前搜尋結果或當前分類的資料集
-            let targetData = (typeof currentFilteredData !== 'undefined' && currentFilteredData.length > 0) ? currentFilteredData : masterData;
-
-            if (targetData.length === 0) {
-                alert("目前沒有可匯出的標誌資料！");
-                return;
-            }
-
-            document.getElementById('status').innerText = "正在產生 Word 報告，請稍候...";
-
-            // 採用與「匯出全部qrcode」一致的標準模板樣式與尺寸
-            let htmlContent = `
-                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-                <head>
-                    <meta charset="utf-8">
-                    <title>ISO 7010 QR Code 清單</title>
-                    <style>
-                        body { font-family: 'Microsoft JhengHei', Arial, sans-serif; }
-                        .qr-table { width: 100%; border-collapse: collapse; }
-                        .qr-cell { 
-                            width: 33.33%; 
-                            padding: 8px; 
-                            vertical-align: top; 
-                            border: 1px solid #ddd;
-                        }
-                        .card-inner {
-                            text-align: center;
-                            padding: 5px;
-                        }
-                        .img-container {
-                            width: 80px;
-                            height: 80px;
-                            margin: 0 auto;
-                            display: block;
-                        }
-                        .img-container img {
-                            max-width: 80px;
-                            max-height: 80px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <h2 style="text-align: center; color: #333;">ISO 7010 搜尋結果標誌與 QR Code 清單</h2>
-                    <p style="text-align: center; color: #666; font-size: 12px;">匯出時間：${new Date().toLocaleString()} | 筆數：${targetData.length} 筆</p>
-                    <hr style="margin-bottom: 20px;">
-                    <table class="qr-table">
-            `;
-
-            let cols = 3;
-            for (let i = 0; i < targetData.length; i++) {
-                if (i % cols === 0) htmlContent += '<tr>';
-
-                let item = targetData[i];
-                let rowId = item.id || item.ID || '';
-                let rowName = item.name || item.Name || '';
-                let rowRisk = item.risk || item.Risk || '';
-                let imgUrl = item.svg_url || item.image || '';
-                let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey || `${rowId}-${rowRisk}`);
-
-                // 產生與原模板一致大小的 QR Code
-                let qrDataUrl = '';
-                try {
-                    qrDataUrl = await generateQrCodeDataUrl(targetUrl);
-                } catch (e) {
-                    console.error("QR Code 生成失敗", e);
-                }
-
-                htmlContent += `
-                    <td class="qr-cell">
-                        <div class="card-inner">
-                            <div class="img-container">
-                                ${imgUrl ? `<img src="${imgUrl}" crossorigin="anonymous">` : ''}
-                            </div>
-                            <div style="margin: 6px 0;">
-                                ${qrDataUrl ? `<img src="${qrDataUrl}" width="80" height="80">` : ''}
-                            </div>
-                            <div style="font-size: 12px; font-weight: bold; color: #007bff;">${rowId}</div>
-                            <div style="font-size: 11px; color: #333; height: 32px; overflow: hidden;">${rowName}</div>
-                            ${rowRisk ? `<div style="font-size: 10px; color: #d9534f; font-weight: bold;">[${rowRisk}]</div>` : ''}
-                        </div>
-                    </td>
-                `;
-
-                if (i % cols === cols - 1 || i === targetData.length - 1) {
-                    let remaining = cols - (i % cols) - 1;
-                    for (let r = 0; r < remaining; r++) {
-                        htmlContent += `<td class="qr-cell" style="border:none;"></td>`;
-                    }
-                    htmlContent += '</tr>';
-                }
-            }
-
-            htmlContent += `</table></body></html>`;
-
-            let blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
-            let url = URL.createObjectURL(blob);
-            let a = document.createElement('a');
-            a.href = url;
-            a.download = `ISO7010_QRCode_List_${new Date().toISOString().slice(0,10)}.doc`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            document.getElementById('status').innerText = "✅ QR Code Word 報告已成功匯出！";
-        }
-
-        // 統一尺寸的輔助生成函式
-        function generateQrCodeDataUrl(text) {
-            return new Promise((resolve) => {
-                let div = document.createElement('div');
-                new QRCode(div, {
-                    text: text,
-                    width: 80,
-                    height: 80,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.L
-                });
-                setTimeout(() => {
-                    let canvas = div.querySelector('canvas');
-                    if (canvas) {
-                        resolve(canvas.toDataURL("image/png"));
-                    } else {
-                        let img = div.querySelector('img');
-                        resolve(img ? img.src : '');
-                    }
-                }, 40);
-            });
-        }
-        
     </script>
 </body>
 </html>
