@@ -89,6 +89,7 @@
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
         
         <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
+        <button onclick="exportAllQRCodesWord()" style="background: #6610f2; color: white;">📑 匯出全部 QRcode (Word)</button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
     </div>
@@ -213,6 +214,127 @@
             checkUrlDirectEvaluation();
         };
 
+
+
+        // 輔助函式：將指定的文字轉成 Base64 的 QR Code 圖片 Data URL
+function generateQRCodeBase64(text) {
+    return new Promise((resolve) => {
+        let tempDiv = document.createElement('div');
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+        
+        new QRCode(tempDiv, {
+            text: text,
+            width: 80,
+            height: 80,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.L
+        });
+
+        // 稍微等待 DOM 渲染完成抓取 Canvas
+        setTimeout(() => {
+            let canvas = tempDiv.querySelector('canvas');
+            let imgData = canvas ? canvas.toDataURL("image/png") : "";
+            document.body.removeChild(tempDiv);
+            resolve(imgData);
+        }, 100);
+    });
+}
+
+// 核心：匯出全部 QRcode 與圖形至 Word 檔案
+async function exportAllQRCodesWord() {
+    if (masterData.length === 0) {
+        alert("目前沒有可匯出的資料！");
+        return;
+    }
+
+    document.getElementById('status').innerText = "⏳ 正在產生所有標誌的圖形與 QR Code，請稍候...";
+    
+    let htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8">
+            <title>ISO7010 QR Code 清冊</title>
+            <style>
+                body { font-family: 'Microsoft JhengHei', Arial, sans-serif; }
+                .card-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; page-break-inside: avoid; }
+                .card-cell { border: 1px solid #ccc; padding: 15px; text-align: center; width: 33%; vertical-align: top; background: #fffdf0; }
+                .img-box { width: 60px; height: 60px; object-fit: contain; }
+                .qr-box { width: 75px; height: 75px; object-fit: contain; }
+                .badge { display: inline-block; background: #ffc107; color: #333; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; margin-top: 4px; }
+            </style>
+        </head>
+        <body>
+            <h2 style="text-align: center;">ISO7010 安全標誌與風險評估 QR Code 清冊</h2>
+            <p style="text-align: center; font-size: 12px; color: #666;">匯出日期：${new Date().toISOString().slice(0,10)} | 總計：${masterData.length} 筆</p>
+    `;
+
+    // 採 3 欄式表格排版包裝每個標誌卡片
+    htmlContent += `<table style="width:100%; border-collapse: separate; border-spacing: 10px;">`;
+
+    for (let i = 0; i < masterData.length; i++) {
+        let item = masterData[i];
+        let rowId = item.id || item.ID || '';
+        let rowName = item.name || item.Name || '';
+        let rowCat = item.category || item.Category || '';
+        let rowRisk = item.risk || item.Risk || '';
+        let imgUrl = item.svg_url || item.image || '';
+        
+        let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
+        let qrBase64 = await generateQRCodeBase64(targetUrl);
+
+        if (i % 3 === 0) htmlContent += `<tr>`;
+
+        htmlContent += `
+            <td class="card-cell">
+                <table style="width:100%; border:none;">
+                    <tr>
+                        <td style="text-align:center; border:none; padding:0 5px;">
+                            ${imgUrl ? `<img src="${imgUrl}" class="img-box">` : '<span style="font-size:10px;">無圖示</span>'}
+                        </td>
+                        <td style="text-align:center; border:none; padding:0 5px;">
+                            ${qrBase64 ? `<img src="${qrBase64}" class="qr-box">` : ''}
+                        </td>
+                    </tr>
+                </table>
+                <div style="font-weight: bold; font-size: 13px; color: #007bff; margin-top: 6px;">${rowId}</div>
+                <div style="font-size: 11px; color: #333; margin: 2px 0;">${rowName}</div>
+                <div style="font-size: 10px; color: #666;">分類: ${rowCat}</div>
+                ${rowRisk ? `<div class="badge">風險: ${rowRisk}</div>` : ''}
+            </td>
+        `;
+
+        if (i % 3 === 2 || i === masterData.length - 1) {
+            // 補齊結尾格，確保表格版型不跑版
+            let remainder = 2 - (i % 3);
+            for (let r = 0; r < remainder; r++) {
+                htmlContent += `<td style="border:none; width: 33%;"></td>`;
+            }
+            htmlContent += `</tr>`;
+        }
+    }
+
+    htmlContent += `</table></body></html>`;
+
+    // 建立 Blob 並觸發 Word (.doc) 檔案下載
+    let blob = new Blob(['\ufeff' + htmlContent], {
+        type: 'application/msword'
+    });
+    
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement('a');
+    a.href = url;
+    a.download = `ISO7010_QRCodes_${new Date().toISOString().slice(0,10)}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    document.getElementById('status').innerText = `✅ 系統就緒 | Word 清冊匯出成功！`;
+}
+
+        
         // 支援透過 QR Code 掃描後的網址參數直接導向該標誌的評估頁面
         function checkUrlDirectEvaluation() {
             const urlParams = new URLSearchParams(window.location.search);
