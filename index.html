@@ -450,16 +450,24 @@ async function exportAllQRCodesWord() {
             document.getElementById(viewId).classList.add('active');
         }
 
-        function goBackToCategory() {
+        async function goBackToCategory() {
             currentCategory = null;
+            document.getElementById('searchInput').value = '';
+            
+            // 💡 加入非同步抓取最新資料，確保返回首頁時顯示最新狀態
+            document.getElementById('status').innerText = "⏳ 正在同步最新資料...";
+            await initPhase5(); 
+
             showView('categoryView');
             document.getElementById('backBtn').style.display = 'none';
-            document.getElementById('searchInput').value = '';
             renderCategoryGrid(masterData);
-            document.getElementById('status').innerText = `✅ 系統就緒 | 請選擇分類`;
         }
 
-        function goBackToDetail() {
+       async function goBackToDetail() {
+            // 💡 同樣在返回上一層時，先同步最新資料
+            document.getElementById('status').innerText = "⏳ 正在同步最新資料...";
+            await initPhase5();
+
             if (currentCategory) {
                 showView('detailView');
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
