@@ -886,8 +886,6 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
                 });
 
                 alert("🚫 已拒絕該變更請求。");
-                // 💡 關鍵：審批成功後，立即重新向 GAS 抓取最新資料並重新渲染畫面
-            await initPhase5();
                 getPendingList();
             } catch (e) {
                 alert("❌ 網路連線異常，操作失敗。");
