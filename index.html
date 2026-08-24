@@ -205,6 +205,7 @@
         let masterData = [];
         let currentFilteredData = [];
         let currentCategory = null;
+        let isDataDirty = false; // 追蹤資料是否需要重新載入
         
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
 
@@ -454,9 +455,14 @@ async function exportAllQRCodesWord() {
             currentCategory = null;
             document.getElementById('searchInput').value = '';
             
-            // 💡 加入非同步抓取最新資料，確保返回首頁時顯示最新狀態
-            document.getElementById('status').innerText = "⏳ 正在同步最新資料...";
-            await initPhase5(); 
+           // 💡 只有在資料有被更動過（isDataDirty === true）時，才去向 GAS 抓取最新資料！
+    if (isDataDirty) {
+        document.getElementById('status').innerText = "⏳ 偵測到資料變更，正在同步最新資料...";
+        await initPhase5();
+        isDataDirty = false; // 同步完成後重置旗標
+    } else {
+        document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
+    }
 
             showView('categoryView');
             document.getElementById('backBtn').style.display = 'none';
@@ -464,9 +470,12 @@ async function exportAllQRCodesWord() {
         }
 
        async function goBackToDetail() {
-            // 💡 同樣在返回上一層時，先同步最新資料
-            document.getElementById('status').innerText = "⏳ 正在同步最新資料...";
-            await initPhase5();
+            // 💡 同樣檢查是否有更動
+            if (isDataDirty) {
+        document.getElementById('status').innerText = "⏳ 偵測到資料變更，正在同步最新資料...";
+        await initPhase5();
+        isDataDirty = false;
+    }
 
             if (currentCategory) {
                 showView('detailView');
@@ -749,6 +758,7 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
                 });
 
                 alert("✅ [管理者] 7 大危害風險評估已成功儲存並覆寫！");
+                isDataDirty = true;
                 document.getElementById('status').innerText = `✅ 系統就緒 | 上次更新：ID ${rowId} (${rowRisk})`;
                 goBackToDetail();
             } catch (e) {
@@ -866,8 +876,7 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
                 });
 
                 alert("✅ 已核准並寫入主表！");
-                // 💡 關鍵：審批成功後，立即重新向 GAS 抓取最新資料並重新渲染畫面
-            await initPhase5();
+                isDataDirty = true;
                 getPendingList();
                 if (typeof initPhase5 === 'function') setTimeout(() => initPhase5(), 2000);
             } catch (e) {
