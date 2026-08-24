@@ -87,7 +87,7 @@
     <div class="toolbar">
         <button id="backBtn" onclick="goBackToCategory()" style="background: #6c757d; display: none;">⬅️ 返回分類首頁</button>
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
-        
+        <button class="action-btn" style="background: #20c997;" onclick="exportFilteredGridToWord()">📥 匯出搜尋結果 QR Code (Word)</button>
         <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
         <button onclick="exportAllQRCodesWord()" style="background: #6610f2; color: white;">📑 匯出全部 QRcode (Word)</button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
@@ -1054,6 +1054,174 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
             let fileName = `ISO7010_RiskEval_${new Date().toISOString().slice(0,10)}.xlsx`;
             XLSX.writeFile(workbook, fileName);
         }
+
+        async function exportFilteredGridToWord() {
+            // 抓取目前搜尋結果或當前分類的資料集（即第二層邏輯的資料來源）
+            let targetData = (typeof currentFilteredData !== 'undefined' && currentFilteredData.length > 0) ? currentFilteredData : masterData;
+
+            if (targetData.length === 0) {
+                alert("目前沒有可匯出的標誌資料！");
+                return;
+            }
+
+            document.getElementById('status').innerText = "正在產生搜尋結果的 QR Code 容器 Word 報告，請稍候...";
+
+            // 建立與第二層容器相符的 Word 專用 HTML 結構（表格化排版以確保 Word 內完美並排）
+            let htmlContent = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                <head>
+                    <meta charset="utf-8">
+                    <title>ISO 7010 搜尋結果與 QR Code 容器清單</title>
+                    <style>
+                        body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background-color: #fff; }
+                        .grid-table { width: 100%; border-collapse: collapse; }
+                        .sign-card-cell { 
+                            width: 33.33%; 
+                            padding: 10px; 
+                            vertical-align: top; 
+                        }
+                        .sign-card-box {
+                            border: 1px solid #ccc;
+                            border-radius: 8px;
+                            padding: 12px;
+                            background: #ffffff;
+                            height: 100%;
+                            box-sizing: border-box;
+                        }
+                        .sign-content-box {
+                            display: table;
+                            width: 100%;
+                            margin-bottom: 8px;
+                        }
+                        .sign-img-wrap {
+                            display: table-cell;
+                            width: 55px;
+                            height: 55px;
+                            vertical-align: middle;
+                            text-align: center;
+                            border: 1px solid #eee;
+                            background: #f9f9f9;
+                        }
+                        .sign-img-wrap img {
+                            max-width: 50px;
+                            max-height: 50px;
+                        }
+                        .qr-code-wrap {
+                            display: table-cell;
+                            width: 50px;
+                            height: 50px;
+                            vertical-align: middle;
+                            text-align: right;
+                        }
+                        .sign-badge {
+                            display: inline-block;
+                            padding: 2px 8px;
+                            font-size: 11px;
+                            font-weight: bold;
+                            color: #fff;
+                            background-color: #ffc107;
+                            border-radius: 4px;
+                            margin-top: 4px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h2 style="text-align: center; color: #333;">ISO 7010 搜尋結果標誌與 QR Code 清單</h2>
+                    <p style="text-align: center; color: #666; font-size: 12px;">匯出時間：${new Date().toLocaleString()} | 筆數：${targetData.length} 筆</p>
+                    <hr style="margin-bottom: 20px;">
+                    <table class="grid-table">
+            `;
+
+            // 以 3 個欄位一列的方式進行表格化排版，模擬畫面上的 Grid 容器
+            let cols = 3;
+            for (let i = 0; i < targetData.length; i++) {
+                if (i % cols === 0) htmlContent += '<tr>';
+
+                let item = targetData[i];
+                let rowId = item.id || item.ID || '';
+                let rowName = item.name || item.Name || '';
+                let rowRisk = item.risk || item.Risk || '';
+                let imgUrl = item.svg_url || item.image || '';
+                let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey || `${rowId}-${rowRisk}`);
+
+                // 產生專屬 QR Code Base64
+                let qrDataUrl = '';
+                try {
+                    qrDataUrl = await generateQrCodeDataUrl(targetUrl);
+                } catch (e) {
+                    console.error("QR Code 生成失敗", e);
+                }
+
+                let badgeHtml = rowRisk ? `<br><span class="sign-badge">${rowRisk}</span>` : '';
+
+                htmlContent += `
+                    <td class="sign-card-cell">
+                        <div class="sign-card-box">
+                            <div class="sign-content-box">
+                                <div class="sign-img-wrap">
+                                    ${imgUrl ? `<img src="${imgUrl}" crossorigin="anonymous">` : '<span style="font-size:10px;color:#888;">無圖示</span>'}
+                                </div>
+                                <div class="qr-code-wrap">
+                                    ${qrDataUrl ? `<img src="${qrDataUrl}" width="50" height="50">` : ''}
+                                </div>
+                            </div>
+                            <div style="font-weight: bold; font-size: 14px; color: #007bff; margin-top: 4px;">${rowId}</div>
+                            <div style="font-size: 12px; color: #333; margin: 4px 0; min-height: 28px;">${rowName}</div>
+                            ${badgeHtml}
+                        </div>
+                    </td>
+                `;
+
+                if (i % cols === cols - 1 || i === targetData.length - 1) {
+                    // 補齊不足的欄位避免表格變形
+                    let remaining = cols - (i % cols) - 1;
+                    for (let r = 0; r < remaining; r++) {
+                        htmlContent += `<td class="sign-card-cell"></td>`;
+                    }
+                    htmlContent += '</tr>';
+                }
+            }
+
+            htmlContent += `</table></body></html>`;
+
+            // 觸發 Word 檔案下載
+            let blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `ISO7010_FilteredGrid_${new Date().toISOString().slice(0,10)}.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            document.getElementById('status').innerText = "✅ 搜尋結果 QR Code 容器 Word 報告已成功匯出！";
+        }
+
+        // 輔助函式：動態轉換 QR Code 給 Word 使用
+        function generateQrCodeDataUrl(text) {
+            return new Promise((resolve) => {
+                let div = document.createElement('div');
+                new QRCode(div, {
+                    text: text,
+                    width: 50,
+                    height: 50,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.L
+                });
+                setTimeout(() => {
+                    let canvas = div.querySelector('canvas');
+                    if (canvas) {
+                        resolve(canvas.toDataURL("image/png"));
+                    } else {
+                        let img = div.querySelector('img');
+                        resolve(img ? img.src : '');
+                    }
+                }, 40);
+            });
+        }
+        
     </script>
 </body>
 </html>
