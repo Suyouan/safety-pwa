@@ -925,14 +925,24 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
 
             try {
                 document.getElementById('status').innerText = "⏳ 正在驗證管理員身分...";
-                let response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    // 注意：若 GAS 使用 fetch 且有回傳內容，建議調整 GAS 的回傳方式或確保能夠讀取。
-                    // 由於您原本使用 mode: 'no-cors' 會拿不到 response.json()，
-                    // 建議將驗證改用 GET 帶參數，或者使用以下方式：
-                });
+                let response = await fetch(`${GAS_URL}?action=verifyLogin&pwd=${encodeURIComponent(inputPwd)}`);
+                let result = await response.json();
+
+                if (result.status === "success") {
+                    isAdmin = true;
+                    sessionStorage.setItem('isAdmin', 'true');
+                    alert("管理員登入成功！");
+                    document.getElementById('adminModal').style.display = 'none';
+                    document.getElementById('pwdInput').value = '';
+                    updateAdminUI();
+                    openPendingModal();
+                } else {
+                    alert("密碼錯誤！");
+                    document.getElementById('status').innerText = "❌ 登入失敗";
+                }
             } catch (e) {
-                // 為了避開無 cors 限制，最簡單的做法是透過 doGet 進行安全密碼驗證：
+                console.error("登入驗證異常：", e);
+                alert("❌ 連線異常，無法驗證密碼。");
             }
         }
 
