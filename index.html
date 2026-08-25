@@ -459,7 +459,7 @@ async function exportAllQRCodesWord() {
 
             showView('categoryView');
             document.getElementById('backBtn').style.display = 'none';
-            renderCategoryGrid(masterData);
+           //更改此行，以免lag renderCategoryGrid(masterData);
         }
 
        async function goBackToDetail() {
@@ -468,7 +468,7 @@ async function exportAllQRCodesWord() {
             if (currentCategory) {
                 showView('detailView');
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
-                renderDetailGrid(filtered, currentCategory);
+              //更改此行，以免lag  renderDetailGrid(filtered, currentCategory);
             } else {
                 goBackToCategory();
             }
