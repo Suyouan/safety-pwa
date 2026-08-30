@@ -128,32 +128,24 @@
             <input type="hidden" id="evalUniqueKey">
             <table class="eval-table">
                 <tr>
-                    <td class="label-col">1. 發生頻率 (freq)</td>
-                    <td id="cell_freq" class="editable-cell" ondblclick="enableCellEdit('freq')" title="雙擊編輯">載入中...</td>
-                </tr>
-                <tr>
-                    <td class="label-col">2. 消除 (elim)</td>
+                    <td class="label-col">1. 消除 (elim)</td>
                     <td id="cell_elim" class="editable-cell" ondblclick="enableCellEdit('elim')" title="雙擊編輯">載入中...</td>
                 </tr>
                 <tr>
-                    <td class="label-col">3. 取代 (sub)</td>
+                    <td class="label-col">2. 取代 (sub)</td>
                     <td id="cell_sub" class="editable-cell" ondblclick="enableCellEdit('sub')" title="雙擊編輯">載入中...</td>
                 </tr>
                 <tr>
-                    <td class="label-col">4. 工程管制 (eng)</td>
+                    <td class="label-col">3. 工程管制 (eng)</td>
                     <td id="cell_eng" class="editable-cell" ondblclick="enableCellEdit('eng')" title="雙擊編輯">載入中...</td>
                 </tr>
                 <tr>
-                    <td class="label-col">5. 行政管制 (admin)</td>
+                    <td class="label-col">4. 行政管制 (admin)</td>
                     <td id="cell_admin" class="editable-cell" ondblclick="enableCellEdit('admin')" title="雙擊編輯">載入中...</td>
                 </tr>
                 <tr>
-                    <td class="label-col">6. 個人防護用具 (ppe)</td>
+                    <td class="label-col">5. 個人防護用具 (ppe)</td>
                     <td id="cell_ppe" class="editable-cell" ondblclick="enableCellEdit('ppe')" title="雙擊編輯">載入中...</td>
-                </tr>
-                <tr>
-                    <td class="label-col">7. 風險等級 (risk)</td>
-                    <td id="cell_risk" class="readonly-cell">唯讀</td>
                 </tr>
             </table>
         </div>
@@ -380,7 +372,6 @@ async function exportAllQRCodesWord() {
         let rowId = item.id || item.ID || '';
         let rowName = item.name || item.Name || '';
         let rowCat = item.category || item.Category || '';
-        let rowRisk = item.risk || item.Risk || '';
         let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
         
         let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
@@ -396,7 +387,6 @@ async function exportAllQRCodesWord() {
                 <div class="card-id">${rowId}</div>
                 <div class="card-name">${rowName}</div>
                 <div class="card-category">分類：${rowCat}</div>
-                ${rowRisk ? `<div><span class="badge">風險等級：${rowRisk}</span></div>` : ''}
             </div>
         `;
         printWindow.document.write(cardHtml);
@@ -485,8 +475,7 @@ async function exportAllQRCodesWord() {
                 if (result.status === "success") {
                     masterData = result.data.map(item => {
                         let rowId = item.id || item.ID || 'unknown';
-                        let rowRisk = item.risk || item.Risk || 'Normal';
-                        item.uniqueKey = `${rowId}-${rowRisk}`;
+                        item.uniqueKey = `${rowId}`;
                         return item;
                     });
                     
@@ -570,7 +559,6 @@ async function exportAllQRCodesWord() {
                 let card = document.createElement('div');
                 let rowId = item.id || item.ID || '';
                 let rowName = item.name || item.Name || '';
-                let rowRisk = item.risk || item.Risk || '';
                 let imgUrl = item.svg_url || item.image || '';
 
                 if (isWarning) {
@@ -581,8 +569,8 @@ async function exportAllQRCodesWord() {
                     card.className = 'sign-card';
                 }
 
-                let badgeHtml = rowRisk ? `<div class="sign-badge">${rowRisk}</div>` : '';
-                let deleteBtnHtml = isAdmin ? `<br><button class="action-btn" style="background:#dc3545; margin-top:8px;" onclick="event.stopPropagation(); deleteRow('${rowId}', '${rowRisk}')">刪除</button>` : '';
+                let badgeHtml = `<div class="sign-badge"></div>` : '';
+                let deleteBtnHtml = isAdmin ? `<br><button class="action-btn" style="background:#dc3545; margin-top:8px;" onclick="event.stopPropagation(); deleteRow('${rowId}')">刪除</button>` : '';
 
                 // 組合卡片內部 HTML，預留 qrcode 容器 div
                 card.innerHTML = `
@@ -624,16 +612,12 @@ async function exportAllQRCodesWord() {
             document.getElementById('evalUniqueKey').value = uniqueKey;
             document.getElementById('evalPageImg').src = item.svg_url || item.image || '';
             document.getElementById('evalPageTitle').innerText = item.name || item.Name || '安全標誌';
-            // 修改後（只顯示風險等級）
-document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk || item.Risk || 'Normal'}`;
 
-            document.getElementById('cell_freq').innerText = item.freq || item.Freq || '-';
             document.getElementById('cell_elim').innerText = item.elim || item.Elim || '-';
             document.getElementById('cell_sub').innerText = item.sub || item.Sub || '-';
             document.getElementById('cell_eng').innerText = item.eng || item.Eng || '-';
             document.getElementById('cell_admin').innerText = item.admin || item.Admin || '-';
             document.getElementById('cell_ppe').innerText = item.ppe || item.Ppe || '-';
-            document.getElementById('cell_risk').innerText = item.risk || item.Risk || '-';
 
             let hintText = document.getElementById('evalHintText');
             if (isAdmin) {
@@ -681,12 +665,10 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
                     document.getElementById('status').innerText = `⏳ 您的建議已送出，欄位 [${fieldKey}] 正等待管理員審批...`;
                     try {
                         let rowId = item ? (item.id || item.ID || '') : '';
-                        let rowRisk = item ? (item.risk || item.Risk || '') : '';
                         let updatePayload = {
                             action: 'submitPendingApproval',
                             uniqueKey: uniqueKey, // 👈 加上這一行
                             id: rowId,
-                            risk: rowRisk,
                             field: fieldKey,
                             value: newVal
                         };
@@ -717,14 +699,13 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
             if (!item) return;
 
             let rowId = item.id || item.ID || '';
-            let rowRisk = item.risk || item.Risk || '';
 
             let updatedData = {
     action: 'updateEvaluation',
     uniqueKey: uniqueKey, // 👈 加上這一行
     id: rowId,
-    risk: rowRisk,
-    freq: document.getElementById('cell_freq').innerText === '-' ? '' : document.getElementById('cell_freq').innerText,
+
+  
     elim: document.getElementById('cell_elim').innerText === '-' ? '' : document.getElementById('cell_elim').innerText,
     sub: document.getElementById('cell_sub').innerText === '-' ? '' : document.getElementById('cell_sub').innerText,
     eng: document.getElementById('cell_eng').innerText === '-' ? '' : document.getElementById('cell_eng').innerText,
@@ -732,7 +713,6 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
     ppe: document.getElementById('cell_ppe').innerText === '-' ? '' : document.getElementById('cell_ppe').innerText
 };
 
-            item.freq = updatedData.freq;
             item.elim = updatedData.elim;
             item.sub = updatedData.sub;
             item.eng = updatedData.eng;
@@ -748,7 +728,7 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
                 });
 
                 alert("✅ [管理者] 7 大危害風險評估已成功儲存並覆寫！");
-                document.getElementById('status').innerText = `✅ 系統就緒 | 上次更新：ID ${rowId} (${rowRisk})`;
+                document.getElementById('status').innerText = `✅ 系統就緒 | 上次更新：ID ${rowId}`;
                 goBackToDetail();
             } catch (e) {
                 console.error("儲存失敗：", e);
@@ -829,15 +809,14 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
                     html += `
                         <tr style="border-bottom: 1px solid #dee2e6;">
                             <td style="padding: 10px;">${item.id}</td>
-                            <td style="padding: 10px;">${item.risk || '-'}</td>
                             <td style="padding: 10px;">${item.field}</td>
                             <td style="padding: 10px;">${item.value}</td>
                             <td style="padding: 10px; text-align: center;">
-                                <button onclick="approvePendingItem('${item.id}', '${item.risk}', '${item.field}', '${item.value}')" 
+                                <button onclick="approvePendingItem('${item.id}', '${item.field}', '${item.value}')" 
                                         style="background: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; margin-right: 5px;">
                                     核准
                                 </button>
-                                <button onclick="rejectPendingItem('${item.id}', '${item.risk}', '${item.field}')" 
+                                <button onclick="rejectPendingItem('${item.id}', '${item.field}')" 
                                         style="background: #dc3545; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">
                                     拒絕
                                 </button>
@@ -854,14 +833,14 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
             }
         }
 
-        async function approvePendingItem(id, risk, field, value) {
+        async function approvePendingItem(id, field, value) {
             if (!confirm(`確定要核准 ID: ${id} (${field} -> ${value}) 嗎？`)) return;
 
             try {
                 await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify({ action: 'approvePending', id, risk, field, value })
+                    body: JSON.stringify({ action: 'approvePending', id, field, value })
                 });
 
                 alert("✅ 已核准並寫入主表！");
@@ -872,14 +851,14 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
             }
         }
 
-        async function rejectPendingItem(id, risk, field) {
+        async function rejectPendingItem(id, field) {
             if (!confirm(`確定要拒絕 ID: ${id} (${field}) 的變更請求嗎？`)) return;
 
             try {
                 await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify({ action: 'rejectPending', id, risk, field })
+                    body: JSON.stringify({ action: 'rejectPending', id, field })
                 });
 
                 alert("🚫 已拒絕該變更請求。");
@@ -971,15 +950,15 @@ document.getElementById('evalPageSub').innerText = `風險等級: ${item.risk ||
             document.getElementById('adminModal').style.display = 'none';
         }
 
-        async function deleteRow(id, risk) {
-            if (!confirm(`確定要刪除 ID: ${id} (${risk}) 嗎？此動作無法復原！`)) return;
+        async function deleteRow(id) {
+            if (!confirm(`確定要刪除 ID: ${id} 嗎？此動作無法復原！`)) return;
 
             try {
                 document.getElementById('status').innerText = "正在刪除資料...";
                 await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    body: JSON.stringify({ action: 'deleteRecord', id: id, risk: risk })
+                    body: JSON.stringify({ action: 'deleteRecord', id: id })
                 });
 
                 alert("已送出刪除請求，請稍候重新整理以同步試算表資料。");
@@ -1132,7 +1111,6 @@ async function exportFilteredCardsWord() {
         let item = targetData[i];
         let rowId = item.id || item.ID || '';
         let rowName = item.name || item.Name || '';
-        let rowRisk = item.risk || item.Risk || '';
         let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
         
         let cardHtml = `
@@ -1145,7 +1123,6 @@ async function exportFilteredCardsWord() {
                 </div>
                 <div class="card-id">${rowId}</div>
                 <div class="card-name">${rowName}</div>
-                ${rowRisk ? `<div><span class="badge">風險等級：${rowRisk}</span></div>` : ''}
             </div>
         `;
         printWindow.document.write(cardHtml);
@@ -1203,7 +1180,6 @@ async function exportFilteredCardsWord() {
                 category: newCat, 
                 name: newName, 
                 svg_url: newImg,
-                risk: 'Normal',
                 uniqueKey: `${newId}-Normal`
             };
             
@@ -1243,14 +1219,11 @@ async function exportFilteredCardsWord() {
                 "ID": item.id || item.ID || '',
                 "Category": item.category || item.Category || '',
                 "Name": item.name || item.Name || '',
-                "Freq": item.freq || item.Freq || '',
                 "Elim": item.elim || item.Elim || '',
                 "Sub": item.sub || item.Sub || '',
                 "Eng": item.eng || item.Eng || '',
                 "Admin": item.admin || item.Admin || '',
                 "Ppe": item.ppe || item.Ppe || '',
-                "Risk Level": item.risk || item.Risk || '',
-                "UniqueKey": item.uniqueKey || ''
             }));
 
             let worksheet = XLSX.utils.json_to_sheet(exportData);
