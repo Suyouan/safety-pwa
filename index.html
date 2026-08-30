@@ -569,7 +569,7 @@ async function exportAllQRCodesWord() {
                     card.className = 'sign-card';
                 }
 
-                let badgeHtml = `<div class="sign-badge"></div>` ;
+                let badgeHtml = `<div class="sign-badge"></div>`;
                 let deleteBtnHtml = isAdmin ? `<br><button class="action-btn" style="background:#dc3545; margin-top:8px;" onclick="event.stopPropagation(); deleteRow('${rowId}')">刪除</button>` : '';
 
                 // 組合卡片內部 HTML，預留 qrcode 容器 div
@@ -602,6 +602,8 @@ async function exportAllQRCodesWord() {
                         });
                     }
                 }, 50);
+            });
+        }
 
         function openEvalView(uniqueKey) {
             let item = masterData.find(d => d.uniqueKey === uniqueKey);
