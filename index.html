@@ -12,7 +12,7 @@
         body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
         h2 { user-select: none; display: inline-block; }
         .toolbar { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
-        input[type="text"], input[type="password"], input[type="number"] { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px; }
+        input[type="text"], input[type="password"], input[type="number"], input[type="datetime-local"] { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px; }
         button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background: #28a745; color: white; }
         button:hover { opacity: 0.9; }
         
@@ -52,6 +52,14 @@
         .quiz-question { font-weight: bold; margin-bottom: 10px; color: #0056b3; }
         .quiz-options label { display: block; background: #f8f9fa; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; cursor: pointer; }
         .quiz-options label:hover { background: #e2e6ea; }
+
+        /* 醒目限時考核按鈕閃爍動畫 */
+        @keyframes pulseAlert {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        .exam-alert-btn { background: #dc3545 !important; animation: pulseAlert 1.5s infinite; border: 2px solid #fff !important; }
     </style>
 </head>
 <body>
@@ -70,20 +78,28 @@
         </div>
     </div>
 
-    <!-- 測驗結算與交卷身分填寫 Modal -->
+    <!-- 正式考核身分驗證與作答彈窗 -->
+    <div id="examAuthModal" class="modal">
+        <div class="modal-content" style="text-align: center;">
+            <h3 id="examModalTitle">🎓 正式考核身分驗證</h3>
+            <p id="examModalDesc" style="font-size: 13px; color: #666; margin-bottom: 15px;"></p>
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="font-size: 12px; font-weight: bold;">員工工號：</label>
+                <input type="text" id="authEmpId" placeholder="例如: T12345" style="width: 90%; margin-bottom: 8px;"><br>
+                <label style="font-size: 12px; font-weight: bold;">員工姓名：</label>
+                <input type="text" id="authEmpName" placeholder="例如: 蘇宥安" style="width: 90%;">
+            </div>
+            <button onclick="verifyAndStartExam()" style="background: #28a745; width: 100%; margin-bottom: 8px;">開始正式作答</button>
+            <button onclick="document.getElementById('examAuthModal').style.display='none'" style="background: #6c757d; width: 100%;">取消</button>
+        </div>
+    </div>
+
+    <!-- 測驗結算 Modal -->
     <div id="quizResultModal" class="modal">
         <div class="modal-content" style="text-align: center;">
             <h3 id="quizResultTitle">🎓 測驗結算</h3>
             <p id="quizScoreText" style="font-size: 20px; font-weight: bold; color: #28a745; margin: 15px 0;"></p>
-            <div id="empInputArea" style="margin-bottom: 15px; text-align: left;">
-                <p style="font-size: 13px; color: #666;">若為正式考核，請填寫您的身分以便記錄成績：</p>
-                <label style="font-size: 12px;">員工工號：</label>
-                <input type="text" id="quizEmpId" placeholder="例如: T12345" style="width: 90%; margin-bottom: 8px;"><br>
-                <label style="font-size: 12px;">員工姓名：</label>
-                <input type="text" id="quizEmpName" placeholder="例如: 蘇宥安" style="width: 90%;">
-            </div>
-            <button id="submitScoreBtn" onclick="submitExamScore()" style="background: #28a745; width: 100%; margin-bottom: 8px;">提交考核成績</button>
-            <button onclick="document.getElementById('quizResultModal').style.display='none'; goBackToCategory();" style="background: #6c757d; width: 100%;">返回首頁</button>
+            <button onclick="document.getElementById('quizResultModal').style.display='none'; goBackToCategory();" style="background: #28a745; width: 100%;">完成並返回首頁</button>
         </div>
     </div>
 
@@ -104,7 +120,8 @@
         <button onclick="promptExportFilteredCards()" style="background: #e83e8c; color: white;">📑 匯出目前結果卡片 (Word/PDF)</button>
         <button onclick="exportAllQRCodesWord()" style="background: #6610f2; color: white;">📑 匯出全部 QRcode (Word)</button>
         <button onclick="startQuiz('practice')" style="background: #fd7e14; color: white;">📝 模擬小考</button>
-        <button onclick="startQuiz('exam')" style="background: #20c997; color: white;">🎓 正式考核</button>
+        <!-- 正式考核按鈕預設隱藏，待後端讀取到開放時間時動態顯示 -->
+        <button id="examBtn" onclick="openExamAuthModal()" style="display: none;"></button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
     </div>
@@ -191,6 +208,22 @@
             <div id="controlView" class="admin-only" style="display: none;">
                 <p style="color: green; font-weight: bold;">目前已獲得管理員權限</p>
                 <hr style="border:0; border-top:1px solid #ddd; margin: 10px 0;">
+                
+                <h4>🎯 發起與設定正式考試</h4>
+                <label style="font-size:11px; color:#666;">考試名稱</label>
+                <input type="text" id="adminExamTitle" placeholder="例如: 2026年度安衛正式考核" style="width: 93%; padding: 6px; margin-bottom: 6px;">
+                <label style="font-size:11px; color:#666;">開始時間</label>
+                <input type="datetime-local" id="adminExamStart" style="width: 93%; padding: 6px; margin-bottom: 6px;">
+                <label style="font-size:11px; color:#666;">結束時間</label>
+                <input type="datetime-local" id="adminExamEnd" style="width: 93%; padding: 6px; margin-bottom: 6px;">
+                <label style="font-size:11px; color:#666;">狀態開關</label>
+                <select id="adminExamStatus" style="width: 96%; padding: 6px; margin-bottom: 10px;">
+                    <option value="Active">啟用 (開放作答)</option>
+                    <option value="Inactive">關閉 (不開放)</option>
+                </select>
+                <button onclick="saveExamConfig()" style="width: 100%; margin-bottom: 12px; background: #28a745;">儲存考試設定</button>
+
+                <hr style="border:0; border-top:1px solid #ddd; margin: 10px 0;">
                 <h4>變更管理員密碼</h4>
                 <input type="password" id="oldPwd" placeholder="請輸入舊密碼" style="width: 93%; padding: 6px; margin-bottom: 5px;">
                 <input type="password" id="newPwd" placeholder="請輸入新密碼" style="width: 93%; padding: 6px; margin-bottom: 10px;">
@@ -220,34 +253,128 @@
     </div>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
+        const GAS_URL = "您的GAS部署網址"; 
         let masterData = [];
         let currentCategory = null;
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
         let currentQuizQuestions = [];
         let currentQuizMode = 'practice';
         let currentSingleItem = null;   
-        let currentFilteredData = [];   
+        let currentFilteredData = [];
+        let examConfigData = null;
+        let verifiedEmpId = "";
+        let verifiedEmpName = "";
 
         window.onload = function() {
             initPhase5();
+            checkExamAvailability();
             updateAdminUI();
             checkUrlDirectEvaluation();
         };
 
+        // 檢查正式考試是否在時間與狀態內
+        async function checkExamAvailability() {
+            try {
+                let res = await fetch(`${GAS_URL}?action=getExamConfig`);
+                let result = await res.json();
+                if (result.status === "success") {
+                    examConfigData = result.data;
+                    let examBtn = document.getElementById('examBtn');
+                    
+                    if (examConfigData.status === "Active") {
+                        let now = new Date();
+                        let start = examConfigData.startTime ? new Date(examConfigData.startTime) : null;
+                        let end = examConfigData.endTime ? new Date(examConfigData.endTime) : null;
+
+                        let isRunning = true;
+                        if (start && now < start) isRunning = false;
+                        if (end && now > end) isRunning = false;
+
+                        if (isRunning) {
+                            examBtn.style.display = 'inline-block';
+                            examBtn.className = 'exam-alert-btn';
+                            examBtn.innerText = `🔥 進行中：${examConfigData.title}`;
+                        } else {
+                            examBtn.style.display = 'none';
+                        }
+                    } else {
+                        examBtn.style.display = 'none';
+                    }
+                }
+            } catch (e) {
+                console.error("檢查考試設定失敗", e);
+            }
+        }
+
+        function openExamAuthModal() {
+            document.getElementById('authEmpId').value = '';
+            document.getElementById('authEmpName').value = '';
+            document.getElementById('examModalTitle').innerText = `🎓 ${examConfigData.title || '正式考核'}`;
+            document.getElementById('examModalDesc').innerText = `請填寫您的工號進行身分驗證。系統規定每位員工僅能正式作答一次！`;
+            document.getElementById('examAuthModal').style.display = 'block';
+        }
+
+        async function verifyAndStartExam() {
+            let empId = document.getElementById('authEmpId').value.trim();
+            let empName = document.getElementById('authEmpName').value.trim();
+
+            if (!empId || !empName) {
+                alert("請完整填寫工號與姓名！");
+                return;
+            }
+
+            document.getElementById('status').innerText = "⏳ 正在驗證您的作答資格...";
+            try {
+                let res = await fetch(`${GAS_URL}?action=checkExamAttempt&empId=${encodeURIComponent(empId)}`);
+                let result = await res.json();
+
+                if (result.status === "success") {
+                    if (result.hasAttempted) {
+                        alert(`⚠️ 驗證失敗：工號 [${empId}] 已經完成過本次正式考核，系統規定只能作答一次！`);
+                        document.getElementById('status').innerText = `❌ 重複作答已被阻擋`;
+                        return;
+                    }
+                    
+                    verifiedEmpId = empId;
+                    verifiedEmpName = empName;
+                    document.getElementById('examAuthModal').style.display = 'none';
+                    document.getElementById('status').innerText = `✅ 驗證成功，開始正式考試`;
+                    startQuiz('exam');
+                } else {
+                    alert("驗證異常，請稍後再試。");
+                }
+            } catch (e) {
+                alert("❌ 網路連線異常，無法驗證身分。");
+            }
+        }
+
+        async function saveExamConfig() {
+            let title = document.getElementById('adminExamTitle').value.trim();
+            let start = document.getElementById('adminExamStart').value;
+            let end = document.getElementById('adminExamEnd').value;
+            let status = document.getElementById('adminExamStatus').value;
+
+            if (!title) { alert("請輸入考試名稱"); return; }
+
+            try {
+                await fetch(GAS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'saveExamConfig', examTitle: title, startTime: start, endTime: end, status: status })
+                });
+                alert("✅ 正式考試設定已成功儲存！");
+                document.getElementById('adminModal').style.display = 'none';
+                checkExamAvailability();
+            } catch (e) {
+                alert("❌ 儲存失敗，請檢查網路連線。");
+            }
+        }
+
         async function exportAllQRCodesWord() {
-            if (masterData.length === 0) {
-                alert("目前沒有可匯出的資料！");
-                return;
-            }
-
+            if (masterData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
             document.getElementById('status').innerText = "⏳ 正在產生所有標誌的圖形與 QR Code 清冊...";
-
             let printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                alert("請允許彈出視窗以檢視匯出清冊！");
-                return;
-            }
+            if (!printWindow) { alert("請允許彈出視窗以檢視匯出清冊！"); return; }
 
             let htmlContent = `
                 <!DOCTYPE html>
@@ -277,53 +404,34 @@
                     <div class="print-btn-bar"><button class="print-btn" onclick="window.print()">🖨️ 列印清冊 / 存成 PDF</button></div>
                     <div class="grid-container">
             `;
-
             printWindow.document.write(htmlContent);
-
             for (let i = 0; i < masterData.length; i++) {
                 let item = masterData[i];
-                let rowId = item.id || item.ID || '';
-                let rowName = item.name || item.Name || '';
-                let rowCat = item.category || item.Category || '';
-                let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
-                
                 printWindow.document.write(`
                     <div class="card">
                         <div class="content-row">
-                            <div>${imgUrl ? `<img src="${imgUrl}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}</div>
+                            <div>${item.svg_url ? `<img src="${item.svg_url}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}</div>
                             <div id="qrcode-${i}"></div>
                         </div>
-                        <div class="card-id">${rowId}</div>
-                        <div class="card-name">${rowName}</div>
-                        <div class="card-category">分類：${rowCat}</div>
+                        <div class="card-id">${item.id || item.ID || ''}</div>
+                        <div class="card-name">${item.name || item.Name || ''}</div>
+                        <div class="card-category">分類：${item.category || item.Category || ''}</div>
                     </div>
                 `);
             }
-
             printWindow.document.write(`</div></body></html>`);
             printWindow.document.close();
-
             printWindow.onload = function() {
                 for (let i = 0; i < masterData.length; i++) {
-                    let item = masterData[i];
-                    let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
+                    let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(masterData[i].uniqueKey);
                     let qrContainer = printWindow.document.getElementById(`qrcode-${i}`);
                     if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
-                        new printWindow.QRCode(qrContainer, {
-                            text: targetUrl, width: 75, height: 75, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L
-                        });
+                        new printWindow.QRCode(qrContainer, { text: targetUrl, width: 75, height: 75, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L });
                     }
                 }
             };
-
             let scripts = document.querySelectorAll('script');
-            scripts.forEach(s => {
-                if (s.src && s.src.includes('qrcode')) {
-                    let sTag = printWindow.document.createElement('script');
-                    sTag.src = s.src;
-                    printWindow.document.head.appendChild(sTag);
-                }
-            });
+            scripts.forEach(s => { if (s.src && s.src.includes('qrcode')) { let sTag = printWindow.document.createElement('script'); sTag.src = s.src; printWindow.document.head.appendChild(sTag); } });
             document.getElementById('status').innerText = `✅ 清冊頁面已成功開啟！`;
         }
 
@@ -348,18 +456,10 @@
                 targetData = masterData;
             }
             
-            if (targetData.length === 0) {
-                alert("目前沒有可匯出的卡片資料！");
-                return;
-            }
-
+            if (targetData.length === 0) { alert("目前沒有可匯出的卡片資料！"); return; }
             document.getElementById('status').innerText = `⏳ 正在產生目前結果卡片清冊 (倍數 x${multiplier})...`;
-
             let printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                alert("請允許彈出視窗以檢視匯出清冊！");
-                return;
-            }
+            if (!printWindow) { alert("請允許彈出視窗以檢視匯出清冊！"); return; }
 
             let htmlContent = `
                 <!DOCTYPE html>
@@ -388,69 +488,50 @@
                     <div class="print-btn-bar"><button class="print-btn" onclick="window.print()">🖨️ 列印 / 另存為 PDF</button></div>
                     <div class="grid-container">
             `;
-
             printWindow.document.write(htmlContent);
 
             let renderIndex = 0;
             for (let m = 0; m < multiplier; m++) {
                 for (let i = 0; i < targetData.length; i++) {
                     let item = targetData[i];
-                    let rowId = item.id || item.ID || '';
-                    let rowName = item.name || item.Name || '';
-                    let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
-                    
                     printWindow.document.write(`
                         <div class="card">
                             <div class="content-row">
-                                <div>${imgUrl ? `<img src="${imgUrl}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}</div>
+                                <div>${item.svg_url ? `<img src="${item.svg_url}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}</div>
                                 <div id="export-qr-${renderIndex}"></div>
                             </div>
-                            <div class="card-id">${rowId}</div>
-                            <div class="card-name">${rowName}</div>
+                            <div class="card-id">${item.id || item.ID || ''}</div>
+                            <div class="card-name">${item.name || item.Name || ''}</div>
                         </div>
                     `);
                     renderIndex++;
                 }
             }
-
             printWindow.document.write(`</div></body></html>`);
             printWindow.document.close();
-
             printWindow.onload = function() {
                 let curIdx = 0;
                 for (let m = 0; m < multiplier; m++) {
                     for (let i = 0; i < targetData.length; i++) {
-                        let item = targetData[i];
-                        let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
+                        let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(targetData[i].uniqueKey);
                         let qrContainer = printWindow.document.getElementById(`export-qr-${curIdx}`);
                         if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
-                            new printWindow.QRCode(qrContainer, {
-                                text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L
-                            });
+                            new printWindow.QRCode(qrContainer, { text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L });
                         }
                         curIdx++;
                     }
                 }
             };
-
             let scripts = document.querySelectorAll('script');
-            scripts.forEach(s => {
-                if (s.src && s.src.includes('qrcode')) {
-                    let sTag = printWindow.document.createElement('script');
-                    sTag.src = s.src;
-                    printWindow.document.head.appendChild(sTag);
-                }
-            });
+            scripts.forEach(s => { if (s.src && s.src.includes('qrcode')) { let sTag = printWindow.document.createElement('script'); sTag.src = s.src; printWindow.document.head.appendChild(sTag); } });
             document.getElementById('status').innerText = `✅ 目前結果卡片清冊已成功開啟！`;
         }
 
-        // 📥 匯出全部 Excel
         function exportAllExcel() {
             if (masterData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
             generateExcelFile(masterData, `SafetyMindset_All_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
-        // 📥 匯出目前結果 Excel
         function exportFilteredExcel() {
             let targetData = [];
             let isEvalViewActive = document.getElementById('evalView').classList.contains('active');
@@ -463,21 +544,14 @@
             } else {
                 targetData = masterData;
             }
-
             if (targetData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
             generateExcelFile(targetData, `SafetyMindset_Filtered_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
         function generateExcelFile(dataArray, fileName) {
             let exportData = dataArray.map(item => ({
-                "ID": item.id || item.ID || '', 
-                "Category": item.category || item.Category || '', 
-                "Name": item.name || item.Name || '',
-                "Elim": item.elim || item.Elim || '', 
-                "Sub": item.sub || item.Sub || '', 
-                "Eng": item.eng || item.Eng || '', 
-                "Admin": item.admin || item.Admin || '', 
-                "Ppe": item.ppe || item.Ppe || ''
+                "ID": item.id || item.ID || '', "Category": item.category || item.Category || '', "Name": item.name || item.Name || '',
+                "Elim": item.elim || item.Elim || '', "Sub": item.sub || item.Sub || '', "Eng": item.eng || item.Eng || '', "Admin": item.admin || item.Admin || '', "Ppe": item.ppe || item.Ppe || ''
             }));
             let worksheet = XLSX.utils.json_to_sheet(exportData);
             let workbook = XLSX.utils.book_new();
@@ -488,9 +562,7 @@
         function checkUrlDirectEvaluation() {
             const urlParams = new URLSearchParams(window.location.search);
             const targetKey = urlParams.get('evalKey');
-            if (targetKey && masterData.length > 0) {
-                openEvalView(targetKey);
-            }
+            if (targetKey && masterData.length > 0) { openEvalView(targetKey); }
         }
 
         function showView(viewId) {
@@ -499,9 +571,7 @@
         }
 
         function goBackToCategory() {
-            currentCategory = null;
-            currentSingleItem = null;
-            currentFilteredData = [];
+            currentCategory = null; currentSingleItem = null; currentFilteredData = [];
             document.getElementById('searchInput').value = '';
             showView('categoryView');
             document.getElementById('backBtn').style.display = 'none';
@@ -513,9 +583,7 @@
                 showView('detailView');
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
                 renderDetailGrid(filtered, currentCategory);
-            } else {
-                goBackToCategory();
-            }
+            } else { goBackToCategory(); }
         }
 
         async function initPhase5() {
@@ -523,14 +591,12 @@
                 document.getElementById('status').innerText = "正在向 GAS 發送請求...";
                 let response = await fetch(GAS_URL);
                 let result = await response.json();
-                
                 if (result.status === "success") {
                     masterData = result.data.map(item => {
                         let rowId = item.id || item.ID || 'unknown';
                         item.uniqueKey = `${rowId}`;
                         return item;
                     });
-                    
                     renderCategoryGrid(masterData);
                     document.getElementById('status').innerText = `✅ 系統就緒 | 總筆數：${masterData.length} 筆`;
                     checkUrlDirectEvaluation();
@@ -538,7 +604,6 @@
                     document.getElementById('status').innerText = "❌ 載入失敗：" + result.message;
                 }
             } catch (error) {
-                console.error("連線錯誤：", error);
                 document.getElementById('status').innerText = "❌ 網路連線異常，請檢查 GAS 部署網址。";
             }
         }
@@ -546,34 +611,20 @@
         function renderCategoryGrid(data) {
             let gridContainer = document.getElementById('categoryGridContainer');
             gridContainer.innerHTML = '';
-
             let categoriesMap = {};
             data.forEach(item => {
                 let cat = String(item.category || item.Category || '未分類').trim();
-                if (!categoriesMap[cat]) {
-                    categoriesMap[cat] = item;
-                }
+                if (!categoriesMap[cat]) { categoriesMap[cat] = item; }
             });
-
             let cats = Object.keys(categoriesMap);
-            if (cats.length === 0) {
-                gridContainer.innerHTML = `<p style="color: #888;">目前無任何分類資料</p>`;
-                return;
-            }
+            if (cats.length === 0) { gridContainer.innerHTML = `<p style="color: #888;">目前無任何分類資料</p>`; return; }
 
             cats.forEach(cat => {
-                let representativeItem = categoriesMap[cat];
-                let imgUrl = representativeItem.svg_url || representativeItem.image || '';
-                let repName = representativeItem.name || representativeItem.Name || cat;
-
+                let rep = categoriesMap[cat];
                 let card = document.createElement('div');
                 card.className = 'category-card';
                 card.onclick = () => selectCategory(cat);
-                card.innerHTML = `
-                    <img src="${imgUrl}">
-                    <h3>${cat}</h3>
-                    <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">代表：${repName}</p>
-                `;
+                card.innerHTML = `<img src="${rep.svg_url || rep.image || ''}"><h3>${cat}</h3><p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">代表：${rep.name || rep.Name || cat}</p>`;
                 gridContainer.appendChild(card);
             });
         }
@@ -583,7 +634,6 @@
             showView('detailView');
             document.getElementById('backBtn').style.display = 'inline-block';
             document.getElementById('detailCategoryTitle').innerText = `📁 分類明細：${catName}`;
-
             let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === catName);
             renderDetailGrid(filtered, catName);
         }
@@ -592,37 +642,28 @@
             currentFilteredData = data; 
             let gridContainer = document.getElementById('signGridContainer');
             gridContainer.innerHTML = '';
-            
-            let hintEl = document.getElementById('detailHint');
-            hintEl.innerText = "💡 提示：點擊卡片即可進入第三層進行 7 大危害風險評估。";
+            document.getElementById('detailHint').innerText = "💡 提示：點擊卡片即可進入第三層進行 7 大危害風險評估。";
 
-            if (data.length === 0) {
-                gridContainer.innerHTML = `<p style="color: #888;">找不到符合條件的資料</p>`;
-                return;
-            }
+            if (data.length === 0) { gridContainer.innerHTML = `<p style="color: #888;">找不到符合條件的資料</p>`; return; }
 
             data.forEach((item, index) => {
                 let card = document.createElement('div');
-                let rowId = item.id || item.ID || '';
-                let rowName = item.name || item.Name || '';
-                let imgUrl = item.svg_url || item.image || '';
-
-                // 👈 修正：只要有資料，無論是分類明細還是搜尋結果，全部支援點擊進入第三層評估
                 card.className = 'sign-card clickable';
                 card.onclick = () => openEvalView(item.uniqueKey);
                 card.title = "點擊進入 7 大危害風險評估頁面";
 
+                let rowId = item.id || item.ID || '';
                 let deleteBtnHtml = isAdmin ? `<br><button class="action-btn" style="background:#dc3545; margin-top:8px;" onclick="event.stopPropagation(); deleteRow('${rowId}')">刪除</button>` : '';
 
                 card.innerHTML = `
                     <div class="sign-content-box">
                         <div class="sign-img-wrap">
-                            ${imgUrl ? `<img src="${imgUrl}">` : '<div style="height:55px; line-height:55px;">無圖示</div>'}
+                            ${item.svg_url ? `<img src="${item.svg_url}">` : '<div style="height:55px; line-height:55px;">無圖示</div>'}
                         </div>
                         <div class="qr-code-wrap" id="qrcode_${index}_${rowId}"></div>
                     </div>
                     <div style="font-weight: bold; font-size: 14px; color: #007bff;">${rowId}</div>
-                    <div style="font-size: 13px; color: #333; margin: 4px 0;">${rowName}</div>
+                    <div style="font-size: 13px; color: #333; margin: 4px 0;">${item.name || item.Name || ''}</div>
                     ${deleteBtnHtml}
                 `;
                 gridContainer.appendChild(card);
@@ -631,9 +672,7 @@
                     let qrContainer = document.getElementById(`qrcode_${index}_${rowId}`);
                     if (qrContainer && qrContainer.innerHTML === "") {
                         let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
-                        new QRCode(qrContainer, {
-                            text: targetUrl, width: 50, height: 50, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
-                        });
+                        new QRCode(qrContainer, { text: targetUrl, width: 50, height: 50, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
                     }
                 }, 50);
             });
@@ -651,9 +690,7 @@
             let qrBox = document.getElementById('evalPageQrContainer');
             qrBox.innerHTML = '';
             let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
-            new QRCode(qrBox, {
-                text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
-            });
+            new QRCode(qrBox, { text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
 
             document.getElementById('cell_elim').innerText = item.elim || item.Elim || '-';
             document.getElementById('cell_sub').innerText = item.sub || item.Sub || '-';
@@ -662,11 +699,7 @@
             document.getElementById('cell_ppe').innerText = item.ppe || item.Ppe || '-';
 
             let hintText = document.getElementById('evalHintText');
-            if (isAdmin) {
-                hintText.innerText = "💡 [管理者模式] 雙擊欄位可直接編輯並儲存更新。";
-            } else {
-                hintText.innerText = "💡 [一般檢視] 雙擊欄位可輸入新資訊（送出後進入後台等待管理員審批）。";
-            }
+            hintText.innerText = isAdmin ? "💡 [管理者模式] 雙擊欄位可直接編輯並儲存更新。" : "💡 [一般檢視] 雙擊欄位可輸入新資訊（送出後進入後台等待管理員審批）。";
 
             showView('evalView');
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -675,11 +708,8 @@
         function enableCellEdit(fieldKey) {
             let cell = document.getElementById(`cell_${fieldKey}`);
             if (cell.querySelector('input')) return;
-
             let originalVal = cell.innerText === '-' ? '' : cell.innerText;
-            let defaultInputVal = isAdmin ? originalVal : '';
-            cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="${defaultInputVal}" placeholder="請輸入新資訊..." style="width: 90%; padding: 4px;" autofocus>`;
-            
+            cell.innerHTML = `<input type="text" id="input_${fieldKey}" value="${isAdmin ? originalVal : ''}" placeholder="請輸入新資訊..." style="width: 90%; padding: 4px;" autofocus>`;
             let inputEl = document.getElementById(`input_${fieldKey}`);
             let isCommitted = false;
             
@@ -687,12 +717,7 @@
                 if (isCommitted) return;
                 isCommitted = true;
                 let newVal = inputEl.value.trim();
-
-                if (!newVal && !isAdmin) {
-                    cell.innerText = originalVal || '-';
-                    return;
-                }
-
+                if (!newVal && !isAdmin) { cell.innerText = originalVal || '-'; return; }
                 let uniqueKey = document.getElementById('evalUniqueKey').value;
                 let item = masterData.find(d => d.uniqueKey === uniqueKey);
 
@@ -700,11 +725,8 @@
                     cell.innerText = newVal || '-';
                     if (item) { item[fieldKey] = newVal; }
                     try {
-                        let rowId = item ? (item.id || item.ID || '') : '';
                         let updatePayload = {
-                            action: 'updateEvaluation',
-                            uniqueKey: uniqueKey,
-                            id: rowId,
+                            action: 'updateEvaluation', uniqueKey: uniqueKey, id: item ? (item.id || item.ID || '') : '',
                             elim: document.getElementById('cell_elim').innerText === '-' ? '' : document.getElementById('cell_elim').innerText,
                             sub: document.getElementById('cell_sub').innerText === '-' ? '' : document.getElementById('cell_sub').innerText,
                             eng: document.getElementById('cell_eng').innerText === '-' ? '' : document.getElementById('cell_eng').innerText,
@@ -713,55 +735,35 @@
                         };
                         await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(updatePayload) });
                         alert("✅ [管理者] 評估資料已成功更新至雲端！");
-                    } catch (e) {
-                        alert("❌ 網路連線異常，更新失敗。");
-                    }
+                    } catch (e) { alert("❌ 更新失敗。"); }
                 } else {
                     cell.innerText = originalVal || '-';
                     try {
-                        let rowId = item ? (item.id || item.ID || '') : '';
-                        let updatePayload = {
-                            action: 'submitPendingApproval', uniqueKey: uniqueKey, id: rowId, field: fieldKey, value: newVal
-                        };
+                        let updatePayload = { action: 'submitPendingApproval', uniqueKey: uniqueKey, id: item ? (item.id || item.ID || '') : '', field: fieldKey, value: newVal };
                         await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(updatePayload) });
                         alert("✅ 您的修改已送出，目前已進入後台等待管理員審批！");
-                    } catch (e) {
-                        alert("❌ 審批送出失敗，請檢查網路連線。");
-                    }
+                    } catch (e) { alert("❌ 審批送出失敗。"); }
                 }
             }
-
             inputEl.onblur = commitEdit;
             inputEl.onkeydown = function(e) { if (e.key === 'Enter') { commitEdit(); } };
         }
 
-        // ================= 互動考題制度功能 =================
+        // ================= 互動考題制度 =================
         function startQuiz(mode) {
-            if (masterData.length < 4) {
-                alert("資料庫中的標誌數量不足 4 筆，無法自動產生選擇題測驗！");
-                return;
-            }
+            if (masterData.length < 4) { alert("資料庫中的標誌數量不足 4 筆，無法自動產生選擇題！"); return; }
             currentQuizMode = mode;
-            document.getElementById('quizHeaderTitle').innerText = (mode === 'practice') ? "📝 模擬小考 (自主練習)" : "🎓 正式考核";
+            document.getElementById('quizHeaderTitle').innerText = (mode === 'practice') ? "📝 模擬小考 (自主練習)" : `🎓 正式考核：${examConfigData ? examConfigData.title : ''}`;
             
             let shuffled = [...masterData].sort(() => 0.5 - Math.random());
             let selectedItems = shuffled.slice(0, Math.min(5, shuffled.length));
             
-            currentQuizQuestions = selectedItems.map((item, qIdx) => {
+            currentQuizQuestions = selectedItems.map((item) => {
                 let correctName = item.name || item.Name || '未知標誌';
-                let imgUrl = item.svg_url || item.image || '';
-                
                 let wrongPool = masterData.filter(d => (d.name || d.Name) !== correctName);
                 let shuffledWrong = wrongPool.sort(() => 0.5 - Math.random()).slice(0, 3);
                 let options = [correctName, ...shuffledWrong.map(w => w.name || w.Name)].sort(() => 0.5 - Math.random());
-                
-                return {
-                    id: item.id || item.ID,
-                    imgUrl: imgUrl,
-                    questionText: `請問代號 [${item.id || item.ID}] 的安全標誌代表下列何種含義？`,
-                    options: options,
-                    correctAnswer: correctName
-                };
+                return { id: item.id || item.ID, imgUrl: item.svg_url || item.image || '', questionText: `請問代號 [${item.id || item.ID}] 的安全標誌代表下列何種含義？`, options: options, correctAnswer: correctName };
             });
 
             renderQuizUI();
@@ -771,89 +773,38 @@
         function renderQuizUI() {
             let area = document.getElementById('quizContentArea');
             area.innerHTML = '';
-
             currentQuizQuestions.forEach((q, idx) => {
-                let qDiv = document.createElement('div');
-                qDiv.style.marginBottom = "25px";
-                qDiv.style.paddingBottom = "15px";
-                qDiv.style.borderBottom = "1px solid #eee";
-                
                 let optionsHtml = '';
-                q.options.forEach((opt, oIdx) => {
-                    optionsHtml += `
-                        <label>
-                            <input type="radio" name="q_${idx}" value="${escapeHtml(opt)}" style="margin-right:8px;">
-                            ${opt}
-                        </label>
-                    `;
+                q.options.forEach(opt => {
+                    optionsHtml += `<label><input type="radio" name="q_${idx}" value="${opt.replace(/"/g, '&quot;')}" style="margin-right:8px;">${opt}</label>`;
                 });
-
-                qDiv.innerHTML = `
-                    <div class="quiz-question">第 ${idx + 1} 題：${q.questionText}</div>
-                    ${q.imgUrl ? `<div style="margin:10px 0;"><img src="${q.imgUrl}" width="60" height="60" style="object-fit:contain; border:1px solid #ddd; padding:3px; background:#fff;"></div>` : ''}
-                    <div class="quiz-options">${optionsHtml}</div>
-                `;
+                let qDiv = document.createElement('div');
+                qDiv.style.marginBottom = "25px"; qDiv.style.paddingBottom = "15px"; qDiv.style.borderBottom = "1px solid #eee";
+                qDiv.innerHTML = `<div class="quiz-question">第 ${idx + 1} 題：${q.questionText}</div>${q.imgUrl ? `<div style="margin:10px 0;"><img src="${q.imgUrl}" width="60" height="60" style="object-fit:contain; border:1px solid #ddd; padding:3px; background:#fff;"></div>` : ''}<div class="quiz-options">${optionsHtml}</div>`;
                 area.appendChild(qDiv);
             });
         }
 
-        function escapeHtml(text) {
-            return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        }
-
-        function submitQuizAnswers() {
+        async function submitQuizAnswers() {
             let score = 0;
             let total = currentQuizQuestions.length;
-            
             currentQuizQuestions.forEach((q, idx) => {
                 let selected = document.querySelector(`input[name="q_${idx}"]:checked`);
-                if (selected && selected.value === q.correctAnswer) {
-                    score += (100 / total);
-                }
+                if (selected && selected.value === q.correctAnswer) { score += (100 / total); }
             });
-
             score = Math.round(score);
-            let resultModal = document.getElementById('quizResultModal');
-            let empArea = document.getElementById('empInputArea');
-            let titleEl = document.getElementById('quizResultTitle');
-            let scoreText = document.getElementById('quizScoreText');
 
             if (currentQuizMode === 'exam') {
-                titleEl.innerText = "🎓 正式考核已完成";
-                scoreText.innerText = `您的測驗得分：${score} 分`;
-                empArea.style.display = 'block';
-            } else {
-                titleEl.innerText = "📝 模擬小考成績";
-                scoreText.innerText = `自主練習得分：${score} 分`;
-                empArea.style.display = 'none';
-            }
-            resultModal.style.display = 'block';
-        }
-
-        async function submitExamScore() {
-            let empId = document.getElementById('quizEmpId').value.trim();
-            let empName = document.getElementById('quizEmpName').value.trim();
-            let scoreStr = document.getElementById('quizScoreText').innerText;
-
-            if (!empId || !empName) {
-                alert("請完整輸入您的「員工工號」與「員工姓名」！");
-                return;
+                try {
+                    let payload = { action: 'submitQuizResult', empId: verifiedEmpId, empName: verifiedEmpName, score: `${score} 分` };
+                    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                    alert("✅ 正式考核成績已成功上傳並記錄！");
+                } catch (e) { alert("❌成績上傳失敗"); }
             }
 
-            try {
-                let payload = {
-                    action: 'submitQuizResult',
-                    empId: empId,
-                    empName: empName,
-                    score: scoreStr
-                };
-                await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-                alert("✅ 成績已成功送出並記錄至雲端！");
-                document.getElementById('quizResultModal').style.display = 'none';
-                goBackToCategory();
-            } catch (e) {
-                alert("❌ 成績上傳失敗，請檢查網路連線。");
-            }
+            document.getElementById('quizResultTitle').innerText = (currentQuizMode === 'exam') ? "🎓 正式考核已完成" : "📝 模擬小考成績";
+            document.getElementById('quizScoreText').innerText = `您的測驗得分：${score} 分`;
+            document.getElementById('quizResultModal').style.display = 'block';
         }
         // ====================================================
 
@@ -863,12 +814,9 @@
                 if (currentCategory) {
                     let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
                     renderDetailGrid(filtered, currentCategory);
-                } else {
-                    renderCategoryGrid(masterData);
-                }
+                } else { renderCategoryGrid(masterData); }
                 return;
             }
-
             showView('detailView');
             document.getElementById('backBtn').style.display = 'inline-block';
             document.getElementById('detailCategoryTitle').innerText = `🔍 搜尋結果：「${keyword}」`;
@@ -892,12 +840,7 @@
                 container.innerHTML = "<p>正在載入待審批清單...</p>";
                 let response = await fetch(`${GAS_URL}?action=getPendingList`);
                 let result = await response.json();
-                
-                if (result.status !== "success" || !result.data || result.data.length === 0) {
-                    container.innerHTML = "<p>目前沒有需要審批的變更資料。</p>";
-                    return;
-                }
-                
+                if (result.status !== "success" || !result.data || result.data.length === 0) { container.innerHTML = "<p>目前沒有需要審批的變更資料。</p>"; return; }
                 let html = `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;"><th style="padding: 10px;">ID</th><th style="padding: 10px;">欄位</th><th style="padding: 10px;">變更值</th><th style="padding: 10px; text-align: center;">操作</th></tr></thead><tbody>`;
                 result.data.forEach(item => {
                     html += `<tr style="border-bottom: 1px solid #dee2e6;"><td style="padding: 10px;">${item.id}</td><td style="padding: 10px;">${item.field}</td><td style="padding: 10px;">${item.value}</td><td style="padding: 10px; text-align: center;"><button onclick="approvePendingItem('${item.id}', '${item.field}', '${item.value}')" style="background: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; margin-right: 5px;">核准</button><button onclick="rejectPendingItem('${item.id}', '${item.field}')" style="background: #dc3545; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">拒絕</button></td></tr>`;
