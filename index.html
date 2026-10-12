@@ -225,7 +225,8 @@
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
         let currentQuizQuestions = [];
         let currentQuizMode = 'practice';
-        let currentSingleItem = null; // 👈 記錄目前在第三層正在檢視的單張卡片
+        let currentSingleItem = null;   // 記錄目前在第三層正在檢視的單張卡片
+        let currentFilteredData = [];   // 👈 記錄目前畫面上過濾出來的清單（分類明細或搜尋結果）
 
         window.onload = function() {
             initPhase5();
@@ -336,14 +337,19 @@
         async function exportFilteredCardsWord(multiplier) {
             let targetData = [];
             
-            // 👈 關鍵修正：判斷目前是否在第三層詳情頁面
+            // 👈 精準判斷目前層級：
+            // 1. 若在第三層詳情頁：只匯出該單張卡片
+            // 2. 若在第二層分類或搜尋頁：匯出 currentFilteredData（目前畫面上篩選出的清單）
+            // 3. 若在首頁：匯出全部 masterData
             let isEvalViewActive = document.getElementById('evalView').classList.contains('active');
+            let isDetailViewActive = document.getElementById('detailView').classList.contains('active');
+
             if (isEvalViewActive && currentSingleItem) {
-                targetData = [currentSingleItem]; // 若在第三層，只匯出當前單張卡片
-            } else if (currentCategory) {
-                targetData = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
+                targetData = [currentSingleItem];
+            } else if (isDetailViewActive && currentFilteredData.length > 0) {
+                targetData = currentFilteredData;
             } else {
-                targetData = masterData; // 預設全部
+                targetData = masterData;
             }
             
             if (targetData.length === 0) {
@@ -423,7 +429,7 @@
                         let qrContainer = printWindow.document.getElementById(`export-qr-${curIdx}`);
                         if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
                             new printWindow.QRCode(qrContainer, {
-                                text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+                                text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L
                             });
                         }
                         curIdx++;
@@ -457,14 +463,15 @@
 
         function goBackToCategory() {
             currentCategory = null;
-            currentSingleItem = null; // 離開詳情頁時清空
+            currentSingleItem = null;
+            currentFilteredData = [];
             document.getElementById('searchInput').value = '';
             showView('categoryView');
             document.getElementById('backBtn').style.display = 'none';
         }
 
         function goBackToDetail() {
-            currentSingleItem = null; // 離開詳情頁時清空
+            currentSingleItem = null;
             if (currentCategory) {
                 showView('detailView');
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
@@ -545,6 +552,7 @@
         }
 
         function renderDetailGrid(data, catName) {
+            currentFilteredData = data; // 👈 記錄目前畫面上呈現的這批明細清單
             let gridContainer = document.getElementById('signGridContainer');
             gridContainer.innerHTML = '';
             
@@ -607,7 +615,7 @@
             let item = masterData.find(d => d.uniqueKey === uniqueKey);
             if (!item) return;
 
-            currentSingleItem = item; // 👈 記錄目前正在檢視的單張標誌資料
+            currentSingleItem = item; 
             document.getElementById('evalUniqueKey').value = uniqueKey;
             document.getElementById('evalPageImg').src = item.svg_url || item.image || '';
             document.getElementById('evalPageTitle').innerText = item.name || item.Name || '安全標誌';
@@ -843,7 +851,7 @@
                 String(item.name || item.Name || '').toLowerCase().includes(keyword) ||
                 String(item.category || item.Category || '').toLowerCase().includes(keyword)
             );
-            renderDetailGrid(filtered, 'Search Result');
+            renderDetailGrid(filtered, 'Search Result'); // renderDetailGrid 內部會自動記錄至 currentFilteredData
         }
 
         function openAdminModal() { document.getElementById('adminModal').style.display = 'block'; updateAdminUI(); }
