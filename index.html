@@ -99,7 +99,8 @@
         <button id="backBtn" onclick="goBackToCategory()" style="background: #6c757d; display: none;">⬅️ 返回分類首頁</button>
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
         
-        <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
+        <button onclick="exportAllExcel()" style="background: #17a2b8;">📥 匯出全部 Excel</button>
+        <button onclick="exportFilteredExcel()" style="background: #138496;">📥 匯出目前結果 Excel</button>
         <button onclick="promptExportFilteredCards()" style="background: #e83e8c; color: white;">📑 匯出目前結果卡片 (Word/PDF)</button>
         <button onclick="exportAllQRCodesWord()" style="background: #6610f2; color: white;">📑 匯出全部 QRcode (Word)</button>
         <button onclick="startQuiz('practice')" style="background: #fd7e14; color: white;">📝 模擬小考</button>
@@ -225,8 +226,8 @@
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
         let currentQuizQuestions = [];
         let currentQuizMode = 'practice';
-        let currentSingleItem = null;   // 記錄目前在第三層正在檢視的單張卡片
-        let currentFilteredData = [];   // 👈 記錄目前畫面上過濾出來的清單（分類明細或搜尋結果）
+        let currentSingleItem = null;   
+        let currentFilteredData = [];   
 
         window.onload = function() {
             initPhase5();
@@ -309,7 +310,7 @@
                     let qrContainer = printWindow.document.getElementById(`qrcode-${i}`);
                     if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
                         new printWindow.QRCode(qrContainer, {
-                            text: targetUrl, width: 75, height: 75, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+                            text: targetUrl, width: 75, height: 75, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L
                         });
                     }
                 }
@@ -336,11 +337,6 @@
 
         async function exportFilteredCardsWord(multiplier) {
             let targetData = [];
-            
-            // 👈 精準判斷目前層級：
-            // 1. 若在第三層詳情頁：只匯出該單張卡片
-            // 2. 若在第二層分類或搜尋頁：匯出 currentFilteredData（目前畫面上篩選出的清單）
-            // 3. 若在首頁：匯出全部 masterData
             let isEvalViewActive = document.getElementById('evalView').classList.contains('active');
             let isDetailViewActive = document.getElementById('detailView').classList.contains('active');
 
@@ -448,6 +444,47 @@
             document.getElementById('status').innerText = `✅ 目前結果卡片清冊已成功開啟！`;
         }
 
+        // 📥 匯出全部 Excel
+        function exportAllExcel() {
+            if (masterData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
+            generateExcelFile(masterData, `SafetyMindset_All_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // 📥 匯出目前結果 Excel
+        function exportFilteredExcel() {
+            let targetData = [];
+            let isEvalViewActive = document.getElementById('evalView').classList.contains('active');
+            let isDetailViewActive = document.getElementById('detailView').classList.contains('active');
+
+            if (isEvalViewActive && currentSingleItem) {
+                targetData = [currentSingleItem];
+            } else if (isDetailViewActive && currentFilteredData.length > 0) {
+                targetData = currentFilteredData;
+            } else {
+                targetData = masterData;
+            }
+
+            if (targetData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
+            generateExcelFile(targetData, `SafetyMindset_Filtered_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        function generateExcelFile(dataArray, fileName) {
+            let exportData = dataArray.map(item => ({
+                "ID": item.id || item.ID || '', 
+                "Category": item.category || item.Category || '', 
+                "Name": item.name || item.Name || '',
+                "Elim": item.elim || item.Elim || '', 
+                "Sub": item.sub || item.Sub || '', 
+                "Eng": item.eng || item.Eng || '', 
+                "Admin": item.admin || item.Admin || '', 
+                "Ppe": item.ppe || item.Ppe || ''
+            }));
+            let worksheet = XLSX.utils.json_to_sheet(exportData);
+            let workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Safety_Mindset_Data");
+            XLSX.writeFile(workbook, fileName);
+        }
+
         function checkUrlDirectEvaluation() {
             const urlParams = new URLSearchParams(window.location.search);
             const targetKey = urlParams.get('evalKey');
@@ -552,18 +589,12 @@
         }
 
         function renderDetailGrid(data, catName) {
-            currentFilteredData = data; // 👈 記錄目前畫面上呈現的這批明細清單
+            currentFilteredData = data; 
             let gridContainer = document.getElementById('signGridContainer');
             gridContainer.innerHTML = '';
             
             let hintEl = document.getElementById('detailHint');
-            let isWarning = (String(catName).trim() === 'Warning sign');
-
-            if (isWarning) {
-                hintEl.innerText = "💡 此分類為「Warning sign」，圖形與專屬 QR Code 並排顯示，點擊卡片即可進入第三層進行風險評估。";
-            } else {
-                hintEl.innerText = "ℹ️ 此分類為一般標誌，提供圖示、專屬 QR Code 與名稱檢視。";
-            }
+            hintEl.innerText = "💡 提示：點擊卡片即可進入第三層進行 7 大危害風險評估。";
 
             if (data.length === 0) {
                 gridContainer.innerHTML = `<p style="color: #888;">找不到符合條件的資料</p>`;
@@ -576,13 +607,10 @@
                 let rowName = item.name || item.Name || '';
                 let imgUrl = item.svg_url || item.image || '';
 
-                if (isWarning) {
-                    card.className = 'sign-card clickable';
-                    card.onclick = () => openEvalView(item.uniqueKey);
-                    card.title = "點擊進入 7 大危害風險評估頁面";
-                } else {
-                    card.className = 'sign-card';
-                }
+                // 👈 修正：只要有資料，無論是分類明細還是搜尋結果，全部支援點擊進入第三層評估
+                card.className = 'sign-card clickable';
+                card.onclick = () => openEvalView(item.uniqueKey);
+                card.title = "點擊進入 7 大危害風險評估頁面";
 
                 let deleteBtnHtml = isAdmin ? `<br><button class="action-btn" style="background:#dc3545; margin-top:8px;" onclick="event.stopPropagation(); deleteRow('${rowId}')">刪除</button>` : '';
 
@@ -851,7 +879,7 @@
                 String(item.name || item.Name || '').toLowerCase().includes(keyword) ||
                 String(item.category || item.Category || '').toLowerCase().includes(keyword)
             );
-            renderDetailGrid(filtered, 'Search Result'); // renderDetailGrid 內部會自動記錄至 currentFilteredData
+            renderDetailGrid(filtered, 'Search Result'); 
         }
 
         function openAdminModal() { document.getElementById('adminModal').style.display = 'block'; updateAdminUI(); }
@@ -955,18 +983,6 @@
                 await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'addRecord', id: newId, category: newCat, name: newName, svg_url: newImg }) });
                 alert(`✅ 新增成功！`); document.getElementById('addModal').style.display = 'none'; setTimeout(() => initPhase5(), 1500);
             } catch (e) { alert("失敗"); }
-        }
-
-        function exportToExcel() {
-            if (masterData.length === 0) { alert("無資料"); return; }
-            let exportData = masterData.map(item => ({
-                "ID": item.id || '', "Category": item.category || '', "Name": item.name || '',
-                "Elim": item.elim || '', "Sub": item.sub || '', "Eng": item.eng || '', "Admin": item.admin || '', "Ppe": item.ppe || ''
-            }));
-            let worksheet = XLSX.utils.json_to_sheet(exportData);
-            let workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Safety_Mindset_Data");
-            XLSX.writeFile(workbook, `SafetyMindset_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
     </script>
 </body>
