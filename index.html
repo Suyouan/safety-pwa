@@ -48,7 +48,6 @@
         .editable-cell { cursor: pointer; background: #fffdf0; }
         .editable-cell:hover { background-color: #fff3cd; }
 
-        /* 測驗專屬樣式 */
         .quiz-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 700px; margin: 0 auto; }
         .quiz-question { font-weight: bold; margin-bottom: 10px; color: #0056b3; }
         .quiz-options label { display: block; background: #f8f9fa; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; cursor: pointer; }
@@ -226,6 +225,7 @@
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
         let currentQuizQuestions = [];
         let currentQuizMode = 'practice';
+        let currentSingleItem = null; // 👈 記錄目前在第三層正在檢視的單張卡片
 
         window.onload = function() {
             initPhase5();
@@ -308,7 +308,7 @@
                     let qrContainer = printWindow.document.getElementById(`qrcode-${i}`);
                     if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
                         new printWindow.QRCode(qrContainer, {
-                            text: targetUrl, width: 75, height: 75, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L
+                            text: targetUrl, width: 75, height: 75, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
                         });
                     }
                 }
@@ -334,9 +334,16 @@
         }
 
         async function exportFilteredCardsWord(multiplier) {
-            let targetData = masterData;
-            if (currentCategory) {
+            let targetData = [];
+            
+            // 👈 關鍵修正：判斷目前是否在第三層詳情頁面
+            let isEvalViewActive = document.getElementById('evalView').classList.contains('active');
+            if (isEvalViewActive && currentSingleItem) {
+                targetData = [currentSingleItem]; // 若在第三層，只匯出當前單張卡片
+            } else if (currentCategory) {
                 targetData = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
+            } else {
+                targetData = masterData; // 預設全部
             }
             
             if (targetData.length === 0) {
@@ -408,7 +415,6 @@
             printWindow.document.close();
 
             printWindow.onload = function() {
-                let totalCards = targetData.length * multiplier;
                 let curIdx = 0;
                 for (let m = 0; m < multiplier; m++) {
                     for (let i = 0; i < targetData.length; i++) {
@@ -417,7 +423,7 @@
                         let qrContainer = printWindow.document.getElementById(`export-qr-${curIdx}`);
                         if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
                             new printWindow.QRCode(qrContainer, {
-                                text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L
+                                text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
                             });
                         }
                         curIdx++;
@@ -451,12 +457,14 @@
 
         function goBackToCategory() {
             currentCategory = null;
+            currentSingleItem = null; // 離開詳情頁時清空
             document.getElementById('searchInput').value = '';
             showView('categoryView');
             document.getElementById('backBtn').style.display = 'none';
         }
 
         function goBackToDetail() {
+            currentSingleItem = null; // 離開詳情頁時清空
             if (currentCategory) {
                 showView('detailView');
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
@@ -599,11 +607,11 @@
             let item = masterData.find(d => d.uniqueKey === uniqueKey);
             if (!item) return;
 
+            currentSingleItem = item; // 👈 記錄目前正在檢視的單張標誌資料
             document.getElementById('evalUniqueKey').value = uniqueKey;
             document.getElementById('evalPageImg').src = item.svg_url || item.image || '';
             document.getElementById('evalPageTitle').innerText = item.name || item.Name || '安全標誌';
 
-            // 渲染第三層專屬獨立 QR Code
             let qrBox = document.getElementById('evalPageQrContainer');
             qrBox.innerHTML = '';
             let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
@@ -700,7 +708,6 @@
             currentQuizMode = mode;
             document.getElementById('quizHeaderTitle').innerText = (mode === 'practice') ? "📝 模擬小考 (自主練習)" : "🎓 正式考核";
             
-            // 隨機抽 5 題
             let shuffled = [...masterData].sort(() => 0.5 - Math.random());
             let selectedItems = shuffled.slice(0, Math.min(5, shuffled.length));
             
@@ -708,7 +715,6 @@
                 let correctName = item.name || item.Name || '未知標誌';
                 let imgUrl = item.svg_url || item.image || '';
                 
-                // 隨機選 3 個錯誤選項
                 let wrongPool = masterData.filter(d => (d.name || d.Name) !== correctName);
                 let shuffledWrong = wrongPool.sort(() => 0.5 - Math.random()).slice(0, 3);
                 let options = [correctName, ...shuffledWrong.map(w => w.name || w.Name)].sort(() => 0.5 - Math.random());
