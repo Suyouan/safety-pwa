@@ -78,6 +78,21 @@
         </div>
     </div>
 
+    <!-- 員工考核成績總結報告與明細 Modal -->
+    <div id="quizResultsModal" class="modal">
+        <div class="modal-content" style="width:90%; max-width:850px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px;">
+                <h3 style="margin:0;">📊 正式考核成績總結報告與明細</h3>
+                <button onclick="closeQuizResultsModal()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#333;">&times;</button>
+            </div>
+            <div id="quizResultsContent" style="max-height:500px; overflow-y:auto; margin:15px 0;"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <button onclick="exportQuizResultsExcel()" style="background: #17a2b8; color:white;">📥 匯出成績總表 Excel</button>
+                <button onclick="closeQuizResultsModal()" style="background:#6c757d; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">關閉</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 正式考核身分驗證與作答彈窗 -->
     <div id="examAuthModal" class="modal">
         <div class="modal-content" style="text-align: center;">
@@ -120,7 +135,6 @@
         <button onclick="promptExportFilteredCards()" style="background: #e83e8c; color: white;">📑 匯出目前結果卡片 (Word/PDF)</button>
         <button onclick="exportAllQRCodesWord()" style="background: #6610f2; color: white;">📑 匯出全部 QRcode (Word)</button>
         <button onclick="startQuiz('practice')" style="background: #fd7e14; color: white;">📝 模擬小考</button>
-        <!-- 正式考核按鈕預設隱藏，待後端讀取到開放時間時動態顯示 -->
         <button id="examBtn" onclick="openExamAuthModal()" style="display: none;"></button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
@@ -221,7 +235,8 @@
                     <option value="Active">啟用 (開放作答)</option>
                     <option value="Inactive">關閉 (不開放)</option>
                 </select>
-                <button onclick="saveExamConfig()" style="width: 100%; margin-bottom: 12px; background: #28a745;">儲存考試設定</button>
+                <button onclick="saveExamConfig()" style="width: 100%; margin-bottom: 8px; background: #28a745;">儲存考試設定</button>
+                <button onclick="openQuizResultsModal()" style="width: 100%; margin-bottom: 12px; background: #17a2b8;">📊 查看員工考核成績總表</button>
 
                 <hr style="border:0; border-top:1px solid #ddd; margin: 10px 0;">
                 <h4>變更管理員密碼</h4>
@@ -264,6 +279,7 @@
         let examConfigData = null;
         let verifiedEmpId = "";
         let verifiedEmpName = "";
+        let cachedQuizResults = [];
 
         window.onload = function() {
             initPhase5();
@@ -272,7 +288,6 @@
             checkUrlDirectEvaluation();
         };
 
-        // 檢查正式考試是否在時間與狀態內
         async function checkExamAvailability() {
             try {
                 let res = await fetch(`${GAS_URL}?action=getExamConfig`);
@@ -318,10 +333,7 @@
             let empId = document.getElementById('authEmpId').value.trim();
             let empName = document.getElementById('authEmpName').value.trim();
 
-            if (!empId || !empName) {
-                alert("請完整填寫工號與姓名！");
-                return;
-            }
+            if (!empId || !empName) { alert("請完整填寫工號與姓名！"); return; }
 
             document.getElementById('status').innerText = "⏳ 正在驗證您的作答資格...";
             try {
@@ -334,18 +346,13 @@
                         document.getElementById('status').innerText = `❌ 重複作答已被阻擋`;
                         return;
                     }
-                    
                     verifiedEmpId = empId;
                     verifiedEmpName = empName;
                     document.getElementById('examAuthModal').style.display = 'none';
                     document.getElementById('status').innerText = `✅ 驗證成功，開始正式考試`;
                     startQuiz('exam');
-                } else {
-                    alert("驗證異常，請稍後再試。");
                 }
-            } catch (e) {
-                alert("❌ 網路連線異常，無法驗證身分。");
-            }
+            } catch (e) { alert("❌ 網路連線異常，無法驗證身分。"); }
         }
 
         async function saveExamConfig() {
@@ -353,21 +360,124 @@
             let start = document.getElementById('adminExamStart').value;
             let end = document.getElementById('adminExamEnd').value;
             let status = document.getElementById('adminExamStatus').value;
-
             if (!title) { alert("請輸入考試名稱"); return; }
-
             try {
-                await fetch(GAS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ action: 'saveExamConfig', examTitle: title, startTime: start, endTime: end, status: status })
-                });
+                await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveExamConfig', examTitle: title, startTime: start, endTime: end, status: status }) });
                 alert("✅ 正式考試設定已成功儲存！");
                 document.getElementById('adminModal').style.display = 'none';
                 checkExamAvailability();
+            } catch (e) { alert("❌ 儲存失敗。"); }
+        }
+
+        async function openQuizResultsModal() {
+            document.getElementById('quizResultsModal').style.display = 'block';
+            let container = document.getElementById('quizResultsContent');
+            container.innerHTML = "<p>正在載入考核成績總表與總結報告...</p>";
+
+            try {
+                let res = await fetch(`${GAS_URL}?action=getQuizResults`);
+                let result = await res.json();
+
+                if (result.status !== "success") {
+                    container.innerHTML = "<p style='color:red;'>❌ 載入失敗。</p>";
+                    return;
+                }
+
+                cachedQuizResults = result.data || [];
+                if (cachedQuizResults.length === 0) {
+                    container.innerHTML = "<p>目前尚無任何員工的正式考核繳交紀錄。</p>";
+                    return;
+                }
+
+                // 計算總結報告指標
+                let totalExaminees = cachedQuizResults.length;
+                let sumScores = 0;
+                let passCount = 0;
+                let maxScore = -1;
+                let minScore = 101;
+
+                cachedQuizResults.forEach(r => {
+                    let sc = parseFloat(r.score) || 0;
+                    sumScores += sc;
+                    if (sc >= 60) passCount++; // 60分及格標準
+                    if (sc > maxScore) maxScore = sc;
+                    if (sc < minScore) minScore = sc;
+                });
+
+                let avgScore = (sumScores / totalExaminees).toFixed(1);
+                let passRate = ((passCount / totalExaminees) * 100).toFixed(1);
+
+                // 組合總結報告與明細表格 HTML
+                let summaryHtml = `
+                    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                        <h4 style="margin-top:0; color:#0056b3;">📈 考核成效總結報告摘要</h4>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
+                            <div style="background:white; padding:10px; border-radius:5px; border:1px solid #ddd;">
+                                <div style="font-size:12px; color:#666;">總應考人數</div>
+                                <div style="font-size:20px; font-weight:bold; color:#007bff;">${totalExaminees} 人</div>
+                            </div>
+                            <div style="background:white; padding:10px; border-radius:5px; border:1px solid #ddd;">
+                                <div style="font-size:12px; color:#666;">平均得分</div>
+                                <div style="font-size:20px; font-weight:bold; color:#28a745;">${avgScore} 分</div>
+                            </div>
+                            <div style="background:white; padding:10px; border-radius:5px; border:1px solid #ddd;">
+                                <div style="font-size:12px; color:#666;">及格率 (≥60分)</div>
+                                <div style="font-size:20px; font-weight:bold; color:#17a2b8;">${passRate}%</div>
+                            </div>
+                            <div style="background:white; padding:10px; border-radius:5px; border:1px solid #ddd;">
+                                <div style="font-size:12px; color:#666;">最高 / 最低分</div>
+                                <div style="font-size:16px; font-weight:bold; color:#333; margin-top:3px;">${maxScore} / ${minScore} 分</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                let tableHtml = `
+                    <h4>📋 員工個人詳細成績清單</h4>
+                    <table style="width:100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="background: #f1f3f5; border-bottom: 2px solid #dee2e6;">
+                                <th style="padding: 10px;">交卷時間</th>
+                                <th style="padding: 10px;">員工工號</th>
+                                <th style="padding: 10px;">員工姓名</th>
+                                <th style="padding: 10px; text-align: center;">考核得分</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                cachedQuizResults.forEach(r => {
+                    tableHtml += `
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 10px; font-size:13px; color:#555;">${r.timestamp}</td>
+                            <td style="padding: 10px; font-weight:bold; color:#0056b3;">${r.empId}</td>
+                            <td style="padding: 10px;">${r.empName}</td>
+                            <td style="padding: 10px; text-align: center; font-weight:bold; color:${parseInt(r.score) >= 60 ? '#28a745' : '#dc3545'};">${r.score}</td>
+                        </tr>
+                    `;
+                });
+                tableHtml += `</tbody></table>`;
+
+                container.innerHTML = summaryHtml + tableHtml;
             } catch (e) {
-                alert("❌ 儲存失敗，請檢查網路連線。");
+                container.innerHTML = "<p style='color:red;'>❌ 無法連線讀取成績資料。</p>";
             }
+        }
+
+        function closeQuizResultsModal() { document.getElementById('quizResultsModal').style.display = 'none'; }
+
+        function exportQuizResultsExcel() {
+            if (cachedQuizResults.length === 0) { alert("目前沒有可匯出的成績資料！"); return; }
+            let exportData = cachedQuizResults.map(r => ({
+                "交卷時間": r.timestamp,
+                "員工工號": r.empId,
+                "員工姓名": r.empName,
+                "考核得分": r.score
+            }));
+            let worksheet = XLSX.utils.json_to_sheet(exportData);
+            let workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Exam_Results");
+            XLSX.writeFile(workbook, `SafetyMindset_ExamResults_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
         async function exportAllQRCodesWord() {
@@ -796,7 +906,7 @@
 
             if (currentQuizMode === 'exam') {
                 try {
-                    let payload = { action: 'submitQuizResult', empId: verifiedEmpId, empName: verifiedEmpName, score: `${score} 分` };
+                    let payload = { action: 'submitQuizResult', empId: verifiedEmpId, empName: verifiedEmpName, score: `${score}` };
                     await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                     alert("✅ 正式考核成績已成功上傳並記錄！");
                 } catch (e) { alert("❌成績上傳失敗"); }
