@@ -89,8 +89,7 @@
         <input type="text" id="searchInput" placeholder="輸入 ID 或名稱進行搜尋..." oninput="handleSearch()">
         
         <button onclick="exportToExcel()" style="background: #17a2b8;">📥 匯出 Excel</button>
-        <!-- 👇 新增這行：匯出目前搜尋/分類結果的卡片清冊 -->
-    <button onclick="exportFilteredCardsWord()" style="background: #e83e8c; color: white;">📑 匯出目前結果卡片 (Word/PDF)</button>
+        <button onclick="exportFilteredCardsWord()" style="background: #e83e8c; color: white;">📑 匯出目前結果卡片 (Word/PDF)</button>
         <button onclick="exportAllQRCodesWord()" style="background: #6610f2; color: white;">📑 匯出全部 QRcode (Word)</button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
@@ -114,7 +113,7 @@
         <div class="eval-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <button onclick="goBackToDetail()" style="background: #6c757d;">⬅️ 返回上一層</button>
-                <button id="saveEvalBtn" class="admin-only" onclick="saveEvaluation()" style="background: #28a745;">💾 儲存評估變更</button>
+                <!-- 移除無用的儲存評估按鈕，改由雙擊即時互動 -->
             </div>
             
             <div style="text-align: center; border-bottom: 1px solid #eee; padding-bottom: 15px;">
@@ -123,7 +122,7 @@
                 <p id="evalPageSub" style="font-size: 13px; color: #666; margin: 0;"></p>
             </div>
             
-            <p id="evalHintText" style="font-size: 12px; color: #d9534f; margin: 15px 0 5px 0;">💡 提示：前 6 項危害控制欄位可直接**雙擊**進行編輯修改！</p>
+            <p id="evalHintText" style="font-size: 12px; color: #d9534f; margin: 15px 0 5px 0;">💡 提示：欄位可直接**雙擊**進行編輯修改！</p>
             
             <input type="hidden" id="evalUniqueKey">
             <table class="eval-table">
@@ -151,18 +150,15 @@
         </div>
     </div>
 
-
     <!-- 管理者登入/設定 Modal -->
     <div id="adminModal" class="modal">
         <div class="modal-content">
             <h3>管理者中心</h3>
-            <!-- 登入視圖 -->
             <div id="loginView">
-                <p>請輸入管理員密碼 (預設問Acid)：</p>
+                <p>請輸入管理員密碼：</p>
                 <input type="password" id="pwdInput" placeholder="請輸入密碼" style="width: 93%; padding: 8px; margin-bottom: 10px;">
                 <button onclick="verifyLogin()" style="width: 100%; margin-bottom: 5px; background: #007bff;">登入</button>
             </div>
-            <!-- 管理控制視圖 -->
             <div id="controlView" class="admin-only" style="display: none;">
                 <p style="color: green; font-weight: bold;">目前已獲得管理員權限</p>
                 <hr style="border:0; border-top:1px solid #ddd; margin: 10px 0;">
@@ -195,11 +191,9 @@
     </div>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
+        const GAS_URL = "您的GAS部署網址"; 
         let masterData = [];
-        let currentFilteredData = [];
         let currentCategory = null;
-        
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
 
         window.onload = function() {
@@ -208,227 +202,130 @@
             checkUrlDirectEvaluation();
         };
 
-
-
-        // 輔助函式：將指定的文字轉成 Base64 的 QR Code 圖片 Data URL
-function generateQRCodeBase64(text) {
-    return new Promise((resolve) => {
-        let tempDiv = document.createElement('div');
-        tempDiv.style.display = 'none';
-        document.body.appendChild(tempDiv);
-        
-        new QRCode(tempDiv, {
-            text: text,
-            width: 80,
-            height: 80,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.L
-        });
-
-        // 稍微等待 DOM 渲染完成抓取 Canvas
-        setTimeout(() => {
-            let canvas = tempDiv.querySelector('canvas');
-            let imgData = canvas ? canvas.toDataURL("image/png") : "";
-            document.body.removeChild(tempDiv);
-            resolve(imgData);
-        }, 100);
-    });
-}
-
-// 核心：匯出全部 QRcode 與圖形至 Word 檔案
-async function exportAllQRCodesWord() {
-    if (masterData.length === 0) {
-        alert("目前沒有可匯出的資料！");
-        return;
-    }
-
-    document.getElementById('status').innerText = "⏳ 正在產生所有標誌的圖形與 QR Code 清冊...";
-
-    // 1. 建立一個新的獨立預覽視窗
-    let printWindow = window.open('', '_blank');
-    if (!printWindow) {
-        alert("請允許彈出視窗以檢視匯出清冊！");
-        return;
-    }
-
-    let htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>ISO7010 安全標誌與 QR Code 清冊</title>
-            <style>
-                body { 
-                    font-family: 'Microsoft JhengHei', Arial, sans-serif; 
-                    background: #f4f6f9; 
-                    margin: 0; 
-                    padding: 20px; 
-                }
-                h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 5px; }
-                .subtitle { text-align: center; font-size: 13px; color: #666; margin-bottom: 20px; }
+        function generateQRCodeBase64(text) {
+            return new Promise((resolve) => {
+                let tempDiv = document.createElement('div');
+                tempDiv.style.display = 'none';
+                document.body.appendChild(tempDiv);
                 
-                .grid-container {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 15px;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                }
-                
-                .card {
-                    background: #ffffff;
-                    border: 1px solid #dcdcdc;
-                    border-radius: 8px;
-                    padding: 15px;
-                    text-align: center;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                    page-break-inside: avoid;
-                }
-                
-                .content-row {
-                    display: flex;
-                    justify-content: space-around;
-                    align-items: center;
-                    margin-bottom: 10px;
-                }
-                
-                .img-box, .qr-box {
-                    width: 75px;
-                    height: 75px;
-                    object-fit: contain;
-                }
-                
-                /* 放大且清晰的字體排版 */
-                .card-id {
-                    font-size: 18px;
-                    font-weight: bold;
-                    color: #0056b3;
-                    margin: 6px 0 2px 0;
-                }
-                
-                .card-name {
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: #222;
-                    margin-bottom: 4px;
-                    line-height: 1.3;
-                }
-                
-                .card-category {
-                    font-size: 11px;
-                    color: #666;
-                }
-                
-                .badge {
-                    display: inline-block;
-                    background: #ffc107;
-                    color: #333;
-                    font-size: 10px;
-                    font-weight: bold;
-                    padding: 2px 8px;
-                    border-radius: 10px;
-                    margin-top: 6px;
-                }
-
-                .print-btn-bar {
-                    text-align: center;
-                    margin-bottom: 20px;
-                }
-                .print-btn {
-                    background: #007bff;
-                    color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    font-size: 16px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                }
-                .print-btn:hover { background: #0056b3; }
-
-                @media print {
-                    .print-btn-bar { display: none; }
-                    body { background: white; padding: 0; }
-                    .card { border: 1px solid #000; box-shadow: none; }
-                }
-            </style>
-        </head>
-        <body>
-            <h1>ISO7010 安全標誌與風險評估 QR Code 清冊</h1>
-            <div class="subtitle">匯出日期：${new Date().toISOString().slice(0,10)} &nbsp;|&nbsp; 總計：${masterData.length} 筆</div>
-            
-            <div class="print-btn-bar">
-                <button class="print-btn" onclick="window.print()">🖨️ 列印清冊 / 存成 PDF</button>
-            </div>
-
-            <div class="grid-container">
-    `;
-
-    printWindow.document.write(htmlContent);
-
-    // 2. 迴圈動態產生卡片與原生 QR Code
-    for (let i = 0; i < masterData.length; i++) {
-        let item = masterData[i];
-        let rowId = item.id || item.ID || '';
-        let rowName = item.name || item.Name || '';
-        let rowCat = item.category || item.Category || '';
-        let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
-        
-        let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
-        
-        let cardHtml = `
-            <div class="card">
-                <div class="content-row">
-                    <div>
-                        ${imgUrl ? `<img src="${imgUrl}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}
-                    </div>
-                    <div id="qrcode-${i}"></div>
-                </div>
-                <div class="card-id">${rowId}</div>
-                <div class="card-name">${rowName}</div>
-                <div class="card-category">分類：${rowCat}</div>
-            </div>
-        `;
-        printWindow.document.write(cardHtml);
-    }
-
-    printWindow.document.write(`</div></body></html>`);
-    printWindow.document.close();
-
-    // 3. 在新視窗載入完成後，利用原生 QRCode 套件即時生成 QR Code 確保 100% 成功
-    printWindow.onload = function() {
-        for (let i = 0; i < masterData.length; i++) {
-            let item = masterData[i];
-            let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
-            let qrContainer = printWindow.document.getElementById(`qrcode-${i}`);
-            if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
-                new printWindow.QRCode(qrContainer, {
-                    text: targetUrl,
-                    width: 75,
-                    height: 75,
+                new QRCode(tempDiv, {
+                    text: text,
+                    width: 80,
+                    height: 80,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: printWindow.QRCode.CorrectLevel.L
+                    correctLevel: QRCode.CorrectLevel.L
                 });
+
+                setTimeout(() => {
+                    let canvas = tempDiv.querySelector('canvas');
+                    let imgData = canvas ? canvas.toDataURL("image/png") : "";
+                    document.body.removeChild(tempDiv);
+                    resolve(imgData);
+                }, 100);
+            });
+        }
+
+        async function exportAllQRCodesWord() {
+            if (masterData.length === 0) {
+                alert("目前沒有可匯出的資料！");
+                return;
             }
+
+            document.getElementById('status').innerText = "⏳ 正在產生所有標誌的圖形與 QR Code 清冊...";
+
+            let printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert("請允許彈出視窗以檢視匯出清冊！");
+                return;
+            }
+
+            let htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>ISO7010 安全標誌與 QR Code 清冊</title>
+                    <style>
+                        body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+                        h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 5px; }
+                        .subtitle { text-align: center; font-size: 13px; color: #666; margin-bottom: 20px; }
+                        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 1200px; margin: 0 auto; }
+                        .card { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); page-break-inside: avoid; }
+                        .content-row { display: flex; justify-content: space-around; align-items: center; margin-bottom: 10px; }
+                        .img-box, .qr-box { width: 75px; height: 75px; object-fit: contain; }
+                        .card-id { font-size: 18px; font-weight: bold; color: #0056b3; margin: 6px 0 2px 0; }
+                        .card-name { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 4px; line-height: 1.3; }
+                        .card-category { font-size: 11px; color: #666; }
+                        .print-btn-bar { text-align: center; margin-bottom: 20px; }
+                        .print-btn { background: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+                        .print-btn:hover { background: #0056b3; }
+                        @media print { .print-btn-bar { display: none; } body { background: white; padding: 0; } .card { border: 1px solid #000; box-shadow: none; } }
+                    </style>
+                </head>
+                <body>
+                    <h1>ISO7010 安全標誌與風險評估 QR Code 清冊</h1>
+                    <div class="subtitle">匯出日期：${new Date().toISOString().slice(0,10)} &nbsp;|&nbsp; 總計：${masterData.length} 筆</div>
+                    <div class="print-btn-bar"><button class="print-btn" onclick="window.print()">🖨️ 列印清冊 / 存成 PDF</button></div>
+                    <div class="grid-container">
+            `;
+
+            printWindow.document.write(htmlContent);
+
+            for (let i = 0; i < masterData.length; i++) {
+                let item = masterData[i];
+                let rowId = item.id || item.ID || '';
+                let rowName = item.name || item.Name || '';
+                let rowCat = item.category || item.Category || '';
+                let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
+                
+                let cardHtml = `
+                    <div class="card">
+                        <div class="content-row">
+                            <div>${imgUrl ? `<img src="${imgUrl}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}</div>
+                            <div id="qrcode-${i}"></div>
+                        </div>
+                        <div class="card-id">${rowId}</div>
+                        <div class="card-name">${rowName}</div>
+                        <div class="card-category">分類：${rowCat}</div>
+                    </div>
+                `;
+                printWindow.document.write(cardHtml);
+            }
+
+            printWindow.document.write(`</div></body></html>`);
+            printWindow.document.close();
+
+            printWindow.onload = function() {
+                for (let i = 0; i < masterData.length; i++) {
+                    let item = masterData[i];
+                    let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
+                    let qrContainer = printWindow.document.getElementById(`qrcode-${i}`);
+                    if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
+                        new printWindow.QRCode(qrContainer, {
+                            text: targetUrl,
+                            width: 75,
+                            height: 75,
+                            colorDark: "#000000",
+                            colorLight: "#ffffff",
+                            correctLevel: printWindow.QRCode.CorrectLevel.L
+                        });
+                    }
+                }
+            };
+
+            let scripts = document.querySelectorAll('script');
+            scripts.forEach(s => {
+                if (s.src && s.src.includes('qrcode')) {
+                    let sTag = printWindow.document.createElement('script');
+                    sTag.src = s.src;
+                    printWindow.document.head.appendChild(sTag);
+                }
+            });
+
+            document.getElementById('status').innerText = `✅ 清冊頁面已成功開啟！`;
         }
-    };
 
-    // 同時把主畫面的 script 引入傳過去，確保 QRCode 套件可以用
-    let scripts = document.querySelectorAll('script');
-    scripts.forEach(s => {
-        if (s.src && s.src.includes('qrcode')) {
-            let sTag = printWindow.document.createElement('script');
-            sTag.src = s.src;
-            printWindow.document.head.appendChild(sTag);
-        }
-    });
-
-    document.getElementById('status').innerText = `✅ 清冊頁面已成功開啟！`;
-}
-
-        
-        // 支援透過 QR Code 掃描後的網址參數直接導向該標誌的評估頁面
         function checkUrlDirectEvaluation() {
             const urlParams = new URLSearchParams(window.location.search);
             const targetKey = urlParams.get('evalKey');
@@ -445,22 +342,17 @@ async function exportAllQRCodesWord() {
         async function goBackToCategory() {
             currentCategory = null;
             document.getElementById('searchInput').value = '';
-            
-        document.getElementById('status').innerText = "⏳ 偵測到資料變更，正在同步最新資料...";
-
-
+            document.getElementById('status').innerText = "⏳ 正在返回分類首頁...";
             showView('categoryView');
             document.getElementById('backBtn').style.display = 'none';
-           //更改此行，以免lag renderCategoryGrid(masterData);
         }
 
-       async function goBackToDetail() {
-        document.getElementById('status').innerText = "⏳ 偵測到資料變更，正在同步最新資料...";
-
+        async function goBackToDetail() {
+            document.getElementById('status').innerText = "⏳ 正在返回明細列表...";
             if (currentCategory) {
                 showView('detailView');
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
-              //更改此行，以免lag  renderDetailGrid(filtered, currentCategory);
+                renderDetailGrid(filtered, currentCategory);
             } else {
                 goBackToCategory();
             }
@@ -537,7 +429,6 @@ async function exportAllQRCodesWord() {
         }
 
         function renderDetailGrid(data, catName) {
-            currentFilteredData = data;
             let gridContainer = document.getElementById('signGridContainer');
             gridContainer.innerHTML = '';
             
@@ -545,7 +436,7 @@ async function exportAllQRCodesWord() {
             let isWarning = (String(catName).trim() === 'Warning sign');
 
             if (isWarning) {
-                hintEl.innerText = "💡 此分類為「Warning sign」，圖形與專屬 QR Code 並排顯示，風險等級數字位於下方，點擊卡片即可進入第三層進行 7 大風險評估。";
+                hintEl.innerText = "💡 此分類為「Warning sign」，圖形與專屬 QR Code 並排顯示，點擊卡片即可進入第三層進行風險評估。";
             } else {
                 hintEl.innerText = "ℹ️ 此分類為一般標誌，提供圖示、專屬 QR Code 與名稱檢視。";
             }
@@ -569,10 +460,8 @@ async function exportAllQRCodesWord() {
                     card.className = 'sign-card';
                 }
 
-                let badgeHtml = `<div class="sign-badge"></div>`;
                 let deleteBtnHtml = isAdmin ? `<br><button class="action-btn" style="background:#dc3545; margin-top:8px;" onclick="event.stopPropagation(); deleteRow('${rowId}')">刪除</button>` : '';
 
-                // 組合卡片內部 HTML，預留 qrcode 容器 div
                 card.innerHTML = `
                     <div class="sign-content-box">
                         <div class="sign-img-wrap">
@@ -582,12 +471,11 @@ async function exportAllQRCodesWord() {
                     </div>
                     <div style="font-weight: bold; font-size: 14px; color: #007bff;">${rowId}</div>
                     <div style="font-size: 13px; color: #333; margin: 4px 0;">${rowName}</div>
-                    ${badgeHtml}
+                    <div class="sign-badge"></div>
                     ${deleteBtnHtml}
                 `;
                 gridContainer.appendChild(card);
 
-                // 動態產生專屬 QR Code，讓使用者掃描後可直接連結回該標誌頁面
                 setTimeout(() => {
                     let qrContainer = document.getElementById(`qrcode_${index}_${rowId}`);
                     if (qrContainer && qrContainer.innerHTML === "") {
@@ -621,9 +509,9 @@ async function exportAllQRCodesWord() {
 
             let hintText = document.getElementById('evalHintText');
             if (isAdmin) {
-                hintText.innerText = "💡 [管理者模式] 點擊儲存按鈕可直接將變更寫入雲端試算表。";
+                hintText.innerText = "💡 [管理者模式] 雙擊欄位可直接編輯並儲存更新。";
             } else {
-                hintText.innerText = "💡 [一般檢視] 雙擊欄位可輸入新資訊（輸入後與原資訊以「 ; 」合併，並自動進入後台等待審批）。";
+                hintText.innerText = "💡 [一般檢視] 雙擊欄位可輸入新資訊（送出後進入後台等待管理員審批）。";
             }
 
             showView('evalView');
@@ -659,7 +547,30 @@ async function exportAllQRCodesWord() {
                     if (item) {
                         item[fieldKey] = newVal;
                     }
-                    document.getElementById('status').innerText = `💡 [管理者] 欄位 [${fieldKey}] 已暫存修改，請記得點擊右上角「儲存評估變更」！`;
+                    document.getElementById('status').innerText = `⏳ [管理者] 正在將欄位 [${fieldKey}] 更新至雲端...`;
+                    try {
+                        let rowId = item ? (item.id || item.ID || '') : '';
+                        let updatePayload = {
+                            action: 'updateEvaluation',
+                            uniqueKey: uniqueKey,
+                            id: rowId,
+                            elim: document.getElementById('cell_elim').innerText === '-' ? '' : document.getElementById('cell_elim').innerText,
+                            sub: document.getElementById('cell_sub').innerText === '-' ? '' : document.getElementById('cell_sub').innerText,
+                            eng: document.getElementById('cell_eng').innerText === '-' ? '' : document.getElementById('cell_eng').innerText,
+                            admin: document.getElementById('cell_admin').innerText === '-' ? '' : document.getElementById('cell_admin').innerText,
+                            ppe: document.getElementById('cell_ppe').innerText === '-' ? '' : document.getElementById('cell_ppe').innerText
+                        };
+                        await fetch(GAS_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify(updatePayload)
+                        });
+                        alert("✅ [管理者] 評估資料已成功更新至雲端！");
+                        document.getElementById('status').innerText = `✅ 系統就緒`;
+                    } catch (e) {
+                        console.error("更新失敗：", e);
+                        alert("❌ 網路連線異常，更新失敗。");
+                    }
                 } else {
                     cell.innerText = originalVal || '-';
                     document.getElementById('status').innerText = `⏳ 您的建議已送出，欄位 [${fieldKey}] 正等待管理員審批...`;
@@ -667,7 +578,7 @@ async function exportAllQRCodesWord() {
                         let rowId = item ? (item.id || item.ID || '') : '';
                         let updatePayload = {
                             action: 'submitPendingApproval',
-                            uniqueKey: uniqueKey, // 👈 加上這一行
+                            uniqueKey: uniqueKey,
                             id: rowId,
                             field: fieldKey,
                             value: newVal
@@ -691,50 +602,6 @@ async function exportAllQRCodesWord() {
                     commitEdit();
                 }
             };
-        }
-
-        async function saveEvaluation() {
-            let uniqueKey = document.getElementById('evalUniqueKey').value;
-            let item = masterData.find(d => d.uniqueKey === uniqueKey);
-            if (!item) return;
-
-            let rowId = item.id || item.ID || '';
-
-            let updatedData = {
-    action: 'updateEvaluation',
-    uniqueKey: uniqueKey, // 👈 加上這一行
-    id: rowId,
-
-  
-    elim: document.getElementById('cell_elim').innerText === '-' ? '' : document.getElementById('cell_elim').innerText,
-    sub: document.getElementById('cell_sub').innerText === '-' ? '' : document.getElementById('cell_sub').innerText,
-    eng: document.getElementById('cell_eng').innerText === '-' ? '' : document.getElementById('cell_eng').innerText,
-    admin: document.getElementById('cell_admin').innerText === '-' ? '' : document.getElementById('cell_admin').innerText,
-    ppe: document.getElementById('cell_ppe').innerText === '-' ? '' : document.getElementById('cell_ppe').innerText
-};
-
-            item.elim = updatedData.elim;
-            item.sub = updatedData.sub;
-            item.eng = updatedData.eng;
-            item.admin = updatedData.admin;
-            item.ppe = updatedData.ppe;
-
-            try {
-                document.getElementById('status').innerText = "正在由管理者權限儲存風險評估變更至雲端...";
-                await fetch(GAS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify(updatedData)
-                });
-
-                alert("✅ [管理者] 7 大危害風險評估已成功儲存並覆寫！");
-                document.getElementById('status').innerText = `✅ 系統就緒 | 上次更新：ID ${rowId}`;
-                goBackToDetail();
-            } catch (e) {
-                console.error("儲存失敗：", e);
-                alert("❌ 網路連線異常，儲存失敗。");
-                document.getElementById('status').innerText = "❌ 評估同步失敗";
-            }
         }
 
         function handleSearch() {
@@ -761,8 +628,6 @@ async function exportAllQRCodesWord() {
             );
             renderDetailGrid(filtered, 'Search Result');
         }
-
-    
 
         function openAdminModal() {
             document.getElementById('adminModal').style.display = 'block';
@@ -796,7 +661,6 @@ async function exportAllQRCodesWord() {
                         <thead>
                             <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
                                 <th style="padding: 10px;">ID</th>
-                                <th style="padding: 10px;">風險項目</th>
                                 <th style="padding: 10px;">欄位</th>
                                 <th style="padding: 10px;">變更值</th>
                                 <th style="padding: 10px; text-align: center;">操作</th>
@@ -845,7 +709,7 @@ async function exportAllQRCodesWord() {
 
                 alert("✅ 已核准並寫入主表！");
                 getPendingList();
-                if (typeof initPhase5 === 'function') setTimeout(() => initPhase5(), 2000);
+                setTimeout(() => initPhase5(), 2000);
             } catch (e) {
                 alert("❌ 網路連線異常，核准失敗。");
             }
@@ -977,193 +841,108 @@ async function exportAllQRCodesWord() {
             document.getElementById('addModal').style.display = 'block';
         }
 
-        // 核心新增：將「目前搜尋或分類結果」的第二層卡片匯出為適當佔比的 Word / PDF 清冊
-async function exportFilteredCardsWord() {
-    // 判斷目前應該匯出什麼資料：若有搜尋或在分類中，則使用 currentFilteredData，否則退回全部 masterData
-    let targetData = (currentFilteredData && currentFilteredData.length > 0) ? currentFilteredData : masterData;
-    
-    if (targetData.length === 0) {
-        alert("目前沒有可匯出的卡片資料！");
-        return;
-    }
-
-    document.getElementById('status').innerText = "⏳ 正在產生目前結果的第二層卡片清冊...";
-
-    let printWindow = window.open('', '_blank');
-    if (!printWindow) {
-        alert("請允許彈出視窗以檢視匯出清冊！");
-        return;
-    }
-
-    let htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>安全標誌卡片清冊匯出</title>
-            <style>
-                body { 
-                    font-family: 'Microsoft JhengHei', Arial, sans-serif; 
-                    background: #f4f6f9; 
-                    margin: 0; 
-                    padding: 20px; 
-                }
-                h1 { text-align: center; color: #333; font-size: 20px; margin-bottom: 5px; }
-                .subtitle { text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; }
-                
-                /* 三欄式格狀排版，確保持比例與合適佔比 */
-                .grid-container {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 15px;
-                    max-width: 1100px;
-                    margin: 0 auto;
-                }
-                
-                .card {
-                    background: #ffffff;
-                    border: 1px solid #dcdcdc;
-                    border-radius: 8px;
-                    padding: 15px;
-                    text-align: center;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                    page-break-inside: avoid;
-                }
-                
-                /* 圖形與 QR Code 左右並排配置，佔比適中 */
-                .content-row {
-                    display: flex;
-                    justify-content: space-around;
-                    align-items: center;
-                    margin-bottom: 10px;
-                }
-                
-                .img-box, .qr-box {
-                    width: 65px;
-                    height: 65px;
-                    object-fit: contain;
-                }
-                
-                .card-id {
-                    font-size: 15px;
-                    font-weight: bold;
-                    color: #007bff;
-                    margin: 4px 0 2px 0;
-                }
-                
-                .card-name {
-                    font-size: 13px;
-                    font-weight: 600;
-                    color: #333;
-                    margin-bottom: 4px;
-                    line-height: 1.3;
-                }
-                
-                .badge {
-                    display: inline-block;
-                    background: #ffc107;
-                    color: #333;
-                    font-size: 11px;
-                    font-weight: bold;
-                    padding: 2px 8px;
-                    border-radius: 10px;
-                    margin-top: 4px;
-                }
-
-                .print-btn-bar {
-                    text-align: center;
-                    margin-bottom: 20px;
-                }
-                .print-btn {
-                    background: #28a745;
-                    color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    font-size: 15px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-weight: bold;
-                }
-                .print-btn:hover { opacity: 0.9; }
-
-                @media print {
-                    .print-btn-bar { display: none; }
-                    body { background: white; padding: 0; }
-                    .card { border: 1px solid #333; box-shadow: none; }
-                }
-            </style>
-        </head>
-        <body>
-            <h1>安全標誌與風險卡片清冊</h1>
-            <div class="subtitle">匯出日期：${new Date().toISOString().slice(0,10)} &nbsp;|&nbsp; 項目總計：${targetData.length} 筆</div>
-            
-            <div class="print-btn-bar">
-                <button class="print-btn" onclick="window.print()">🖨️ 列印 / 另存為 PDF 或匯入 Word</button>
-            </div>
-
-            <div class="grid-container">
-    `;
-
-    printWindow.document.write(htmlContent);
-
-    // 迴圈塞入各筆第二層卡片資訊（標誌圖形、QRcode、說明文字、風險等級，不含七大危害）
-    for (let i = 0; i < targetData.length; i++) {
-        let item = targetData[i];
-        let rowId = item.id || item.ID || '';
-        let rowName = item.name || item.Name || '';
-        let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
-        
-        let cardHtml = `
-            <div class="card">
-                <div class="content-row">
-                    <div>
-                        ${imgUrl ? `<img src="${imgUrl}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}
-                    </div>
-                    <div id="export-qr-${i}"></div>
-                </div>
-                <div class="card-id">${rowId}</div>
-                <div class="card-name">${rowName}</div>
-            </div>
-        `;
-        printWindow.document.write(cardHtml);
-    }
-
-    printWindow.document.write(`</div></body></html>`);
-    printWindow.document.close();
-
-    // 在預覽視窗動態補上 QRCode 生成（確保掃描點擊正常）
-    printWindow.onload = function() {
-        for (let i = 0; i < targetData.length; i++) {
-            let item = targetData[i];
-            let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
-            let qrContainer = printWindow.document.getElementById(`export-qr-${i}`);
-            if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
-                new printWindow.QRCode(qrContainer, {
-                    text: targetUrl,
-                    width: 65,
-                    height: 65,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: printWindow.QRCode.CorrectLevel.L
-                });
+        async function exportFilteredCardsWord() {
+            let targetData = masterData;
+            if (currentCategory) {
+                targetData = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
             }
+            
+            if (targetData.length === 0) {
+                alert("目前沒有可匯出的卡片資料！");
+                return;
+            }
+
+            document.getElementById('status').innerText = "⏳ 正在產生目前結果的第二層卡片清冊...";
+
+            let printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert("請允許彈出視窗以檢視匯出清冊！");
+                return;
+            }
+
+            let htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>安全標誌卡片清冊匯出</title>
+                    <style>
+                        body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+                        h1 { text-align: center; color: #333; font-size: 20px; margin-bottom: 5px; }
+                        .subtitle { text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; }
+                        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 1100px; margin: 0 auto; }
+                        .card { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); page-break-inside: avoid; }
+                        .content-row { display: flex; justify-content: space-around; align-items: center; margin-bottom: 10px; }
+                        .img-box, .qr-box { width: 65px; height: 65px; object-fit: contain; }
+                        .card-id { font-size: 15px; font-weight: bold; color: #007bff; margin: 4px 0 2px 0; }
+                        .card-name { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; line-height: 1.3; }
+                        .print-btn-bar { text-align: center; margin-bottom: 20px; }
+                        .print-btn { background: #28a745; color: white; border: none; padding: 10px 20px; font-size: 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+                        .print-btn:hover { opacity: 0.9; }
+                        @media print { .print-btn-bar { display: none; } body { background: white; padding: 0; } .card { border: 1px solid #333; box-shadow: none; } }
+                    </style>
+                </head>
+                <body>
+                    <h1>安全標誌與風險卡片清冊</h1>
+                    <div class="subtitle">匯出日期：${new Date().toISOString().slice(0,10)} &nbsp;|&nbsp; 項目總計：${targetData.length} 筆</div>
+                    <div class="print-btn-bar"><button class="print-btn" onclick="window.print()">🖨️ 列印 / 另存為 PDF 或匯入 Word</button></div>
+                    <div class="grid-container">
+            `;
+
+            printWindow.document.write(htmlContent);
+
+            for (let i = 0; i < targetData.length; i++) {
+                let item = targetData[i];
+                let rowId = item.id || item.ID || '';
+                let rowName = item.name || item.Name || '';
+                let imgUrl = item.svg_url || item.svg || item.image || item.img || '';
+                
+                let cardHtml = `
+                    <div class="card">
+                        <div class="content-row">
+                            <div>${imgUrl ? `<img src="${imgUrl}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}</div>
+                            <div id="export-qr-${i}"></div>
+                        </div>
+                        <div class="card-id">${rowId}</div>
+                        <div class="card-name">${rowName}</div>
+                    </div>
+                `;
+                printWindow.document.write(cardHtml);
+            }
+
+            printWindow.document.write(`</div></body></html>`);
+            printWindow.document.close();
+
+            printWindow.onload = function() {
+                for (let i = 0; i < targetData.length; i++) {
+                    let item = targetData[i];
+                    let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
+                    let qrContainer = printWindow.document.getElementById(`export-qr-${i}`);
+                    if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
+                        new printWindow.QRCode(qrContainer, {
+                            text: targetUrl,
+                            width: 65,
+                            height: 65,
+                            colorDark: "#000000",
+                            colorLight: "#ffffff",
+                            correctLevel: printWindow.QRCode.CorrectLevel.L
+                        });
+                    }
+                }
+            };
+
+            let scripts = document.querySelectorAll('script');
+            scripts.forEach(s => {
+                if (s.src && s.src.includes('qrcode')) {
+                    let sTag = printWindow.document.createElement('script');
+                    sTag.src = s.src;
+                    printWindow.document.head.appendChild(sTag);
+                }
+            });
+
+            document.getElementById('status').innerText = `✅ 目前結果卡片清冊已成功開啟！`;
         }
-    };
 
-    // 引入 qrcodejs 套件確保預覽頁面可以使用
-    let scripts = document.querySelectorAll('script');
-    scripts.forEach(s => {
-        if (s.src && s.src.includes('qrcode')) {
-            let sTag = printWindow.document.createElement('script');
-            sTag.src = s.src;
-            printWindow.document.head.appendChild(sTag);
-        }
-    });
-
-    document.getElementById('status').innerText = `✅ 目前結果卡片清冊已成功開啟！`;
-}
-
-        
         async function submitAdd() {
             let newId = document.getElementById('addId').value.trim();
             let newCat = document.getElementById('addCategory').value.trim();
@@ -1180,12 +959,12 @@ async function exportFilteredCardsWord() {
                 category: newCat, 
                 name: newName, 
                 svg_url: newImg,
-                uniqueKey: `${newId}-Normal`
+                uniqueKey: `${newId}`
             };
             
             masterData.push(newItem);
-
             document.getElementById('addModal').style.display = 'none';
+
             if (currentCategory === newCat) {
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
                 renderDetailGrid(filtered, currentCategory);
