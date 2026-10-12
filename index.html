@@ -37,7 +37,7 @@
         .qr-code-wrap { background: #fff; padding: 4px; border: 1px solid #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
-        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .action-btn { padding: 4px 8px; font-size: 12px; margin: 2px; }
         .admin-only { display: none; }
 
@@ -60,6 +60,13 @@
             100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
         }
         .exam-alert-btn { background: #dc3545 !important; animation: pulseAlert 1.5s infinite; border: 2px solid #fff !important; }
+
+        /* 管理者中心分頁導覽樣式 */
+        .admin-tab-bar { display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 2px solid #dee2e6; padding-bottom: 8px; }
+        .admin-tab-btn { padding: 8px 12px; border: none; background: #e9ecef; color: #495057; border-radius: 4px 4px 0 0; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .admin-tab-btn.active { background: #007bff; color: white; }
+        .admin-tab-content { display: none; }
+        .admin-tab-content.active { display: block; }
     </style>
 </head>
 <body>
@@ -210,43 +217,58 @@
         </div>
     </div>
 
-    <!-- 管理者登入/設定 Modal -->
+    <!-- 管理者登入/設定 Modal (改為分頁導覽設計) -->
     <div id="adminModal" class="modal">
         <div class="modal-content">
-            <h3>管理者中心</h3>
+            <h3>🔐 管理者中心</h3>
             <div id="loginView">
                 <p>請輸入管理員密碼：</p>
                 <input type="password" id="pwdInput" placeholder="請輸入密碼" style="width: 93%; padding: 8px; margin-bottom: 10px;">
                 <button onclick="verifyLogin()" style="width: 100%; margin-bottom: 5px; background: #007bff;">登入</button>
             </div>
+            
             <div id="controlView" class="admin-only" style="display: none;">
-                <p style="color: green; font-weight: bold;">目前已獲得管理員權限</p>
-                <hr style="border:0; border-top:1px solid #ddd; margin: 10px 0;">
+                <p style="color: green; font-weight: bold; margin-bottom: 10px;">目前已獲得管理員權限</p>
                 
-                <h4>🎯 發起與設定正式考試</h4>
-                <label style="font-size:11px; color:#666;">考試名稱</label>
-                <input type="text" id="adminExamTitle" placeholder="例如: 2026年度安衛正式考核" style="width: 93%; padding: 6px; margin-bottom: 6px;">
-                <label style="font-size:11px; color:#666;">開始時間</label>
-                <input type="datetime-local" id="adminExamStart" style="width: 93%; padding: 6px; margin-bottom: 6px;">
-                <label style="font-size:11px; color:#666;">結束時間</label>
-                <input type="datetime-local" id="adminExamEnd" style="width: 93%; padding: 6px; margin-bottom: 6px;">
-                <label style="font-size:11px; color:#666;">狀態開關</label>
-                <select id="adminExamStatus" style="width: 96%; padding: 6px; margin-bottom: 10px;">
-                    <option value="Active">啟用 (開放作答)</option>
-                    <option value="Inactive">關閉 (不開放)</option>
-                </select>
-                <button onclick="saveExamConfig()" style="width: 100%; margin-bottom: 8px; background: #28a745;">儲存考試設定</button>
-                <button onclick="openQuizResultsModal()" style="width: 100%; margin-bottom: 12px; background: #17a2b8;">📊 查看員工考核成績總表</button>
+                <!-- 分頁導覽按鈕列 -->
+                <div class="admin-tab-bar">
+                    <button class="admin-tab-btn active" onclick="switchAdminTab('examTab', this)">🎯 考試與成績管理</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('securityTab', this)">⚙️ 系統安全與審批</button>
+                </div>
 
-                <hr style="border:0; border-top:1px solid #ddd; margin: 10px 0;">
-                <h4>變更管理員密碼</h4>
-                <input type="password" id="oldPwd" placeholder="請輸入舊密碼" style="width: 93%; padding: 6px; margin-bottom: 5px;">
-                <input type="password" id="newPwd" placeholder="請輸入新密碼" style="width: 93%; padding: 6px; margin-bottom: 10px;">
-                <button onclick="changePassword()" style="width: 100%; margin-bottom: 8px; background: #ffc107; color: #333;">確認修改密碼</button>
-                <button onclick="openPendingModal()" style="width: 100%; margin-bottom: 8px; background: #17a2b8;">📋 查看待審批清單</button>
-                <button onclick="adminLogout()" style="width: 100%; margin-bottom: 8px; background: #dc3545;">登出管理員</button>
+                <!-- 分頁一：考試與成績管理 -->
+                <div id="examTab" class="admin-tab-content active">
+                    <h4 style="margin-top:0;">發起與設定正式考試</h4>
+                    <label style="font-size:11px; color:#666;">考試名稱</label>
+                    <input type="text" id="adminExamTitle" placeholder="例如: 2026年度安衛正式考核" style="width: 93%; padding: 6px; margin-bottom: 6px;">
+                    <label style="font-size:11px; color:#666;">開始時間</label>
+                    <input type="datetime-local" id="adminExamStart" style="width: 93%; padding: 6px; margin-bottom: 6px;">
+                    <label style="font-size:11px; color:#666;">結束時間</label>
+                    <input type="datetime-local" id="adminExamEnd" style="width: 93%; padding: 6px; margin-bottom: 6px;">
+                    <label style="font-size:11px; color:#666;">狀態開關</label>
+                    <select id="adminExamStatus" style="width: 96%; padding: 6px; margin-bottom: 10px;">
+                        <option value="Active">啟用 (開放作答)</option>
+                        <option value="Inactive">關閉 (不開放)</option>
+                    </select>
+                    <div style="display:flex; gap:5px; margin-bottom: 10px;">
+                        <button onclick="saveExamConfig()" style="flex:1; background: #28a745;">儲存考試設定</button>
+                        <button onclick="forceStopExam()" style="flex:1; background: #dc3545;" title="一鍵強制停止目前考試">🛑 強制停止考試</button>
+                    </div>
+                    <button onclick="openQuizResultsModal()" style="width: 100%; margin-bottom: 5px; background: #17a2b8;">📊 查看員工考核成績總表</button>
+                </div>
+
+                <!-- 分頁二：系統安全與審批 -->
+                <div id="securityTab" class="admin-tab-content">
+                    <h4 style="margin-top:0;">變更管理員密碼</h4>
+                    <input type="password" id="oldPwd" placeholder="請輸入舊密碼" style="width: 93%; padding: 6px; margin-bottom: 5px;">
+                    <input type="password" id="newPwd" placeholder="請輸入新密碼" style="width: 93%; padding: 6px; margin-bottom: 10px;">
+                    <button onclick="changePassword()" style="width: 100%; margin-bottom: 8px; background: #ffc107; color: #333;">確認修改密碼</button>
+                    <button onclick="openPendingModal()" style="width: 100%; margin-bottom: 8px; background: #17a2b8;">📋 查看待審批清單</button>
+                    <button onclick="adminLogout()" style="width: 100%; margin-bottom: 8px; background: #dc3545;">登出管理員</button>
+                </div>
             </div>
-            <button onclick="document.getElementById('adminModal').style.display='none'" style="width: 100%; background: #6c757d; margin-top: 5px;">關閉視窗</button>
+            
+            <button onclick="document.getElementById('adminModal').style.display='none'" style="width: 100%; background: #6c757d; margin-top: 15px;">關閉視窗</button>
         </div>
     </div>
 
@@ -288,14 +310,30 @@
             checkUrlDirectEvaluation();
         };
 
+        // 切换管理者中心分頁
+        function switchAdminTab(tabId, btnEl) {
+            document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            btnEl.classList.add('active');
+        }
+
         async function checkExamAvailability() {
             try {
                 let res = await fetch(`${GAS_URL}?action=getExamConfig`);
                 let result = await res.json();
                 if (result.status === "success") {
                     examConfigData = result.data;
-                    let examBtn = document.getElementById('examBtn');
                     
+                    // 將資料回填到管理者設定表單中（即時回顯）
+                    if (examConfigData) {
+                        document.getElementById('adminExamTitle').value = examConfigData.title || '';
+                        document.getElementById('adminExamStart').value = examConfigData.startTime || '';
+                        document.getElementById('adminExamEnd').value = examConfigData.endTime || '';
+                        document.getElementById('adminExamStatus').value = examConfigData.status || 'Inactive';
+                    }
+
+                    let examBtn = document.getElementById('examBtn');
                     if (examConfigData.status === "Active") {
                         let now = new Date();
                         let start = examConfigData.startTime ? new Date(examConfigData.startTime) : null;
@@ -369,6 +407,21 @@
             } catch (e) { alert("❌ 儲存失敗。"); }
         }
 
+        // 一鍵強制停止考試
+        async function forceStopExam() {
+            if (!confirm("確定要立即強制停止並關閉目前的正式考試嗎？")) return;
+            let title = document.getElementById('adminExamTitle').value.trim() || "正式考核";
+            let start = document.getElementById('adminExamStart').value;
+            let end = document.getElementById('adminExamEnd').value;
+
+            try {
+                await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveExamConfig', examTitle: title, startTime: start, endTime: end, status: 'Inactive' }) });
+                document.getElementById('adminExamStatus').value = 'Inactive';
+                alert("🛑 正式考試已強制停止！前台按鈕已關閉。");
+                checkExamAvailability();
+            } catch (e) { alert("❌ 操作失敗。"); }
+        }
+
         async function openQuizResultsModal() {
             document.getElementById('quizResultsModal').style.display = 'block';
             let container = document.getElementById('quizResultsContent');
@@ -389,7 +442,6 @@
                     return;
                 }
 
-                // 計算總結報告指標
                 let totalExaminees = cachedQuizResults.length;
                 let sumScores = 0;
                 let passCount = 0;
@@ -399,7 +451,7 @@
                 cachedQuizResults.forEach(r => {
                     let sc = parseFloat(r.score) || 0;
                     sumScores += sc;
-                    if (sc >= 60) passCount++; // 60分及格標準
+                    if (sc >= 60) passCount++;
                     if (sc > maxScore) maxScore = sc;
                     if (sc < minScore) minScore = sc;
                 });
@@ -407,7 +459,6 @@
                 let avgScore = (sumScores / totalExaminees).toFixed(1);
                 let passRate = ((passCount / totalExaminees) * 100).toFixed(1);
 
-                // 組合總結報告與明細表格 HTML
                 let summaryHtml = `
                     <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
                         <h4 style="margin-top:0; color:#0056b3;">📈 考核成效總結報告摘要</h4>
@@ -452,7 +503,7 @@
                             <td style="padding: 10px; font-size:13px; color:#555;">${r.timestamp}</td>
                             <td style="padding: 10px; font-weight:bold; color:#0056b3;">${r.empId}</td>
                             <td style="padding: 10px;">${r.empName}</td>
-                            <td style="padding: 10px; text-align: center; font-weight:bold; color:${parseInt(r.score) >= 60 ? '#28a745' : '#dc3545'};">${r.score}</td>
+                            <td style="padding: 10px; text-align: center; font-weight:bold; color:${parseInt(r.score) >= 60 ? '#28a745' : '#dc3545'};">${r.score} 分</td>
                         </tr>
                     `;
                 });
@@ -859,7 +910,6 @@
             inputEl.onkeydown = function(e) { if (e.key === 'Enter') { commitEdit(); } };
         }
 
-        // ================= 互動考題制度 =================
         function startQuiz(mode) {
             if (masterData.length < 4) { alert("資料庫中的標誌數量不足 4 筆，無法自動產生選擇題！"); return; }
             currentQuizMode = mode;
@@ -916,7 +966,6 @@
             document.getElementById('quizScoreText').innerText = `您的測驗得分：${score} 分`;
             document.getElementById('quizResultModal').style.display = 'block';
         }
-        // ====================================================
 
         function handleSearch() {
             let keyword = document.getElementById('searchInput').value.toLowerCase().trim();
