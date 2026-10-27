@@ -162,9 +162,14 @@
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
         
-        <!-- 新增：操作說明按鈕與 Google 即時翻譯選單 -->
+        <!-- 操作說明按鈕 -->
         <button onclick="openUserManual()" style="background: #17a2b8; color: white;">📖 操作說明</button>
-        <div id="google_translate_element" style="display:inline-block; vertical-align:middle;"></div>
+        
+        <!-- 🌐 優化後的即時語言切換區塊 (帶有文字提示) -->
+        <div style="display: inline-flex; align-items: center; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; gap: 5px;">
+            <span style="font-size: 13px; font-weight: bold; color: #555; white-space: nowrap;">🌐 語言：</span>
+            <div id="google_translate_element"></div>
+        </div>
     </div>
 
     <!-- 第一層：極簡 Category 首頁 -->
