@@ -67,6 +67,22 @@
         .admin-tab-btn.active { background: #007bff; color: white; }
         .admin-tab-content { display: none; }
         .admin-tab-content.active { display: block; }
+
+        /* Google 翻譯外觀優化樣式 */
+        .goog-te-banner-frame.skiptranslate { display: none !important; }
+        body { top: 0px !important; }
+        .goog-te-combo {
+            padding: 7px 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            color: #333;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+        .goog-logo-link, .goog-te-gadget span { display: none !important; }
+        .goog-te-gadget { color: transparent !important; }
     </style>
 </head>
 <body>
@@ -145,7 +161,10 @@
         <button id="examBtn" onclick="openExamAuthModal()" style="display: none;"></button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
-        <button onclick="openUserManual()" style="background: #17a2b8; color: white;">📖 系統操作說明</button>
+        
+        <!-- 新增：操作說明按鈕與 Google 即時翻譯選單 -->
+        <button onclick="openUserManual()" style="background: #17a2b8; color: white;">📖 操作說明</button>
+        <div id="google_translate_element" style="display:inline-block; vertical-align:middle;"></div>
     </div>
 
     <!-- 第一層：極簡 Category 首頁 -->
@@ -218,7 +237,7 @@
         </div>
     </div>
 
-    <!-- 管理者登入/設定 Modal (改為分頁導覽設計) -->
+    <!-- 管理者登入/設定 Modal -->
     <div id="adminModal" class="modal">
         <div class="modal-content">
             <h3>🔐 管理者中心</h3>
@@ -290,6 +309,19 @@
         </div>
     </div>
 
+    <!-- Google 翻譯初始化 Script -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'zh-TW',
+                includedLanguages: 'zh-TW,zh-CN,en,de',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
     <script>
         const GAS_URL = "https://script.google.com/macros/s/AKfycbxb3cScYhic7VOl7nn0sgOFRuhiTiApcrwlDV9XTMA1UUD_pNZRBuywOAewUeAv1jWmrw/exec"; 
         let masterData = [];
@@ -297,7 +329,7 @@
         let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
         let currentQuizQuestions = [];
         let currentQuizMode = 'practice';
-        let currentSingleItem = null;   
+        let currentSingleItem = null;    
         let currentFilteredData = [];
         let examConfigData = null;
         let verifiedEmpId = "";
@@ -311,23 +343,40 @@
             checkUrlDirectEvaluation();
         };
 
-        // 切换管理者中心分頁
+        // 語系智慧對應開啟對應語言的 user_manual PDF
+        function getCurrentLanguage() {
+            let combo = document.querySelector('.goog-te-combo');
+            if (combo && combo.value) {
+                return combo.value; // 例如 'en', 'de', 'zh-CN', 'zh-TW'
+            }
+            let match = document.cookie.match(/(^|;) ?googtrans=([^;]*)(;|$)/);
+            if (match) {
+                let parts = match[2].split('/');
+                if (parts.length > 0 && parts[parts.length - 1]) {
+                    return parts[parts.length - 1];
+                }
+            }
+            return 'zh-TW';
+        }
+
+        function openUserManual() {
+            let lang = getCurrentLanguage();
+            let pdfMap = {
+                'zh-TW': 'user_manual_zh-TW.pdf',
+                'zh-CN': 'user_manual_zh-CN.pdf',
+                'en': 'user_manual_en.pdf',
+                'de': 'user_manual_de.pdf'
+            };
+            let pdfFileName = pdfMap[lang] || 'user_manual_zh-TW.pdf';
+            window.open(pdfFileName, '_blank');
+        }
+
+        // 切換管理者中心分頁
         function switchAdminTab(tabId, btnEl) {
             document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             btnEl.classList.add('active');
-        }
-
-        // 點擊按鈕後在新分頁開啟操作說明 PDF
-        function openUserManual() {
-            // 如果 PDF 與 index.html 在同一個資料夾下，直接填寫檔名即可
-            const pdfUrl = 'user_manual.pdf'; 
-            
-            // 如果你是把 PDF上傳到其他雲端（例如 Google 雲端硬碟公開連結），則填入完整網址
-            // const pdfUrl = '你的PDF完整公開網址';
-            
-            window.open(pdfUrl, '_blank');
         }
 
         async function checkExamAvailability() {
@@ -337,7 +386,6 @@
                 if (result.status === "success") {
                     examConfigData = result.data;
                     
-                    // 將資料回填到管理者設定表單中（即時回顯）
                     if (examConfigData) {
                         document.getElementById('adminExamTitle').value = examConfigData.title || '';
                         document.getElementById('adminExamStart').value = examConfigData.startTime || '';
@@ -419,7 +467,6 @@
             } catch (e) { alert("❌ 儲存失敗。"); }
         }
 
-        // 一鍵強制停止考試
         async function forceStopExam() {
             if (!confirm("確定要立即強制停止並關閉目前的正式考試嗎？")) return;
             let title = document.getElementById('adminExamTitle').value.trim() || "正式考核";
