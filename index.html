@@ -145,6 +145,7 @@
         <button id="examBtn" onclick="openExamAuthModal()" style="display: none;"></button>
         <button onclick="openAdminModal()" style="background: #6c757d;">🔐 管理者中心</button>
         <button id="addBtn" class="admin-only" onclick="openAddModal()" style="background: #ffc107; color: #333;">➕ 新增標誌</button>
+        <button onclick="openUserManual()" style="background: #17a2b8; color: white;">📖 系統操作說明</button>
     </div>
 
     <!-- 第一層：極簡 Category 首頁 -->
@@ -316,6 +317,17 @@
             document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             btnEl.classList.add('active');
+        }
+
+        // 點擊按鈕後在新分頁開啟操作說明 PDF
+        function openUserManual() {
+            // 如果 PDF 與 index.html 在同一個資料夾下，直接填寫檔名即可
+            const pdfUrl = 'user_manual.pdf'; 
+            
+            // 如果你是把 PDF上傳到其他雲端（例如 Google 雲端硬碟公開連結），則填入完整網址
+            // const pdfUrl = '你的PDF完整公開網址';
+            
+            window.open(pdfUrl, '_blank');
         }
 
         async function checkExamAvailability() {
