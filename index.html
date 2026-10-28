@@ -8,6 +8,11 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- 引入 QRCode.js 用於動態產生標誌專屬 QR Code -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- 引入 PDF.js 引擎，用於在手機與電腦上完美渲染多頁 PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
     <style>
         body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
         h2 { user-select: none; display: inline-block; }
@@ -38,7 +43,7 @@
 
         /* 完美適配手機螢幕的彈窗樣式 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; box-sizing: border-box; }
-        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; width: 92%; max-width: 500px; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); box-sizing: border-box; }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; width: 92%; max-width: 500px; max-height: 85vh; overflow-y: auto; box-sizing: border-box; }
         
         .action-btn { padding: 4px 8px; font-size: 12px; margin: 2px; }
         .admin-only { display: none; }
@@ -168,19 +173,19 @@
         </div>
     </div>
 
-    <!-- 【PWA 專用優化】操作說明 PDF 檢視 Modal -->
+    <!-- 【採用 PDF.js 引擎】多頁平滑滾動操作說明書 Modal -->
     <div id="manualModal" class="modal">
         <div class="modal-content" style="width: 95%; max-width: 900px; height: 90vh; display: flex; flex-direction: column; padding: 15px; box-sizing: border-box;">
-            <!-- 頂部固定返回列：絕對不會被 PDF 覆蓋 -->
+            <!-- 頂部固定返回列 -->
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0;">
-                <h3 style="margin:0; font-size:16px; color:#0056b3;">📖 系統操作說明書</h3>
+                <h3 style="margin:0; font-size:16px; color:#0056b3;">📖 系統操作說明書 (多頁檢視)</h3>
                 <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; font-weight: bold;">
                     ✕ 關閉並返回主頁
                 </button>
             </div>
-            <!-- 內容容器：支援手機平滑捲動 -->
-            <div style="flex-grow:1; width:100%; height:100%; overflow:auto; -webkit-overflow-scrolling: touch; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
-                <iframe id="manualIframe" src="" style="width:100%; height:100%; border:none;"></iframe>
+            <!-- 內容捲動容器：將每一頁 PDF 渲染為 canvas 實現完美上下滑動 -->
+            <div id="pdfViewerContainer" style="flex-grow:1; width:100%; height:100%; overflow-y:auto; -webkit-overflow-scrolling: touch; background: #e9ecef; border: 1px solid #ddd; border-radius: 4px; padding: 10px; box-sizing: border-box;">
+                <p style="text-align:center; padding:20px; color:#666;">⏳ 正在載入說明書...</p>
             </div>
         </div>
     </div>
@@ -408,8 +413,8 @@
             return 'zh-TW';
         }
 
-        // 開啟操作說明 PDF
-        function openUserManual() {
+        // 使用 PDF.js 動態渲染多頁 PDF 到手機畫面上
+        async function openUserManual() {
             let lang = getCurrentLanguage();
             let pdfMap = {
                 'zh-TW': 'user_manual_zh-TW.pdf',
@@ -419,28 +424,49 @@
             };
             let pdfFileName = pdfMap[lang] || 'user_manual.pdf';
             
-            let iframe = document.getElementById('manualIframe');
-            if (iframe) {
-                iframe.src = pdfFileName;
-            }
-            
+            let container = document.getElementById('pdfViewerContainer');
+            container.innerHTML = '<p style="text-align:center; padding:30px; color:#666;">⏳ 正在載入說明書多頁內容...</p>';
             document.getElementById('manualModal').style.display = 'block';
-        }
-        
-        // 關閉操作說明並返回主頁
-        function closeUserManualModal() {
-            let modal = document.getElementById('manualModal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-            let iframe = document.getElementById('manualIframe');
-            if (iframe) {
-                iframe.src = ''; // 清空 iframe 避免資源持續佔用
+
+            try {
+                const loadingTask = pdfjsLib.getDocument(pdfFileName);
+                const pdfDoc = await loadingTask.promise;
+                container.innerHTML = ''; // 清空載入提示
+
+                // 迴圈讀取並渲染每一頁
+                for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                    const page = await pdfDoc.getPage(pageNum);
+                    const scale = 1.5; // 解析度縮放
+                    const viewport = page.getViewport({ scale: scale });
+
+                    const canvas = document.createElement('canvas');
+                    canvas.style.display = 'block';
+                    canvas.style.margin = '0 auto 15px auto';
+                    canvas.style.maxWidth = '100%';
+                    canvas.style.height = 'auto';
+                    canvas.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                    canvas.style.background = '#ffffff';
+
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    container.appendChild(canvas);
+
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: viewport
+                    };
+                    await page.render(renderContext).promise;
+                }
+            } catch (error) {
+                container.innerHTML = `<p style="text-align:center; color:red; padding:20px;">❌ 無法載入 PDF 檔案 (${error.message})。<br><br><a href="${pdfFileName}" target="_blank" style="color:#007bff; font-weight:bold;">點此直接下載 PDF 檔案</a></p>`;
             }
         }
 
         function closeUserManualModal() {
             document.getElementById('manualModal').style.display = 'none';
+            document.getElementById('pdfViewerContainer').innerHTML = ''; // 清空記憶體與畫面
         }
 
         function closeExportModal() {
