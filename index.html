@@ -70,6 +70,10 @@
         .admin-tab-content { display: none; }
         .admin-tab-content.active { display: block; }
 
+        /* 匯出預覽專用列印卡片樣式 */
+        .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 15px; }
+        .preview-card { background: white; border: 1px solid #ccc; border-radius: 6px; padding: 10px; text-align: center; }
+
         /* Google 翻譯外觀優化樣式 */
         .goog-te-banner-frame.skiptranslate { display: none !important; }
         body { top: 0px !important; }
@@ -85,6 +89,13 @@
         }
         .goog-logo-link, .goog-te-gadget span { display: none !important; }
         .goog-te-gadget { color: transparent !important; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #exportPreviewModal, #exportPreviewModal * { visibility: visible; }
+            #exportPreviewModal { position: absolute; left: 0; top: 0; width: 100%; background: white; }
+            .no-print { display: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -143,12 +154,29 @@
         </div>
     </div>
 
-    <!-- 操作說明 PDF 內嵌檢視 Modal (已優化手機版自動調節與多頁捲動) -->
+    <!-- 卡片/QRcode 匯出內嵌視窗 (支援手機版一鍵返回) -->
+    <div id="exportPreviewModal" class="modal">
+        <div class="modal-content" style="width: 95%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; padding: 15px;">
+            <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0; flex-wrap:wrap; gap:8px;">
+                <h3 id="exportModalTitle" style="margin:0; font-size:16px; color:#0056b3;">📑 匯出預覽</h3>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="window.print()" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer;">🖨️ 列印 / 另存 PDF</button>
+                    <button onclick="closeExportModal()" style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer;">✕ 關閉並返回主頁</button>
+                </div>
+            </div>
+            <div id="exportPreviewContainer" style="flex-grow:1; overflow-y:auto; -webkit-overflow-scrolling: touch; padding: 5px;"></div>
+        </div>
+    </div>
+
+    <!-- 操作說明 PDF 內嵌檢視 Modal (支援手機完整滑動與外部下載) -->
     <div id="manualModal" class="modal">
-        <div class="modal-content" style="width: 95%; max-width: 950px; height: 90vh; display: flex; flex-direction: column; padding: 15px; -webkit-overflow-scrolling: touch;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0;">
+        <div class="modal-content" style="width: 95%; max-width: 950px; height: 85vh; display: flex; flex-direction: column; padding: 15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0; flex-wrap:wrap; gap:8px;">
                 <h3 id="manualModalTitle" style="margin:0; font-size:16px; color:#0056b3;">📖 系統操作說明書</h3>
-                <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 4px; font-size: 14px; cursor: pointer;">✕ 關閉並返回系統</button>
+                <div style="display:flex; gap:8px;">
+                    <a id="manualDownloadBtn" href="" target="_blank" style="background: #17a2b8; color: white; text-decoration: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; display: inline-block;">📥 原生開啟/下載</a>
+                    <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer;">✕ 關閉並返回主頁</button>
+                </div>
             </div>
             <div style="flex-grow:1; width:100%; height:100%; overflow:auto; -webkit-overflow-scrolling: touch;">
                 <iframe id="manualIframe" src="" style="width:100%; height:100%; border:none; background:#f9f9f9; border-radius:4px;"></iframe>
@@ -363,7 +391,7 @@
             checkUrlDirectEvaluation();
         };
 
-        // 開啟操作說明 PDF (自動補上 #toolbar=1&view=FitH 參數以支援手機多頁捲動)
+        // 開啟操作說明 PDF (新增下載/外部開啟按鈕與優化移動)
         function getCurrentLanguage() {
             let combo = document.querySelector('.goog-te-combo');
             if (combo && combo.value) { return combo.value; }
@@ -384,6 +412,10 @@
                 'de': 'user_manual_de.pdf'
             };
             let pdfFileName = pdfMap[lang] || 'user_manual.pdf';
+            
+            let downloadBtn = document.getElementById('manualDownloadBtn');
+            if (downloadBtn) downloadBtn.href = pdfFileName;
+
             document.getElementById('manualIframe').src = pdfFileName + "#toolbar=1&view=FitH";
             document.getElementById('manualModal').style.display = 'block';
         }
@@ -391,6 +423,112 @@
         function closeUserManualModal() {
             document.getElementById('manualModal').style.display = 'none';
             document.getElementById('manualIframe').src = ''; 
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportPreviewModal').style.display = 'none';
+            document.getElementById('exportPreviewContainer').innerHTML = '';
+        }
+
+        // 匯出全部 QRcode (改用內嵌 Modal，支援手機版一鍵返回)
+        async function exportAllQRCodesWord() {
+            if (masterData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
+            
+            let container = document.getElementById('exportPreviewContainer');
+            document.getElementById('exportModalTitle').innerText = "📑 全部 QR Code 清冊預覽";
+            container.innerHTML = '<p style="text-align:center;">⏳ 正在產生 QR Code 清冊...</p>';
+            document.getElementById('exportPreviewModal').style.display = 'block';
+
+            let html = `<div class="preview-grid">`;
+            masterData.forEach((item, i) => {
+                html += `
+                    <div class="preview-card">
+                        <div style="display:flex; justify-content:space-around; align-items:center; margin-bottom:8px;">
+                            ${item.svg_url ? `<img src="${item.svg_url}" width="50" height="50" style="object-fit:contain;">` : '<span style="font-size:10px; color:#999;">無圖示</span>'}
+                            <div id="modal-qr-${i}"></div>
+                        </div>
+                        <div style="font-size:14px; font-weight:bold; color:#0056b3;">${item.id || item.ID || ''}</div>
+                        <div style="font-size:12px; color:#333;">${item.name || item.Name || ''}</div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+
+            setTimeout(() => {
+                masterData.forEach((item, i) => {
+                    let qrBox = document.getElementById(`modal-qr-${i}`);
+                    if (qrBox) {
+                        let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(item.uniqueKey);
+                        new QRCode(qrBox, { text: targetUrl, width: 55, height: 55, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
+                    }
+                });
+            }, 100);
+        }
+
+        function promptExportFilteredCards() {
+            let multStr = prompt("請問每張卡片需要重複列印幾份？(預設 1，例如輸入 10 則每張卡片重複 10 份)", "1");
+            if (multStr === null) return;
+            let multiplier = parseInt(multStr) || 1;
+            if (multiplier < 1) multiplier = 1;
+            exportFilteredCardsWord(multiplier);
+        }
+
+        // 匯出目前結果卡片 (改用內嵌 Modal，支援手機版一鍵返回)
+        async function exportFilteredCardsWord(multiplier) {
+            let targetData = [];
+            let isEvalViewActive = document.getElementById('evalView').classList.contains('active');
+            let isDetailViewActive = document.getElementById('detailView').classList.contains('active');
+
+            if (isEvalViewActive && currentSingleItem) {
+                targetData = [currentSingleItem];
+            } else if (isDetailViewActive && currentFilteredData.length > 0) {
+                targetData = currentFilteredData;
+            } else {
+                targetData = masterData;
+            }
+            
+            if (targetData.length === 0) { alert("目前沒有可匯出的卡片資料！"); return; }
+            
+            let container = document.getElementById('exportPreviewContainer');
+            document.getElementById('exportModalTitle').innerText = `📑 標誌卡片預覽 (倍數 x${multiplier})`;
+            container.innerHTML = '<p style="text-align:center;">⏳ 正在產生卡片預覽...</p>';
+            document.getElementById('exportPreviewModal').style.display = 'block';
+
+            let html = `<div class="preview-grid">`;
+            let renderIndex = 0;
+            for (let m = 0; m < multiplier; m++) {
+                for (let i = 0; i < targetData.length; i++) {
+                    let item = targetData[i];
+                    html += `
+                        <div class="preview-card">
+                            <div style="display:flex; justify-content:space-around; align-items:center; margin-bottom:8px;">
+                                ${item.svg_url ? `<img src="${item.svg_url}" width="50" height="50" style="object-fit:contain;">` : '<span style="font-size:10px; color:#999;">無圖示</span>'}
+                                <div id="card-modal-qr-${renderIndex}"></div>
+                            </div>
+                            <div style="font-size:14px; font-weight:bold; color:#007bff;">${item.id || item.ID || ''}</div>
+                            <div style="font-size:12px; color:#333;">${item.name || item.Name || ''}</div>
+                        </div>
+                    `;
+                    renderIndex++;
+                }
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+
+            setTimeout(() => {
+                let curIdx = 0;
+                for (let m = 0; m < multiplier; m++) {
+                    for (let i = 0; i < targetData.length; i++) {
+                        let qrBox = document.getElementById(`card-modal-qr-${curIdx}`);
+                        if (qrBox) {
+                            let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(targetData[i].uniqueKey);
+                            new QRCode(qrBox, { text: targetUrl, width: 55, height: 55, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
+                        }
+                        curIdx++;
+                    }
+                }
+            }, 100);
         }
 
         // 切換管理者中心分頁
@@ -641,163 +779,6 @@
             XLSX.writeFile(workbook, `SafetyMindset_ExamResults_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
-        async function exportAllQRCodesWord() {
-            if (masterData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
-            document.getElementById('status').innerText = "⏳ 正在產生所有標誌的圖形與 QR Code 清冊...";
-            let printWindow = window.open('', '_blank');
-            if (!printWindow) { alert("請允許彈出視窗以檢視匯出清冊！"); return; }
-
-            let htmlContent = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <title>Safety-Mindset智慧庫 - QR Code 清冊</title>
-                    <style>
-                        body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
-                        h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 5px; }
-                        .subtitle { text-align: center; font-size: 13px; color: #666; margin-bottom: 20px; }
-                        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 1200px; margin: 0 auto; }
-                        .card { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); page-break-inside: avoid; }
-                        .content-row { display: flex; justify-content: space-around; align-items: center; margin-bottom: 10px; }
-                        .img-box { width: 75px; height: 75px; object-fit: contain; }
-                        .card-id { font-size: 18px; font-weight: bold; color: #0056b3; margin: 6px 0 2px 0; }
-                        .card-name { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 4px; line-height: 1.3; }
-                        .card-category { font-size: 11px; color: #666; }
-                        .print-btn-bar { text-align: center; margin-bottom: 20px; }
-                        .print-btn { background: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; }
-                        @media print { .print-btn-bar { display: none; } body { background: white; padding: 0; } .card { border: 1px solid #000; box-shadow: none; } }
-                    </style>
-                </head>
-                <body>
-                    <h1>Safety-Mindset智慧庫 - 安全標誌與 QR Code 清冊</h1>
-                    <div class="subtitle">匯出日期：${new Date().toISOString().slice(0,10)} &nbsp;|&nbsp; 總計：${masterData.length} 筆</div>
-                    <div class="print-btn-bar"><button class="print-btn" onclick="window.print()">🖨️ 列印清冊 / 存成 PDF</button></div>
-                    <div class="grid-container">
-            `;
-            printWindow.document.write(htmlContent);
-            for (let i = 0; i < masterData.length; i++) {
-                let item = masterData[i];
-                printWindow.document.write(`
-                    <div class="card">
-                        <div class="content-row">
-                            <div>${item.svg_url ? `<img src="${item.svg_url}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}</div>
-                            <div id="qrcode-${i}"></div>
-                        </div>
-                        <div class="card-id">${item.id || item.ID || ''}</div>
-                        <div class="card-name">${item.name || item.Name || ''}</div>
-                        <div class="card-category">分類：${item.category || item.Category || ''}</div>
-                    </div>
-                `);
-            }
-            printWindow.document.write(`</div></body></html>`);
-            printWindow.document.close();
-            printWindow.onload = function() {
-                for (let i = 0; i < masterData.length; i++) {
-                    let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(masterData[i].uniqueKey);
-                    let qrContainer = printWindow.document.getElementById(`qrcode-${i}`);
-                    if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
-                        new printWindow.QRCode(qrContainer, { text: targetUrl, width: 75, height: 75, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L });
-                    }
-                }
-            };
-            let scripts = document.querySelectorAll('script');
-            scripts.forEach(s => { if (s.src && s.src.includes('qrcode')) { let sTag = printWindow.document.createElement('script'); sTag.src = s.src; printWindow.document.head.appendChild(sTag); } });
-            document.getElementById('status').innerText = `✅ 清冊頁面已成功開啟！`;
-        }
-
-        function promptExportFilteredCards() {
-            let multStr = prompt("請問每張卡片需要重複列印幾份？(預設 1，例如輸入 10 則每張卡片重複 10 份)", "1");
-            if (multStr === null) return;
-            let multiplier = parseInt(multStr) || 1;
-            if (multiplier < 1) multiplier = 1;
-            exportFilteredCardsWord(multiplier);
-        }
-
-        async function exportFilteredCardsWord(multiplier) {
-            let targetData = [];
-            let isEvalViewActive = document.getElementById('evalView').classList.contains('active');
-            let isDetailViewActive = document.getElementById('detailView').classList.contains('active');
-
-            if (isEvalViewActive && currentSingleItem) {
-                targetData = [currentSingleItem];
-            } else if (isDetailViewActive && currentFilteredData.length > 0) {
-                targetData = currentFilteredData;
-            } else {
-                targetData = masterData;
-            }
-            
-            if (targetData.length === 0) { alert("目前沒有可匯出的卡片資料！"); return; }
-            document.getElementById('status').innerText = `⏳ 正在產生目前結果卡片清冊 (倍數 x${multiplier})...`;
-            let printWindow = window.open('', '_blank');
-            if (!printWindow) { alert("請允許彈出視窗以檢視匯出清冊！"); return; }
-
-            let htmlContent = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <title>Safety-Mindset智慧庫 - 卡片清冊匯出</title>
-                    <style>
-                        body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
-                        h1 { text-align: center; color: #333; font-size: 20px; margin-bottom: 5px; }
-                        .subtitle { text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; }
-                        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 1100px; margin: 0 auto; }
-                        .card { background: #ffffff; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); page-break-inside: avoid; }
-                        .content-row { display: flex; justify-content: space-around; align-items: center; margin-bottom: 10px; }
-                        .img-box { width: 65px; height: 65px; object-fit: contain; }
-                        .card-id { font-size: 15px; font-weight: bold; color: #007bff; margin: 4px 0 2px 0; }
-                        .card-name { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; line-height: 1.3; }
-                        .print-btn-bar { text-align: center; margin-bottom: 20px; }
-                        .print-btn { background: #28a745; color: white; border: none; padding: 10px 20px; font-size: 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-                        @media print { .print-btn-bar { display: none; } body { background: white; padding: 0; } .card { border: 1px solid #333; box-shadow: none; } }
-                    </style>
-                </head>
-                <body>
-                    <h1>Safety-Mindset智慧庫 - 標誌卡片清冊</h1>
-                    <div class="subtitle">匯出日期：${new Date().toISOString().slice(0,10)} &nbsp;|&nbsp; 原始項目：${targetData.length} 筆 &nbsp;|&nbsp; 複製倍數：x${multiplier}</div>
-                    <div class="print-btn-bar"><button class="print-btn" onclick="window.print()">🖨️ 列印 / 另存為 PDF</button></div>
-                    <div class="grid-container">
-            `;
-            printWindow.document.write(htmlContent);
-
-            let renderIndex = 0;
-            for (let m = 0; m < multiplier; m++) {
-                for (let i = 0; i < targetData.length; i++) {
-                    let item = targetData[i];
-                    printWindow.document.write(`
-                        <div class="card">
-                            <div class="content-row">
-                                <div>${item.svg_url ? `<img src="${item.svg_url}" class="img-box" alt="標誌">` : '<span style="font-size:11px; color:#999;">無圖示</span>'}</div>
-                                <div id="export-qr-${renderIndex}"></div>
-                            </div>
-                            <div class="card-id">${item.id || item.ID || ''}</div>
-                            <div class="card-name">${item.name || item.Name || ''}</div>
-                        </div>
-                    `);
-                    renderIndex++;
-                }
-            }
-            printWindow.document.write(`</div></body></html>`);
-            printWindow.document.close();
-            printWindow.onload = function() {
-                let curIdx = 0;
-                for (let m = 0; m < multiplier; m++) {
-                    for (let i = 0; i < targetData.length; i++) {
-                        let targetUrl = window.location.origin + window.location.pathname + "?evalKey=" + encodeURIComponent(targetData[i].uniqueKey);
-                        let qrContainer = printWindow.document.getElementById(`export-qr-${curIdx}`);
-                        if (qrContainer && typeof printWindow.QRCode !== 'undefined') {
-                            new printWindow.QRCode(qrContainer, { text: targetUrl, width: 65, height: 65, colorDark: "#000000", colorLight: "#ffffff", correctLevel: printWindow.QRCode.CorrectLevel.L });
-                        }
-                        curIdx++;
-                    }
-                }
-            };
-            let scripts = document.querySelectorAll('script');
-            scripts.forEach(s => { if (s.src && s.src.includes('qrcode')) { let sTag = printWindow.document.createElement('script'); sTag.src = s.src; printWindow.document.head.appendChild(sTag); } });
-            document.getElementById('status').innerText = `✅ 目前結果卡片清冊已成功開啟！`;
-        }
-
         function exportAllExcel() {
             if (masterData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
             generateExcelFile(masterData, `SafetyMindset_All_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -1029,7 +1010,6 @@
             inputEl.onkeydown = function(e) { if (e.key === 'Enter') { commitEdit(); } };
         }
 
-        // ================= 升級版智慧多元題型組題邏輯 (具備翻譯外掛防護) =================
         function startQuiz(mode) {
             if (!masterData || masterData.length < 2) { alert("資料庫中的標誌數量不足，無法自動產生測驗題！"); return; }
             currentQuizMode = mode;
