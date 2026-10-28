@@ -238,9 +238,9 @@
 
                 <h4 style="color: #0056b3; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">五、常見問題與操作排除 (FAQ)</h4>
                 <ul style="padding-left: 20px; margin-bottom: 30px;">
-                    <li><strong>Q1：無法開啟隨堂小考？</strong><br>A1：可能是資料庫標誌少於 4 筆，請聯繫管理員新增資料[cite: 6]。</li>
-                    <li><strong>Q2：正式考核成績未顯示？</strong><br>A2：請確認網路連線與工號無誤後重新提交，或聯繫工安部門[cite: 6]。</li>
-                    <li><strong>Q3：管理員密碼錯誤？</strong><br>A3：請確認大小寫，或使用修改密碼功能尋求系統管理員協助[cite: 6]。</li>
+                    <li><strong>Q1：無法開啟隨堂小考？</strong><br>A1：可能是資料庫標誌少於 4 筆，請聯繫管理員新增資料。</li>
+                    <li><strong>Q2：正式考核成績未顯示？</strong><br>A2：請確認網路連線與工號無誤後重新提交，或聯繫工安部門。</li>
+                    <li><strong>Q3：管理員密碼錯誤？</strong><br>A3：請確認大小寫，或使用修改密碼功能尋求系統管理員協助。</li>
                 </ul>
 
             </div>
@@ -1140,6 +1140,7 @@
             };
         }
 
+        // 【已恢復】支援 7 大危害評估對應題型的隨堂小考與正式考核生成邏輯
         function startQuiz(mode) {
             if (!masterData || masterData.length < 2) { 
                 alert("資料庫中的標誌數量不足，無法自動產生測驗題！"); 
@@ -1152,6 +1153,7 @@
                 titleHeader.innerText = (mode === 'practice') ? "📝 模擬小考 (自主練習)" : `🎓 正式考核：${currentExamTitle}`;
             }
             
+            // 收集全域控制與防護措施詞庫，用於產生干擾選項
             let globalControlPool = [];
             masterData.forEach(item => {
                 ['elim', 'sub', 'eng', 'admin', 'ppe'].forEach(k => {
