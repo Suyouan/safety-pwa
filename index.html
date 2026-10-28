@@ -165,7 +165,7 @@
         <!-- 操作說明按鈕 -->
         <button onclick="openUserManual()" style="background: #17a2b8; color: white;">📖 操作說明</button>
         
-        <!-- 🌐 優化後的即時語言切換區塊 (帶有文字提示) -->
+        <!-- Google 即時語言切換區塊 (帶有文字提示與明確外框) -->
         <div style="display: inline-flex; align-items: center; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; gap: 5px;">
             <span style="font-size: 13px; font-weight: bold; color: #555; white-space: nowrap;">🌐 語言：</span>
             <div id="google_translate_element"></div>
@@ -348,32 +348,9 @@
             checkUrlDirectEvaluation();
         };
 
-        // 語系智慧對應開啟對應語言的 user_manual PDF
-        function getCurrentLanguage() {
-            let combo = document.querySelector('.goog-te-combo');
-            if (combo && combo.value) {
-                return combo.value; // 例如 'en', 'de', 'zh-CN', 'zh-TW'
-            }
-            let match = document.cookie.match(/(^|;) ?googtrans=([^;]*)(;|$)/);
-            if (match) {
-                let parts = match[2].split('/');
-                if (parts.length > 0 && parts[parts.length - 1]) {
-                    return parts[parts.length - 1];
-                }
-            }
-            return 'zh-TW';
-        }
-
+        // 語系智慧對應開啟對應語言的 user_manual PDF (預設 user_manual.pdf)
         function openUserManual() {
-            let lang = getCurrentLanguage();
-            let pdfMap = {
-                'zh-TW': 'user_manual_zh-TW.pdf',
-                'zh-CN': 'user_manual_zh-CN.pdf',
-                'en': 'user_manual_en.pdf',
-                'de': 'user_manual_de.pdf'
-            };
-            let pdfFileName = pdfMap[lang] || 'user_manual_zh-TW.pdf';
-            window.open(pdfFileName, '_blank');
+            window.open('user_manual.pdf', '_blank');
         }
 
         // 切換管理者中心分頁
@@ -974,20 +951,85 @@
             inputEl.onkeydown = function(e) { if (e.key === 'Enter') { commitEdit(); } };
         }
 
+        // ================= 升級版智慧多元題型組題邏輯 =================
         function startQuiz(mode) {
-            if (masterData.length < 4) { alert("資料庫中的標誌數量不足 4 筆，無法自動產生選擇題！"); return; }
+            if (masterData.length < 2) { alert("資料庫中的標誌數量不足，無法自動產生測驗題！"); return; }
             currentQuizMode = mode;
             document.getElementById('quizHeaderTitle').innerText = (mode === 'practice') ? "📝 模擬小考 (自主練習)" : `🎓 正式考核：${examConfigData ? examConfigData.title : ''}`;
             
-            let shuffled = [...masterData].sort(() => 0.5 - Math.random());
-            let selectedItems = shuffled.slice(0, Math.min(5, shuffled.length));
+            // 收集全庫所有控制措施內容作為跨欄位混淆的總干擾池
+            let globalControlPool = [];
+            masterData.forEach(item => {
+                ['elim', 'sub', 'eng', 'admin', 'ppe'].forEach(k => {
+                    let val = item[k] || item[k.toUpperCase()] || '';
+                    if (val && val.trim() !== '-' && val.trim() !== '') {
+                        globalControlPool.push(val.trim());
+                    }
+                });
+            });
+
+            // 隨機抽選最多 5 道題
+            let shuffledItems = [...masterData].sort(() => 0.5 - Math.random());
+            let selectedItems = shuffledItems.slice(0, Math.min(5, shuffledItems.length));
             
             currentQuizQuestions = selectedItems.map((item) => {
                 let correctName = item.name || item.Name || '未知標誌';
-                let wrongPool = masterData.filter(d => (d.name || d.Name) !== correctName);
-                let shuffledWrong = wrongPool.sort(() => 0.5 - Math.random()).slice(0, 3);
-                let options = [correctName, ...shuffledWrong.map(w => w.name || w.Name)].sort(() => 0.5 - Math.random());
-                return { id: item.id || item.ID, imgUrl: item.svg_url || item.image || '', questionText: `請問代號 [${item.id || item.ID}] 的安全標誌代表下列何種含義？`, options: options, correctAnswer: correctName };
+                let itemId = item.id || item.ID || '';
+                let imgUrl = item.svg_url || item.image || '';
+
+                // 決定題型：50% 機會考標誌名稱辨識，50% 機會考五大控制措施應用
+                let qTypes = ['name'];
+                let controlFields = [
+                    { key: 'elim', label: '消除 (elim)' },
+                    { key: 'sub', label: '取代 (sub)' },
+                    { key: 'eng', label: '工程管制 (eng)' },
+                    { key: 'admin', label: '行政管制 (admin)' },
+                    { key: 'ppe', label: '個人防護用具 (ppe)' }
+                ];
+                
+                // 檢查該標誌有哪些有填寫內容的控制欄位
+                let availableControls = controlFields.filter(f => {
+                    let val = item[f.key] || item[f.key.toUpperCase()] || '';
+                    return val && val.trim() !== '-' && val.trim() !== '';
+                });
+
+                if (availableControls.length > 0) {
+                    qTypes.push('control');
+                }
+
+                let chosenType = qTypes[Math.floor(Math.random() * qTypes.length)];
+
+                if (chosenType === 'name') {
+                    // 題型一：標誌名稱辨識題
+                    let wrongPool = masterData.filter(d => (d.name || d.Name) !== correctName);
+                    let shuffledWrong = wrongPool.sort(() => 0.5 - Math.random()).slice(0, 3);
+                    let options = [correctName, ...shuffledWrong.map(w => w.name || w.Name)].sort(() => 0.5 - Math.random());
+                    return {
+                        questionText: `請問代號 [${itemId}] 的安全標誌代表下列何種含義？`,
+                        imgUrl: imgUrl,
+                        options: options,
+                        correctAnswer: correctName
+                    };
+                } else {
+                    // 題型二：五大控制措施應用題
+                    let targetField = availableControls[Math.floor(Math.random() * availableControls.length)];
+                    let correctAnswer = (item[targetField.key] || item[targetField.key.toUpperCase()] || '').trim();
+
+                    // 從全庫總干擾池中篩選出不等於正確答案的干擾項
+                    let candidateWrong = globalControlPool.filter(ans => ans !== correctAnswer);
+                    // 隨機洗牌並取最多 3 個干擾項
+                    let shuffledWrong = candidateWrong.sort(() => 0.5 - Math.random()).slice(0, 3);
+
+                    // 組合選項並打亂順序 (動態維持 2 ~ 4 選 1，不強求湊數)
+                    let options = [correctAnswer, ...shuffledWrong].sort(() => 0.5 - Math.random());
+
+                    return {
+                        questionText: `針對安全標誌 [${itemId}]《${correctName}》，下列何者為其「${targetField.label}」的正確對應措施？`,
+                        imgUrl: imgUrl,
+                        options: options,
+                        correctAnswer: correctAnswer
+                    };
+                }
             });
 
             renderQuizUI();
