@@ -8,11 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- 引入 QRCode.js 用於動態產生標誌專屬 QR Code -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- 引入 PDF.js 引擎，用於在手機與電腦上完美渲染多頁 PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
     <style>
         body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
         h2 { user-select: none; display: inline-block; }
@@ -159,7 +154,7 @@
         </div>
     </div>
 
-    <!-- 卡片/QRcode 匯出內嵌視窗 (支援手機版一鍵返回) -->
+    <!-- 卡片/QRcode 匯出內嵌視窗 -->
     <div id="exportPreviewModal" class="modal">
         <div class="modal-content" style="width: 95%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; padding: 15px;">
             <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0; flex-wrap:wrap; gap:8px;">
@@ -173,19 +168,81 @@
         </div>
     </div>
 
-    <!-- 【採用 PDF.js 引擎】多頁平滑滾動操作說明書 Modal -->
+    <!-- 【方法 A 完美實作】純 HTML 互動式操作說明書 Modal -->
     <div id="manualModal" class="modal">
-        <div class="modal-content" style="width: 95%; max-width: 900px; height: 90vh; display: flex; flex-direction: column; padding: 15px; box-sizing: border-box;">
+        <div class="modal-content" style="width: 95%; max-width: 850px; height: 88vh; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box;">
             <!-- 頂部固定返回列 -->
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0;">
-                <h3 style="margin:0; font-size:16px; color:#0056b3;">📖 系統操作說明書 (多頁檢視)</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0056b3; padding-bottom:10px; margin-bottom:15px; flex-shrink:0;">
+                <h3 style="margin:0; font-size:18px; color:#0056b3;">📖 Safety-Mindset 智慧庫系統 — 使用者操作手冊 v2.4</h3>
                 <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; font-weight: bold;">
                     ✕ 關閉並返回主頁
                 </button>
             </div>
-            <!-- 內容捲動容器：將每一頁 PDF 渲染為 canvas 實現完美上下滑動 -->
-            <div id="pdfViewerContainer" style="flex-grow:1; width:100%; height:100%; overflow-y:auto; -webkit-overflow-scrolling: touch; background: #e9ecef; border: 1px solid #ddd; border-radius: 4px; padding: 10px; box-sizing: border-box;">
-                <p style="text-align:center; padding:20px; color:#666;">⏳ 正在載入說明書...</p>
+            <!-- 內容捲動容器：純網頁 HTML排版，支援手機平滑滾動，支援多國語系翻譯 -->
+            <div style="flex-grow:1; width:100%; height:100%; overflow-y:auto; -webkit-overflow-scrolling: touch; background: #fff; padding: 10px 20px; box-sizing: border-box; line-height: 1.6; color: #333;">
+                
+                <div style="background: #e8f4fd; border-left: 4px solid #0056b3; padding: 12px 15px; margin-bottom: 20px; border-radius: 4px;">
+                    <strong>💡 系統簡介：</strong>歡迎使用 Safety-Mindset 智慧庫系統[cite: 3]。本系統專為提升廠區作業安全意識而設計，提供全廠同仁快速查詢各類職業安全衛生標誌、進行自主模擬測驗，並作為正式安全考核之平台[cite: 3]。
+                </div>
+
+                <h4 style="color: #0056b3; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 15px;">一、安全標誌查詢與瀏覽作業</h4>
+                <p>使用者可透過畫面頂部的功能列快速尋找所需的安全標誌與防護說明[cite: 3]：</p>
+                <ul style="padding-left: 20px; margin-bottom: 15px;">
+                    <li><strong>分類篩選：</strong>點擊主畫面分類卡片或頂部按鈕，系統將即時切換顯示對應分類之項目[cite: 3]。</li>
+                    <li><strong>即時關鍵字搜尋：</strong>於搜尋框輸入標誌名稱（例如：<i>「戴防護帽」</i>）或標誌代號（例如：<i>「P001」</i>），下方列表即時篩選顯示[cite: 3]。</li>
+                    <li><strong>檢視標誌細節：</strong>點擊任意標誌卡片，即可進入風險評估頁面，查看高清圖案、完整名稱與 7 大危害評估對應措施[cite: 3]。</li>
+                </ul>
+
+                <h4 style="color: #0056b3; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">二、功能項目與操作對照表</h4>
+                <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
+                    <thead>
+                        <tr style="background: #f1f3f5; border-bottom: 2px solid #dee2e6;">
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 25%;">功能項目</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left; width: 30%;">操作位置</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">使用說明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">分類檢索</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">首頁分類網格</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">點擊不同類別快速過濾標誌，協助同仁分類學習[cite: 3]。</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">關鍵字搜尋</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">上方搜尋輸入框</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">支援代號與中文名稱模糊搜尋，輸入後立即顯示結果[cite: 3]。</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">申請修改內容</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">標誌詳細評估頁</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">一般同仁若發現需修正處，可雙擊框格填寫新內容送出審核[cite: 3]。</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">發起自主測驗</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">工具列「模擬小考」</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">隨機抽選 5 題標誌測驗，供自我檢視工安認知[cite: 3]。</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h4 style="color: #0056b3; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">三、隨堂小考與正式考核流程</h4>
+                <p>系統提供「隨堂小考（自主練習）」與「正式考核」兩種測驗模式[cite: 4]：</p>
+                <ul style="padding-left: 20px; margin-bottom: 15px;">
+                    <li><strong>隨堂小考（模擬練習）：</strong>隨時可自由發起，每次由系統隨機抽取 5 題。答題完成後立即顯示成績與正確解答，結果不計入正式紀錄[cite: 4]。</li>
+                    <li><strong>正式考核（實名檢定）：</strong>點擊「正式考核」後，必須先輸入員工工號與姓名進行驗證。系統規定每位員工同一個考試僅能正式作答一次，成績將自動上傳至後台備查[cite: 4]。</li>
+                </ul>
+
+                <h4 style="color: #0056b3; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">四、管理員身份登入與權限切換</h4>
+                <p>廠區工安管理者可點擊頁首「管理者中心」，輸入專屬管理密碼後解鎖管理功能（包含正式考試發起、成績總表匯出、待審批清單核准等）[cite: 5]。操作完畢後請務必點擊「登出管理員」，確保資料安全[cite: 5]。</p>
+
+                <h4 style="color: #0056b3; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">五、常見問題與操作排除 (FAQ)</h4>
+                <ul style="padding-left: 20px; margin-bottom: 30px;">
+                    <li><strong>Q1：無法開啟隨堂小考？</strong><br>A1：可能是資料庫標誌少於 4 筆，請聯繫管理員新增資料[cite: 6]。</li>
+                    <li><strong>Q2：正式考核成績未顯示？</strong><br>A2：請確認網路連線與工號無誤後重新提交，或聯繫工安部門[cite: 6]。</li>
+                    <li><strong>Q3：管理員密碼錯誤？</strong><br>A3：請確認大小寫，或使用修改密碼功能尋求系統管理員協助[cite: 6]。</li>
+                </ul>
+
             </div>
         </div>
     </div>
@@ -413,60 +470,13 @@
             return 'zh-TW';
         }
 
-        // 使用 PDF.js 動態渲染多頁 PDF 到手機畫面上
-        async function openUserManual() {
-            let lang = getCurrentLanguage();
-            let pdfMap = {
-                'zh-TW': 'user_manual_zh-TW.pdf',
-                'zh-CN': 'user_manual_zh-CN.pdf',
-                'en': 'user_manual_en.pdf',
-                'de': 'user_manual_de.pdf'
-            };
-            let pdfFileName = pdfMap[lang] || 'user_manual.pdf';
-            
-            let container = document.getElementById('pdfViewerContainer');
-            container.innerHTML = '<p style="text-align:center; padding:30px; color:#666;">⏳ 正在載入說明書多頁內容...</p>';
+        // 開啟純 HTML 版操作說明書 Modal
+        function openUserManual() {
             document.getElementById('manualModal').style.display = 'block';
-
-            try {
-                const loadingTask = pdfjsLib.getDocument(pdfFileName);
-                const pdfDoc = await loadingTask.promise;
-                container.innerHTML = ''; // 清空載入提示
-
-                // 迴圈讀取並渲染每一頁
-                for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-                    const page = await pdfDoc.getPage(pageNum);
-                    const scale = 1.5; // 解析度縮放
-                    const viewport = page.getViewport({ scale: scale });
-
-                    const canvas = document.createElement('canvas');
-                    canvas.style.display = 'block';
-                    canvas.style.margin = '0 auto 15px auto';
-                    canvas.style.maxWidth = '100%';
-                    canvas.style.height = 'auto';
-                    canvas.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                    canvas.style.background = '#ffffff';
-
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-
-                    container.appendChild(canvas);
-
-                    const renderContext = {
-                        canvasContext: context,
-                        viewport: viewport
-                    };
-                    await page.render(renderContext).promise;
-                }
-            } catch (error) {
-                container.innerHTML = `<p style="text-align:center; color:red; padding:20px;">❌ 無法載入 PDF 檔案 (${error.message})。<br><br><a href="${pdfFileName}" target="_blank" style="color:#007bff; font-weight:bold;">點此直接下載 PDF 檔案</a></p>`;
-            }
         }
 
         function closeUserManualModal() {
             document.getElementById('manualModal').style.display = 'none';
-            document.getElementById('pdfViewerContainer').innerHTML = ''; // 清空記憶體與畫面
         }
 
         function closeExportModal() {
