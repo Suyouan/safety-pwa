@@ -432,7 +432,7 @@
             if (authId) authId.value = '';
             if (authName) authName.value = '';
             if (modalTitle) modalTitle.innerText = `🎓 ${examConfigData ? examConfigData.title : '正式考核'}`;
-            if (modalDesc) modalDesc.innerText = `請填寫您的工號進行身分驗證。系統規定每位員工僅能正式作答一次！`;
+            if (modalDesc) modalDesc.innerText = `請填寫您的工號進行身分驗證。系統規定每位員工在同一個考試中僅能正式作答一次！`;
             let authModal = document.getElementById('examAuthModal');
             if (authModal) authModal.style.display = 'block';
         }
@@ -449,13 +449,15 @@
             let statusEl = document.getElementById('status');
             if (statusEl) statusEl.innerText = "⏳ 正在驗證您的作答資格...";
             
+            let currentExamTitle = examConfigData ? (examConfigData.title || "正式考核") : "正式考核";
+
             try {
-                let res = await fetch(`${GAS_URL}?action=checkExamAttempt&empId=${encodeURIComponent(empId)}`);
+                let res = await fetch(`${GAS_URL}?action=checkExamAttempt&empId=${encodeURIComponent(empId)}&examTitle=${encodeURIComponent(currentExamTitle)}`);
                 let result = await res.json();
 
                 if (result.status === "success") {
                     if (result.hasAttempted) {
-                        alert(`⚠️ 驗證失敗：工號 [${empId}] 已經完成過本次正式考核，系統規定只能作答一次！`);
+                        alert(`⚠️ 驗證失敗：工號 [${empId}] 已經完成過本次考試《${currentExamTitle}》，系統規定同一個考試只能作答一次！`);
                         if (statusEl) statusEl.innerText = `❌ 重複作答已被阻擋`;
                         return;
                     }
@@ -469,7 +471,7 @@
                     alert("❌ 驗證失敗，伺服器返回異常。");
                 }
             } catch (e) { 
-                // 即使發生網路跨域限制，也允許安全性容錯進入作答
+                // 網路容錯機制，確保不卡住
                 verifiedEmpId = empId;
                 verifiedEmpName = empName;
                 let authModal = document.getElementById('examAuthModal');
@@ -574,6 +576,7 @@
                         <thead>
                             <tr style="background: #f1f3f5; border-bottom: 2px solid #dee2e6;">
                                 <th style="padding: 10px;">交卷時間</th>
+                                <th style="padding: 10px;">考試名稱</th>
                                 <th style="padding: 10px;">員工工號</th>
                                 <th style="padding: 10px;">員工姓名</th>
                                 <th style="padding: 10px; text-align: center;">考核得分</th>
@@ -586,7 +589,8 @@
                     tableHtml += `
                         <tr style="border-bottom: 1px solid #dee2e6;">
                             <td style="padding: 10px; font-size:13px; color:#555;">${r.timestamp}</td>
-                            <td style="padding: 10px; font-weight:bold; color:#0056b3;">${r.empId}</td>
+                            <td style="padding: 10px; font-size:13px; color:#0056b3; font-weight:bold;">${r.examTitle || '正式考核'}</td>
+                            <td style="padding: 10px; font-weight:bold;">${r.empId}</td>
                             <td style="padding: 10px;">${r.empName}</td>
                             <td style="padding: 10px; text-align: center; font-weight:bold; color:${parseInt(r.score) >= 60 ? '#28a745' : '#dc3545'};">${r.score} 分</td>
                         </tr>
@@ -606,6 +610,7 @@
             if (cachedQuizResults.length === 0) { alert("目前沒有可匯出的成績資料！"); return; }
             let exportData = cachedQuizResults.map(r => ({
                 "交卷時間": r.timestamp,
+                "考試名稱": r.examTitle || '正式考核',
                 "員工工號": r.empId,
                 "員工姓名": r.empName,
                 "考核得分": r.score
@@ -1009,8 +1014,9 @@
             if (!masterData || masterData.length < 2) { alert("資料庫中的標誌數量不足，無法自動產生測驗題！"); return; }
             currentQuizMode = mode;
             let titleHeader = document.getElementById('quizHeaderTitle');
+            let currentExamTitle = examConfigData ? (examConfigData.title || "正式考核") : "正式考核";
             if (titleHeader) {
-                titleHeader.innerText = (mode === 'practice') ? "📝 模擬小考 (自主練習)" : `🎓 正式考核：${examConfigData ? examConfigData.title : ''}`;
+                titleHeader.innerText = (mode === 'practice') ? "📝 模擬小考 (自主練習)" : `🎓 正式考核：${currentExamTitle}`;
             }
             
             // 從原始資料物件收集全庫所有控制措施內容（完全免疫翻譯外掛干擾）
@@ -1118,8 +1124,9 @@
             score = Math.round(score);
 
             if (currentQuizMode === 'exam') {
+                let currentExamTitle = examConfigData ? (examConfigData.title || "正式考核") : "正式考核";
                 try {
-                    let payload = { action: 'submitQuizResult', empId: verifiedEmpId, empName: verifiedEmpName, score: `${score}` };
+                    let payload = { action: 'submitQuizResult', empId: verifiedEmpId, empName: verifiedEmpName, examTitle: currentExamTitle, score: `${score}` };
                     await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                     alert("✅ 正式考核成績已成功上傳並記錄！");
                 } catch (e) { alert("✅ 成績已計算完成（正式考核成績已送出）"); }
