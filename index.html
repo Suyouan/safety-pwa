@@ -143,14 +143,16 @@
         </div>
     </div>
 
-    <!-- 操作說明 PDF 內嵌檢視 Modal (解決手機版無法關閉問題) -->
+    <!-- 操作說明 PDF 內嵌檢視 Modal (已優化手機版自動調節與多頁捲動) -->
     <div id="manualModal" class="modal">
-        <div class="modal-content" style="width: 95%; max-width: 900px; height: 85vh; display: flex; flex-direction: column; padding: 15px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px;">
+        <div class="modal-content" style="width: 95%; max-width: 950px; height: 90vh; display: flex; flex-direction: column; padding: 15px; -webkit-overflow-scrolling: touch;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0;">
                 <h3 id="manualModalTitle" style="margin:0; font-size:16px; color:#0056b3;">📖 系統操作說明書</h3>
                 <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 4px; font-size: 14px; cursor: pointer;">✕ 關閉並返回系統</button>
             </div>
-            <iframe id="manualIframe" src="" style="width:100%; flex-grow:1; border:none; background:#f9f9f9; border-radius:4px;"></iframe>
+            <div style="flex-grow:1; width:100%; height:100%; overflow:auto; -webkit-overflow-scrolling: touch;">
+                <iframe id="manualIframe" src="" style="width:100%; height:100%; border:none; background:#f9f9f9; border-radius:4px;"></iframe>
+            </div>
         </div>
     </div>
 
@@ -178,7 +180,7 @@
         <!-- 操作說明按鈕 -->
         <button onclick="openUserManual()" style="background: #17a2b8; color: white;">📖 操作說明</button>
         
-        <!-- Google 即時語言切換區塊 (帶有文字提示與明確外框) -->
+        <!-- Google 即時語言切換區塊 -->
         <div style="display: inline-flex; align-items: center; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; gap: 5px;">
             <span style="font-size: 13px; font-weight: bold; color: #555; white-space: nowrap;">🌐 語言：</span>
             <div id="google_translate_element"></div>
@@ -361,7 +363,7 @@
             checkUrlDirectEvaluation();
         };
 
-        // 開啟操作說明 PDF (採用內嵌檢視 Modal，解決手機版無法關閉與返回的問題)
+        // 開啟操作說明 PDF (自動補上 #toolbar=1&view=FitH 參數以支援手機多頁捲動)
         function getCurrentLanguage() {
             let combo = document.querySelector('.goog-te-combo');
             if (combo && combo.value) { return combo.value; }
@@ -382,13 +384,13 @@
                 'de': 'user_manual_de.pdf'
             };
             let pdfFileName = pdfMap[lang] || 'user_manual.pdf';
-            document.getElementById('manualIframe').src = pdfFileName;
+            document.getElementById('manualIframe').src = pdfFileName + "#toolbar=1&view=FitH";
             document.getElementById('manualModal').style.display = 'block';
         }
 
         function closeUserManualModal() {
             document.getElementById('manualModal').style.display = 'none';
-            document.getElementById('manualIframe').src = ''; // 清空 iframe 停止載入
+            document.getElementById('manualIframe').src = ''; 
         }
 
         // 切換管理者中心分頁
@@ -490,7 +492,6 @@
                     alert("❌ 驗證失敗，伺服器返回異常。");
                 }
             } catch (e) { 
-                // 網路容錯機制，確保不卡住
                 verifiedEmpId = empId;
                 verifiedEmpName = empName;
                 let authModal = document.getElementById('examAuthModal');
@@ -1038,7 +1039,6 @@
                 titleHeader.innerText = (mode === 'practice') ? "📝 模擬小考 (自主練習)" : `🎓 正式考核：${currentExamTitle}`;
             }
             
-            // 從原始資料物件收集全庫所有控制措施內容（完全免疫翻譯外掛干擾）
             let globalControlPool = [];
             masterData.forEach(item => {
                 ['elim', 'sub', 'eng', 'admin', 'ppe'].forEach(k => {
@@ -1049,7 +1049,6 @@
                 });
             });
 
-            // 隨機抽選最多 5 道題
             let shuffledItems = [...masterData].sort(() => 0.5 - Math.random());
             let selectedItems = shuffledItems.slice(0, Math.min(5, shuffledItems.length));
             
@@ -1058,7 +1057,6 @@
                 let itemId = item.id || item.ID || '';
                 let imgUrl = item.svg_url || item.image || '';
 
-                // 決定題型：50% 機會考標誌名稱辨識，50% 機會考五大控制措施應用
                 let qTypes = ['name'];
                 let controlFields = [
                     { key: 'elim', label: '消除 (elim)' },
@@ -1068,7 +1066,6 @@
                     { key: 'ppe', label: '個人防護用具 (ppe)' }
                 ];
                 
-                // 檢查該標誌有哪些有填寫內容的控制欄位
                 let availableControls = controlFields.filter(f => {
                     let val = item[f.key] || item[f.key.toUpperCase()] || '';
                     return val && typeof val === 'string' && val.trim() !== '-' && val.trim() !== '';
@@ -1081,7 +1078,6 @@
                 let chosenType = qTypes[Math.floor(Math.random() * qTypes.length)];
 
                 if (chosenType === 'name') {
-                    // 題型一：標誌名稱辨識題
                     let wrongPool = masterData.filter(d => (d.name || d.Name) !== correctName);
                     let shuffledWrong = wrongPool.sort(() => 0.5 - Math.random()).slice(0, 3);
                     let options = [correctName, ...shuffledWrong.map(w => w.name || w.Name)].sort(() => 0.5 - Math.random());
@@ -1092,16 +1088,11 @@
                         correctAnswer: correctName
                     };
                 } else {
-                    // 題型二：五大控制措施應用題
                     let targetField = availableControls[Math.floor(Math.random() * availableControls.length)];
                     let correctAnswer = (item[targetField.key] || item[targetField.key.toUpperCase()] || '').trim();
 
-                    // 從全庫總干擾池中篩選出不等於正確答案的干擾項，並排除重複
                     let candidateWrong = [...new Set(globalControlPool.filter(ans => ans !== correctAnswer))];
-                    // 隨機洗牌並取最多 3 個干擾項（彈性維持 2~4 選 1，不強求湊數）
                     let shuffledWrong = candidateWrong.sort(() => 0.5 - Math.random()).slice(0, 3);
-
-                    // 組合選項並打亂順序
                     let options = [correctAnswer, ...shuffledWrong].sort(() => 0.5 - Math.random());
 
                     return {
