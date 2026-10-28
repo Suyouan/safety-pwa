@@ -12,7 +12,7 @@
         body { font-family: sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
         h2 { user-select: none; display: inline-block; }
         .toolbar { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
-        input[type="text"], input[type="password"], input[type="number"], input[type="datetime-local"] { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px; }
+        input[type="text"], input[type="password"], input[type="number"], input[type="datetime-local"] { padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; max-width: 100%; }
         button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background: #28a745; color: white; }
         button:hover { opacity: 0.9; }
         
@@ -36,19 +36,21 @@
         .sign-card img { width: 55px; height: 55px; object-fit: contain; }
         .qr-code-wrap { background: #fff; padding: 4px; border: 1px solid #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
 
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
-        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        /* 完美適配手機螢幕的彈窗樣式 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; box-sizing: border-box; }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; width: 92%; max-width: 500px; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); box-sizing: border-box; }
+        
         .action-btn { padding: 4px 8px; font-size: 12px; margin: 2px; }
         .admin-only { display: none; }
 
-        .eval-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
+        .eval-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; box-sizing: border-box; }
         .eval-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
         .eval-table td { padding: 10px; border: 1px solid #ddd; text-align: left; }
         .eval-table td.label-col { background: #f8f9fa; font-weight: bold; width: 35%; }
         .editable-cell { cursor: pointer; background: #fffdf0; }
         .editable-cell:hover { background-color: #fff3cd; }
 
-        .quiz-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 700px; margin: 0 auto; }
+        .quiz-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 700px; margin: 0 auto; box-sizing: border-box; }
         .quiz-question { font-weight: bold; margin-bottom: 10px; color: #0056b3; }
         .quiz-options label { display: block; background: #f8f9fa; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; cursor: pointer; }
         .quiz-options label:hover { background: #e2e6ea; }
@@ -89,7 +91,7 @@
 
     <!-- 待審批清單彈跳視窗 -->
     <div id="pendingModal" class="modal">
-        <div class="modal-content" style="width:90%; max-width:750px;">
+        <div class="modal-content" style="max-width:750px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px;">
                 <h3 style="margin:0;">📋 待審批變更清單</h3>
                 <button onclick="closePendingModal()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#333;">&times;</button>
@@ -103,13 +105,13 @@
 
     <!-- 員工考核成績總結報告與明細 Modal -->
     <div id="quizResultsModal" class="modal">
-        <div class="modal-content" style="width:90%; max-width:850px;">
+        <div class="modal-content" style="max-width:850px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px;">
                 <h3 style="margin:0;">📊 正式考核成績總結報告與明細</h3>
                 <button onclick="closeQuizResultsModal()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#333;">&times;</button>
             </div>
             <div id="quizResultsContent" style="max-height:500px; overflow-y:auto; margin:15px 0;"></div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <button onclick="exportQuizResultsExcel()" style="background: #17a2b8; color:white;">📥 匯出成績總表 Excel</button>
                 <button onclick="closeQuizResultsModal()" style="background:#6c757d; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">關閉</button>
             </div>
@@ -122,10 +124,10 @@
             <h3 id="examModalTitle">🎓 正式考核身分驗證</h3>
             <p id="examModalDesc" style="font-size: 13px; color: #666; margin-bottom: 15px;"></p>
             <div style="text-align: left; margin-bottom: 15px;">
-                <label style="font-size: 12px; font-weight: bold;">員工工號：</label>
-                <input type="text" id="authEmpId" placeholder="例如: T12345" style="width: 90%; margin-bottom: 8px;"><br>
-                <label style="font-size: 12px; font-weight: bold;">員工姓名：</label>
-                <input type="text" id="authEmpName" placeholder="例如: 蘇宥安" style="width: 90%;">
+                <label style="font-size: 12px; font-weight: bold;">員工工號：</label><br>
+                <input type="text" id="authEmpId" placeholder="例如: T12345" style="width: 100%; margin-bottom: 8px;"><br>
+                <label style="font-size: 12px; font-weight: bold;">員工姓名：</label><br>
+                <input type="text" id="authEmpName" placeholder="例如: 蘇宥安" style="width: 100%;">
             </div>
             <button onclick="verifyAndStartExam()" style="background: #28a745; width: 100%; margin-bottom: 8px;">開始正式作答</button>
             <button onclick="document.getElementById('examAuthModal').style.display='none'" style="background: #6c757d; width: 100%;">取消</button>
@@ -138,6 +140,17 @@
             <h3 id="quizResultTitle">🎓 測驗結算</h3>
             <p id="quizScoreText" style="font-size: 20px; font-weight: bold; color: #28a745; margin: 15px 0;"></p>
             <button onclick="document.getElementById('quizResultModal').style.display='none'; goBackToCategory();" style="background: #28a745; width: 100%;">完成並返回首頁</button>
+        </div>
+    </div>
+
+    <!-- 操作說明 PDF 內嵌檢視 Modal (解決手機版無法關閉問題) -->
+    <div id="manualModal" class="modal">
+        <div class="modal-content" style="width: 95%; max-width: 900px; height: 85vh; display: flex; flex-direction: column; padding: 15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px;">
+                <h3 id="manualModalTitle" style="margin:0; font-size:16px; color:#0056b3;">📖 系統操作說明書</h3>
+                <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 4px; font-size: 14px; cursor: pointer;">✕ 關閉並返回系統</button>
+            </div>
+            <iframe id="manualIframe" src="" style="width:100%; flex-grow:1; border:none; background:#f9f9f9; border-radius:4px;"></iframe>
         </div>
     </div>
 
@@ -248,7 +261,7 @@
             <h3>🔐 管理者中心</h3>
             <div id="loginView">
                 <p>請輸入管理員密碼：</p>
-                <input type="password" id="pwdInput" placeholder="請輸入密碼" style="width: 93%; padding: 8px; margin-bottom: 10px;">
+                <input type="password" id="pwdInput" placeholder="請輸入密碼" style="width: 100%; padding: 8px; margin-bottom: 10px;"><br>
                 <button onclick="verifyLogin()" style="width: 100%; margin-bottom: 5px; background: #007bff;">登入</button>
             </div>
             
@@ -264,20 +277,20 @@
                 <!-- 分頁一：考試與成績管理 -->
                 <div id="examTab" class="admin-tab-content active">
                     <h4 style="margin-top:0;">發起與設定正式考試</h4>
-                    <label style="font-size:11px; color:#666;">考試名稱</label>
-                    <input type="text" id="adminExamTitle" placeholder="例如: 2026年度安衛正式考核" style="width: 93%; padding: 6px; margin-bottom: 6px;">
-                    <label style="font-size:11px; color:#666;">開始時間</label>
-                    <input type="datetime-local" id="adminExamStart" style="width: 93%; padding: 6px; margin-bottom: 6px;">
-                    <label style="font-size:11px; color:#666;">結束時間</label>
-                    <input type="datetime-local" id="adminExamEnd" style="width: 93%; padding: 6px; margin-bottom: 6px;">
-                    <label style="font-size:11px; color:#666;">狀態開關</label>
-                    <select id="adminExamStatus" style="width: 96%; padding: 6px; margin-bottom: 10px;">
+                    <label style="font-size:11px; color:#666;">考試名稱</label><br>
+                    <input type="text" id="adminExamTitle" placeholder="例如: 2026年度安衛正式考核" style="width: 100%; padding: 6px; margin-bottom: 6px;"><br>
+                    <label style="font-size:11px; color:#666;">開始時間</label><br>
+                    <input type="datetime-local" id="adminExamStart" style="width: 100%; padding: 6px; margin-bottom: 6px;"><br>
+                    <label style="font-size:11px; color:#666;">結束時間</label><br>
+                    <input type="datetime-local" id="adminExamEnd" style="width: 100%; padding: 6px; margin-bottom: 6px;"><br>
+                    <label style="font-size:11px; color:#666;">狀態開關</label><br>
+                    <select id="adminExamStatus" style="width: 100%; padding: 6px; margin-bottom: 10px;">
                         <option value="Active">啟用 (開放作答)</option>
                         <option value="Inactive">關閉 (不開放)</option>
                     </select>
                     <div style="display:flex; gap:5px; margin-bottom: 10px;">
-                        <button onclick="saveExamConfig()" style="flex:1; background: #28a745;">儲存考試設定</button>
-                        <button onclick="forceStopExam()" style="flex:1; background: #dc3545;" title="一鍵強制停止目前考試">🛑 強制停止考試</button>
+                        <button onclick="saveExamConfig()" style="flex:1; background: #28a745;">儲存設定</button>
+                        <button onclick="forceStopExam()" style="flex:1; background: #dc3545;" title="一鍵強制停止目前考試">🛑 停止考試</button>
                     </div>
                     <button onclick="openQuizResultsModal()" style="width: 100%; margin-bottom: 5px; background: #17a2b8;">📊 查看員工考核成績總表</button>
                 </div>
@@ -285,8 +298,8 @@
                 <!-- 分頁二：系統安全與審批 -->
                 <div id="securityTab" class="admin-tab-content">
                     <h4 style="margin-top:0;">變更管理員密碼</h4>
-                    <input type="password" id="oldPwd" placeholder="請輸入舊密碼" style="width: 93%; padding: 6px; margin-bottom: 5px;">
-                    <input type="password" id="newPwd" placeholder="請輸入新密碼" style="width: 93%; padding: 6px; margin-bottom: 10px;">
+                    <input type="password" id="oldPwd" placeholder="請輸入舊密碼" style="width: 100%; padding: 6px; margin-bottom: 5px;"><br>
+                    <input type="password" id="newPwd" placeholder="請輸入新密碼" style="width: 100%; padding: 6px; margin-bottom: 10px;"><br>
                     <button onclick="changePassword()" style="width: 100%; margin-bottom: 8px; background: #ffc107; color: #333;">確認修改密碼</button>
                     <button onclick="openPendingModal()" style="width: 100%; margin-bottom: 8px; background: #17a2b8;">📋 查看待審批清單</button>
                     <button onclick="adminLogout()" style="width: 100%; margin-bottom: 8px; background: #dc3545;">登出管理員</button>
@@ -301,14 +314,14 @@
     <div id="addModal" class="modal">
         <div class="modal-content">
             <h3>新增安全標誌</h3>
-            <label style="font-size:12px; color:#666;">ID (例如: P050)</label>
-            <input type="text" id="addId" placeholder="輸入標誌代號" style="width: 93%; padding: 6px; margin-bottom: 8px;">
-            <label style="font-size:12px; color:#666;">Category</label>
-            <input type="text" id="addCategory" placeholder="例如: Warning sign / Prohibition" style="width: 93%; padding: 6px; margin-bottom: 8px;">
-            <label style="font-size:12px; color:#666;">Name</label>
-            <input type="text" id="addName" placeholder="輸入名稱說明" style="width: 93%; padding: 6px; margin-bottom: 8px;">
-            <label style="font-size:12px; color:#666;">圖片網址 (svg_url)</label>
-            <input type="text" id="addImg" placeholder="輸入圖片連結 (選填)" style="width: 93%; padding: 6px; margin-bottom: 15px;">
+            <label style="font-size:12px; color:#666;">ID (例如: P050)</label><br>
+            <input type="text" id="addId" placeholder="輸入標誌代號" style="width: 100%; padding: 6px; margin-bottom: 8px;"><br>
+            <label style="font-size:12px; color:#666;">Category</label><br>
+            <input type="text" id="addCategory" placeholder="例如: Warning sign / Prohibition" style="width: 100%; padding: 6px; margin-bottom: 8px;"><br>
+            <label style="font-size:12px; color:#666;">Name</label><br>
+            <input type="text" id="addName" placeholder="輸入名稱說明" style="width: 100%; padding: 6px; margin-bottom: 8px;"><br>
+            <label style="font-size:12px; color:#666;">圖片網址 (svg_url)</label><br>
+            <input type="text" id="addImg" placeholder="輸入圖片連結 (選填)" style="width: 100%; padding: 6px; margin-bottom: 15px;"><br>
             <button onclick="submitAdd()" style="width: 100%; margin-bottom: 8px; background: #28a745;">確認新增</button>
             <button onclick="document.getElementById('addModal').style.display='none'" style="width: 100%; background: #6c757d;">取消</button>
         </div>
@@ -348,7 +361,7 @@
             checkUrlDirectEvaluation();
         };
 
-        // 開啟操作說明 PDF (會依照目前選取的語言自動對應檔案，找不到則開啟預設檔)
+        // 開啟操作說明 PDF (採用內嵌檢視 Modal，解決手機版無法關閉與返回的問題)
         function getCurrentLanguage() {
             let combo = document.querySelector('.goog-te-combo');
             if (combo && combo.value) { return combo.value; }
@@ -369,7 +382,13 @@
                 'de': 'user_manual_de.pdf'
             };
             let pdfFileName = pdfMap[lang] || 'user_manual.pdf';
-            window.open(pdfFileName, '_blank');
+            document.getElementById('manualIframe').src = pdfFileName;
+            document.getElementById('manualModal').style.display = 'block';
+        }
+
+        function closeUserManualModal() {
+            document.getElementById('manualModal').style.display = 'none';
+            document.getElementById('manualIframe').src = ''; // 清空 iframe 停止載入
         }
 
         // 切換管理者中心分頁
