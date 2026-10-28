@@ -348,9 +348,28 @@
             checkUrlDirectEvaluation();
         };
 
-        // 語系智慧對應開啟對應語言的 user_manual PDF (預設 user_manual.pdf)
+        // 開啟操作說明 PDF (會依照目前選取的語言自動對應檔案，找不到則開啟預設檔)
+        function getCurrentLanguage() {
+            let combo = document.querySelector('.goog-te-combo');
+            if (combo && combo.value) { return combo.value; }
+            let match = document.cookie.match(/(^|;) ?googtrans=([^;]*)(;|$)/);
+            if (match) {
+                let parts = match[2].split('/');
+                if (parts.length > 0 && parts[parts.length - 1]) { return parts[parts.length - 1]; }
+            }
+            return 'zh-TW';
+        }
+
         function openUserManual() {
-            window.open('user_manual.pdf', '_blank');
+            let lang = getCurrentLanguage();
+            let pdfMap = {
+                'zh-TW': 'user_manual_zh-TW.pdf',
+                'zh-CN': 'user_manual_zh-CN.pdf',
+                'en': 'user_manual_en.pdf',
+                'de': 'user_manual_de.pdf'
+            };
+            let pdfFileName = pdfMap[lang] || 'user_manual.pdf';
+            window.open(pdfFileName, '_blank');
         }
 
         // 切換管理者中心分頁
@@ -376,7 +395,7 @@
                     }
 
                     let examBtn = document.getElementById('examBtn');
-                    if (examConfigData.status === "Active") {
+                    if (examConfigData && examConfigData.status === "Active") {
                         let now = new Date();
                         let start = examConfigData.startTime ? new Date(examConfigData.startTime) : null;
                         let end = examConfigData.endTime ? new Date(examConfigData.endTime) : null;
@@ -404,7 +423,7 @@
         function openExamAuthModal() {
             document.getElementById('authEmpId').value = '';
             document.getElementById('authEmpName').value = '';
-            document.getElementById('examModalTitle').innerText = `🎓 ${examConfigData.title || '正式考核'}`;
+            document.getElementById('examModalTitle').innerText = `🎓 ${examConfigData ? examConfigData.title : '正式考核'}`;
             document.getElementById('examModalDesc').innerText = `請填寫您的工號進行身分驗證。系統規定每位員工僅能正式作答一次！`;
             document.getElementById('examAuthModal').style.display = 'block';
         }
@@ -1015,12 +1034,12 @@
                     let targetField = availableControls[Math.floor(Math.random() * availableControls.length)];
                     let correctAnswer = (item[targetField.key] || item[targetField.key.toUpperCase()] || '').trim();
 
-                    // 從全庫總干擾池中篩選出不等於正確答案的干擾項
-                    let candidateWrong = globalControlPool.filter(ans => ans !== correctAnswer);
-                    // 隨機洗牌並取最多 3 個干擾項
+                    // 從全庫總干擾池中篩選出不等於正確答案的干擾項，並排除重複
+                    let candidateWrong = [...new Set(globalControlPool.filter(ans => ans !== correctAnswer))];
+                    // 隨機洗牌並取最多 3 個干擾項（彈性維持 2~4 選 1，不強求湊數）
                     let shuffledWrong = candidateWrong.sort(() => 0.5 - Math.random()).slice(0, 3);
 
-                    // 組合選項並打亂順序 (動態維持 2 ~ 4 選 1，不強求湊數)
+                    // 組合選項並打亂順序
                     let options = [correctAnswer, ...shuffledWrong].sort(() => 0.5 - Math.random());
 
                     return {
