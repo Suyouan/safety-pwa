@@ -168,23 +168,20 @@
         </div>
     </div>
 
-    <!-- 【全面優化手機 PWA】操作說明 PDF 專用互動卡片 Modal -->
+    <!-- 【PWA 專用優化】操作說明 PDF 檢視 Modal -->
     <div id="manualModal" class="modal">
-        <div class="modal-content" style="width: 92%; max-width: 550px; text-align: center; padding: 25px;">
-            <h3 style="margin-top:0; color:#0056b3;">📖 系統操作說明書</h3>
-            <p style="font-size: 13px; color: #666; margin-bottom: 20px;">
-                為確保在手機 PWA 模式下能流暢閱讀多頁內容並隨時返回，請點擊下方按鈕直接下載或開啟完整操作手冊 PDF：
-            </p>
-            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-                <a id="manualDownloadBtn" href="" target="_blank" style="background: #17a2b8; color: white; text-decoration: none; padding: 12px; border-radius: 6px; font-size: 15px; font-weight: bold; display: block; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    📥 下載 / 外部開啟完整 PDF
-                </a>
+        <div class="modal-content" style="width: 95%; max-width: 900px; height: 90vh; display: flex; flex-direction: column; padding: 15px; box-sizing: border-box;">
+            <!-- 頂部固定返回列：絕對不會被 PDF 覆蓋 -->
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0;">
+                <h3 style="margin:0; font-size:16px; color:#0056b3;">📖 系統操作說明書</h3>
+                <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; font-weight: bold;">
+                    ✕ 關閉並返回主頁
+                </button>
             </div>
-            <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 10px; width: 100%; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: bold;">
-                ✕ 關閉並返回主頁
-            </button>
-            <!-- 隱藏的 iframe 用於桌機支援 -->
-            <iframe id="manualIframe" src="" style="display:none;"></iframe>
+            <!-- 內容容器：支援手機平滑捲動 -->
+            <div style="flex-grow:1; width:100%; height:100%; overflow:auto; -webkit-overflow-scrolling: touch; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+                <iframe id="manualIframe" src="" style="width:100%; height:100%; border:none;"></iframe>
+            </div>
         </div>
     </div>
 
@@ -411,7 +408,7 @@
             return 'zh-TW';
         }
 
-        // 開啟操作說明 PDF (針對手機 PWA 最佳化彈窗)
+        // 開啟操作說明 PDF
         function openUserManual() {
             let lang = getCurrentLanguage();
             let pdfMap = {
@@ -422,12 +419,24 @@
             };
             let pdfFileName = pdfMap[lang] || 'user_manual.pdf';
             
-            let downloadBtn = document.getElementById('manualDownloadBtn');
-            if (downloadBtn) {
-                downloadBtn.href = pdfFileName;
+            let iframe = document.getElementById('manualIframe');
+            if (iframe) {
+                iframe.src = pdfFileName;
             }
-
+            
             document.getElementById('manualModal').style.display = 'block';
+        }
+        
+        // 關閉操作說明並返回主頁
+        function closeUserManualModal() {
+            let modal = document.getElementById('manualModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+            let iframe = document.getElementById('manualIframe');
+            if (iframe) {
+                iframe.src = ''; // 清空 iframe 避免資源持續佔用
+            }
         }
 
         function closeUserManualModal() {
