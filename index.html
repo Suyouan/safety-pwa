@@ -168,19 +168,23 @@
         </div>
     </div>
 
-    <!-- 操作說明 PDF 內嵌檢視 Modal (支援手機完整滑動與外部下載) -->
+    <!-- 【全面優化手機 PWA】操作說明 PDF 專用互動卡片 Modal -->
     <div id="manualModal" class="modal">
-        <div class="modal-content" style="width: 95%; max-width: 950px; height: 85vh; display: flex; flex-direction: column; padding: 15px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px; flex-shrink:0; flex-wrap:wrap; gap:8px;">
-                <h3 id="manualModalTitle" style="margin:0; font-size:16px; color:#0056b3;">📖 系統操作說明書</h3>
-                <div style="display:flex; gap:8px;">
-                    <a id="manualDownloadBtn" href="" target="_blank" style="background: #17a2b8; color: white; text-decoration: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; display: inline-block;">📥 原生開啟/下載</a>
-                    <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer;">✕ 關閉並返回主頁</button>
-                </div>
+        <div class="modal-content" style="width: 92%; max-width: 550px; text-align: center; padding: 25px;">
+            <h3 style="margin-top:0; color:#0056b3;">📖 系統操作說明書</h3>
+            <p style="font-size: 13px; color: #666; margin-bottom: 20px;">
+                為確保在手機 PWA 模式下能流暢閱讀多頁內容並隨時返回，請點擊下方按鈕直接下載或開啟完整操作手冊 PDF：
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                <a id="manualDownloadBtn" href="" target="_blank" style="background: #17a2b8; color: white; text-decoration: none; padding: 12px; border-radius: 6px; font-size: 15px; font-weight: bold; display: block; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    📥 下載 / 外部開啟完整 PDF
+                </a>
             </div>
-            <div style="flex-grow:1; width:100%; height:100%; overflow:auto; -webkit-overflow-scrolling: touch;">
-                <iframe id="manualIframe" src="" style="width:100%; height:100%; border:none; background:#f9f9f9; border-radius:4px;"></iframe>
-            </div>
+            <button onclick="closeUserManualModal()" style="background: #dc3545; color: white; border: none; padding: 10px; width: 100%; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: bold;">
+                ✕ 關閉並返回主頁
+            </button>
+            <!-- 隱藏的 iframe 用於桌機支援 -->
+            <iframe id="manualIframe" src="" style="display:none;"></iframe>
         </div>
     </div>
 
@@ -391,18 +395,23 @@
             checkUrlDirectEvaluation();
         };
 
-        // 開啟操作說明 PDF (新增下載/外部開啟按鈕與優化移動)
+        // 取得目前選擇的語言
         function getCurrentLanguage() {
             let combo = document.querySelector('.goog-te-combo');
-            if (combo && combo.value) { return combo.value; }
+            if (combo && combo.value) { 
+                return combo.value; 
+            }
             let match = document.cookie.match(/(^|;) ?googtrans=([^;]*)(;|$)/);
             if (match) {
                 let parts = match[2].split('/');
-                if (parts.length > 0 && parts[parts.length - 1]) { return parts[parts.length - 1]; }
+                if (parts.length > 0 && parts[parts.length - 1]) { 
+                    return parts[parts.length - 1]; 
+                }
             }
             return 'zh-TW';
         }
 
+        // 開啟操作說明 PDF (針對手機 PWA 最佳化彈窗)
         function openUserManual() {
             let lang = getCurrentLanguage();
             let pdfMap = {
@@ -414,15 +423,15 @@
             let pdfFileName = pdfMap[lang] || 'user_manual.pdf';
             
             let downloadBtn = document.getElementById('manualDownloadBtn');
-            if (downloadBtn) downloadBtn.href = pdfFileName;
+            if (downloadBtn) {
+                downloadBtn.href = pdfFileName;
+            }
 
-            document.getElementById('manualIframe').src = pdfFileName + "#toolbar=1&view=FitH";
             document.getElementById('manualModal').style.display = 'block';
         }
 
         function closeUserManualModal() {
             document.getElementById('manualModal').style.display = 'none';
-            document.getElementById('manualIframe').src = ''; 
         }
 
         function closeExportModal() {
@@ -430,9 +439,12 @@
             document.getElementById('exportPreviewContainer').innerHTML = '';
         }
 
-        // 匯出全部 QRcode (改用內嵌 Modal，支援手機版一鍵返回)
+        // 匯出全部 QRcode
         async function exportAllQRCodesWord() {
-            if (masterData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
+            if (masterData.length === 0) { 
+                alert("目前沒有可匯出的資料！"); 
+                return; 
+            }
             
             let container = document.getElementById('exportPreviewContainer');
             document.getElementById('exportModalTitle').innerText = "📑 全部 QR Code 清冊預覽";
@@ -474,7 +486,7 @@
             exportFilteredCardsWord(multiplier);
         }
 
-        // 匯出目前結果卡片 (改用內嵌 Modal，支援手機版一鍵返回)
+        // 匯出目前結果卡片
         async function exportFilteredCardsWord(multiplier) {
             let targetData = [];
             let isEvalViewActive = document.getElementById('evalView').classList.contains('active');
@@ -488,7 +500,10 @@
                 targetData = masterData;
             }
             
-            if (targetData.length === 0) { alert("目前沒有可匯出的卡片資料！"); return; }
+            if (targetData.length === 0) { 
+                alert("目前沒有可匯出的卡片資料！"); 
+                return; 
+            }
             
             let container = document.getElementById('exportPreviewContainer');
             document.getElementById('exportModalTitle').innerText = `📑 標誌卡片預覽 (倍數 x${multiplier})`;
@@ -533,8 +548,12 @@
 
         // 切換管理者中心分頁
         function switchAdminTab(tabId, btnEl) {
-            document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.admin-tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.querySelectorAll('.admin-tab-btn').forEach(el => {
+                el.classList.remove('active');
+            });
             document.getElementById(tabId).classList.add('active');
             btnEl.classList.add('active');
         }
@@ -603,7 +622,10 @@
             let empId = empIdEl.value.trim();
             let empName = empNameEl.value.trim();
 
-            if (!empId || !empName) { alert("請完整填寫工號與姓名！"); return; }
+            if (!empId || !empName) { 
+                alert("請完整填寫工號與姓名！"); 
+                return; 
+            }
 
             let statusEl = document.getElementById('status');
             if (statusEl) statusEl.innerText = "⏳ 正在驗證您的作答資格...";
@@ -644,13 +666,22 @@
             let start = document.getElementById('adminExamStart').value;
             let end = document.getElementById('adminExamEnd').value;
             let status = document.getElementById('adminExamStatus').value;
-            if (!title) { alert("請輸入考試名稱"); return; }
+            if (!title) { 
+                alert("請輸入考試名稱"); 
+                return; 
+            }
             try {
-                await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveExamConfig', examTitle: title, startTime: start, endTime: end, status: status }) });
+                await fetch(GAS_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify({ action: 'saveExamConfig', examTitle: title, startTime: start, endTime: end, status: status }) 
+                });
                 alert("✅ 正式考試設定已成功儲存！");
                 document.getElementById('adminModal').style.display = 'none';
                 checkExamAvailability();
-            } catch (e) { alert("❌ 儲存失敗。"); }
+            } catch (e) { 
+                alert("❌ 儲存失敗。"); 
+            }
         }
 
         async function forceStopExam() {
@@ -660,11 +691,17 @@
             let end = document.getElementById('adminExamEnd').value;
 
             try {
-                await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveExamConfig', examTitle: title, startTime: start, endTime: end, status: 'Inactive' }) });
+                await fetch(GAS_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify({ action: 'saveExamConfig', examTitle: title, startTime: start, endTime: end, status: 'Inactive' }) 
+                });
                 document.getElementById('adminExamStatus').value = 'Inactive';
                 alert("🛑 正式考試已強制停止！前台按鈕已關閉。");
                 checkExamAvailability();
-            } catch (e) { alert("❌ 操作失敗。"); }
+            } catch (e) { 
+                alert("❌ 操作失敗。"); 
+            }
         }
 
         async function openQuizResultsModal() {
@@ -762,10 +799,15 @@
             }
         }
 
-        function closeQuizResultsModal() { document.getElementById('quizResultsModal').style.display = 'none'; }
+        function closeQuizResultsModal() { 
+            document.getElementById('quizResultsModal').style.display = 'none'; 
+        }
 
         function exportQuizResultsExcel() {
-            if (cachedQuizResults.length === 0) { alert("目前沒有可匯出的成績資料！"); return; }
+            if (cachedQuizResults.length === 0) { 
+                alert("目前沒有可匯出的成績資料！"); 
+                return; 
+            }
             let exportData = cachedQuizResults.map(r => ({
                 "交卷時間": r.timestamp,
                 "考試名稱": r.examTitle || '正式考核',
@@ -780,7 +822,10 @@
         }
 
         function exportAllExcel() {
-            if (masterData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
+            if (masterData.length === 0) { 
+                alert("目前沒有可匯出的資料！"); 
+                return; 
+            }
             generateExcelFile(masterData, `SafetyMindset_All_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
@@ -796,14 +841,23 @@
             } else {
                 targetData = masterData;
             }
-            if (targetData.length === 0) { alert("目前沒有可匯出的資料！"); return; }
+            if (targetData.length === 0) { 
+                alert("目前沒有可匯出的資料！"); 
+                return; 
+            }
             generateExcelFile(targetData, `SafetyMindset_Filtered_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
         function generateExcelFile(dataArray, fileName) {
             let exportData = dataArray.map(item => ({
-                "ID": item.id || item.ID || '', "Category": item.category || item.Category || '', "Name": item.name || item.Name || '',
-                "Elim": item.elim || item.Elim || '', "Sub": item.sub || item.Sub || '', "Eng": item.eng || item.Eng || '', "Admin": item.admin || item.Admin || '', "Ppe": item.ppe || item.Ppe || ''
+                "ID": item.id || item.ID || '', 
+                "Category": item.category || item.Category || '', 
+                "Name": item.name || item.Name || '',
+                "Elim": item.elim || item.Elim || '', 
+                "Sub": item.sub || item.Sub || '', 
+                "Eng": item.eng || item.Eng || '', 
+                "Admin": item.admin || item.Admin || '', 
+                "Ppe": item.ppe || item.Ppe || ''
             }));
             let worksheet = XLSX.utils.json_to_sheet(exportData);
             let workbook = XLSX.utils.book_new();
@@ -814,16 +868,22 @@
         function checkUrlDirectEvaluation() {
             const urlParams = new URLSearchParams(window.location.search);
             const targetKey = urlParams.get('evalKey');
-            if (targetKey && masterData.length > 0) { openEvalView(targetKey); }
+            if (targetKey && masterData.length > 0) { 
+                openEvalView(targetKey); 
+            }
         }
 
         function showView(viewId) {
-            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(el => {
+                el.classList.remove('active');
+            });
             document.getElementById(viewId).classList.add('active');
         }
 
         function goBackToCategory() {
-            currentCategory = null; currentSingleItem = null; currentFilteredData = [];
+            currentCategory = null; 
+            currentSingleItem = null; 
+            currentFilteredData = [];
             let searchInput = document.getElementById('searchInput');
             if (searchInput) searchInput.value = '';
             showView('categoryView');
@@ -837,7 +897,9 @@
                 showView('detailView');
                 let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
                 renderDetailGrid(filtered, currentCategory);
-            } else { goBackToCategory(); }
+            } else { 
+                goBackToCategory(); 
+            }
         }
 
         async function initPhase5() {
@@ -871,10 +933,15 @@
             let categoriesMap = {};
             data.forEach(item => {
                 let cat = String(item.category || item.Category || '未分類').trim();
-                if (!categoriesMap[cat]) { categoriesMap[cat] = item; }
+                if (!categoriesMap[cat]) { 
+                    categoriesMap[cat] = item; 
+                }
             });
             let cats = Object.keys(categoriesMap);
-            if (cats.length === 0) { gridContainer.innerHTML = `<p style="color: #888;">目前無任何分類資料</p>`; return; }
+            if (cats.length === 0) { 
+                gridContainer.innerHTML = `<p style="color: #888;">目前無任何分類資料</p>`; 
+                return; 
+            }
 
             cats.forEach(cat => {
                 let rep = categoriesMap[cat];
@@ -905,7 +972,10 @@
             let dtHint = document.getElementById('detailHint');
             if (dtHint) dtHint.innerText = "💡 提示：點擊卡片即可進入第三層進行 7 大危害風險評估。";
 
-            if (data.length === 0) { gridContainer.innerHTML = `<p style="color: #888;">找不到符合條件的資料</p>`; return; }
+            if (data.length === 0) { 
+                gridContainer.innerHTML = `<p style="color: #888;">找不到符合條件的資料</p>`; 
+                return; 
+            }
 
             data.forEach((item, index) => {
                 let card = document.createElement('div');
@@ -978,16 +1048,23 @@
                 if (isCommitted) return;
                 isCommitted = true;
                 let newVal = inputEl.value.trim();
-                if (!newVal && !isAdmin) { cell.innerText = originalVal || '-'; return; }
+                if (!newVal && !isAdmin) { 
+                    cell.innerText = originalVal || '-'; 
+                    return; 
+                }
                 let uniqueKey = document.getElementById('evalUniqueKey').value;
                 let item = masterData.find(d => d.uniqueKey === uniqueKey);
 
                 if (isAdmin) {
                     cell.innerText = newVal || '-';
-                    if (item) { item[fieldKey] = newVal; }
+                    if (item) { 
+                        item[fieldKey] = newVal; 
+                    }
                     try {
                         let updatePayload = {
-                            action: 'updateEvaluation', uniqueKey: uniqueKey, id: item ? (item.id || item.ID || '') : '',
+                            action: 'updateEvaluation', 
+                            uniqueKey: uniqueKey, 
+                            id: item ? (item.id || item.ID || '') : '',
                             elim: document.getElementById('cell_elim').innerText === '-' ? '' : document.getElementById('cell_elim').innerText,
                             sub: document.getElementById('cell_sub').innerText === '-' ? '' : document.getElementById('cell_sub').innerText,
                             eng: document.getElementById('cell_eng').innerText === '-' ? '' : document.getElementById('cell_eng').innerText,
@@ -996,22 +1073,33 @@
                         };
                         await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(updatePayload) });
                         alert("✅ [管理者] 評估資料已成功更新至雲端！");
-                    } catch (e) { alert("❌ 更新失敗。"); }
+                    } catch (e) { 
+                        alert("❌ 更新失敗。"); 
+                    }
                 } else {
                     cell.innerText = originalVal || '-';
                     try {
                         let updatePayload = { action: 'submitPendingApproval', uniqueKey: uniqueKey, id: item ? (item.id || item.ID || '') : '', field: fieldKey, value: newVal };
                         await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(updatePayload) });
                         alert("✅ 您的修改已送出，目前已進入後台等待管理員審批！");
-                    } catch (e) { alert("❌ 審批送出失敗。"); }
+                    } catch (e) { 
+                        alert("❌ 審批送出失敗。"); 
+                    }
                 }
             }
             inputEl.onblur = commitEdit;
-            inputEl.onkeydown = function(e) { if (e.key === 'Enter') { commitEdit(); } };
+            inputEl.onkeydown = function(e) { 
+                if (e.key === 'Enter') { 
+                    commitEdit(); 
+                } 
+            };
         }
 
         function startQuiz(mode) {
-            if (!masterData || masterData.length < 2) { alert("資料庫中的標誌數量不足，無法自動產生測驗題！"); return; }
+            if (!masterData || masterData.length < 2) { 
+                alert("資料庫中的標誌數量不足，無法自動產生測驗題！"); 
+                return; 
+            }
             currentQuizMode = mode;
             let titleHeader = document.getElementById('quizHeaderTitle');
             let currentExamTitle = examConfigData ? (examConfigData.title || "正式考核") : "正式考核";
@@ -1098,7 +1186,9 @@
                     optionsHtml += `<label><input type="radio" name="q_${idx}" value="${opt.replace(/"/g, '&quot;')}" style="margin-right:8px;">${opt}</label>`;
                 });
                 let qDiv = document.createElement('div');
-                qDiv.style.marginBottom = "25px"; qDiv.style.paddingBottom = "15px"; qDiv.style.borderBottom = "1px solid #eee";
+                qDiv.style.marginBottom = "25px"; 
+                qDiv.style.paddingBottom = "15px"; 
+                qDiv.style.borderBottom = "1px solid #eee";
                 qDiv.innerHTML = `<div class="quiz-question">第 ${idx + 1} 題：${q.questionText}</div>${q.imgUrl ? `<div style="margin:10px 0;"><img src="${q.imgUrl}" width="60" height="60" style="object-fit:contain; border:1px solid #ddd; padding:3px; background:#fff;"></div>` : ''}<div class="quiz-options">${optionsHtml}</div>`;
                 area.appendChild(qDiv);
             });
@@ -1109,17 +1199,27 @@
             let total = currentQuizQuestions.length;
             currentQuizQuestions.forEach((q, idx) => {
                 let selected = document.querySelector(`input[name="q_${idx}"]:checked`);
-                if (selected && selected.value === q.correctAnswer) { score += (100 / total); }
+                if (selected && selected.value === q.correctAnswer) { 
+                    score += (100 / total); 
+                }
             });
             score = Math.round(score);
 
             if (currentQuizMode === 'exam') {
                 let currentExamTitle = examConfigData ? (examConfigData.title || "正式考核") : "正式考核";
                 try {
-                    let payload = { action: 'submitQuizResult', empId: verifiedEmpId, empName: verifiedEmpName, examTitle: currentExamTitle, score: `${score}` };
+                    let payload = { 
+                        action: 'submitQuizResult', 
+                        empId: verifiedEmpId, 
+                        empName: verifiedEmpName, 
+                        examTitle: currentExamTitle, 
+                        score: `${score}` 
+                    };
                     await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                     alert("✅ 正式考核成績已成功上傳並記錄！");
-                } catch (e) { alert("✅ 成績已計算完成（正式考核成績已送出）"); }
+                } catch (e) { 
+                    alert("✅ 成績已計算完成（正式考核成績已送出）"); 
+                }
             }
 
             let resTitle = document.getElementById('quizResultTitle');
@@ -1138,7 +1238,9 @@
                 if (currentCategory) {
                     let filtered = masterData.filter(item => String(item.category || item.Category || '').trim() === currentCategory);
                     renderDetailGrid(filtered, currentCategory);
-                } else { renderCategoryGrid(masterData); }
+                } else { 
+                    renderCategoryGrid(masterData); 
+                }
                 return;
             }
             showView('detailView');
@@ -1157,9 +1259,19 @@
             renderDetailGrid(filtered, 'Search Result'); 
         }
 
-        function openAdminModal() { document.getElementById('adminModal').style.display = 'block'; updateAdminUI(); }
-        function openPendingModal() { document.getElementById('pendingModal').style.display = 'block'; getPendingList(); }
-        function closePendingModal() { document.getElementById('pendingModal').style.display = 'none'; }
+        function openAdminModal() { 
+            document.getElementById('adminModal').style.display = 'block'; 
+            updateAdminUI(); 
+        }
+
+        function openPendingModal() { 
+            document.getElementById('pendingModal').style.display = 'block'; 
+            getPendingList(); 
+        }
+
+        function closePendingModal() { 
+            document.getElementById('pendingModal').style.display = 'none'; 
+        }
 
         async function getPendingList() {
             try {
@@ -1167,29 +1279,41 @@
                 container.innerHTML = "<p>正在載入待審批清單...</p>";
                 let response = await fetch(`${GAS_URL}?action=getPendingList`);
                 let result = await response.json();
-                if (result.status !== "success" || !result.data || result.data.length === 0) { container.innerHTML = "<p>目前沒有需要審批的變更資料。</p>"; return; }
+                if (result.status !== "success" || !result.data || result.data.length === 0) { 
+                    container.innerHTML = "<p>目前沒有需要審批的變更資料。</p>"; 
+                    return; 
+                }
                 let html = `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;"><th style="padding: 10px;">ID</th><th style="padding: 10px;">欄位</th><th style="padding: 10px;">變更值</th><th style="padding: 10px; text-align: center;">操作</th></tr></thead><tbody>`;
                 result.data.forEach(item => {
                     html += `<tr style="border-bottom: 1px solid #dee2e6;"><td style="padding: 10px;">${item.id}</td><td style="padding: 10px;">${item.field}</td><td style="padding: 10px;">${item.value}</td><td style="padding: 10px; text-align: center;"><button onclick="approvePendingItem('${item.id}', '${item.field}', '${item.value}')" style="background: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; margin-right: 5px;">核准</button><button onclick="rejectPendingItem('${item.id}', '${item.field}')" style="background: #dc3545; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">拒絕</button></td></tr>`;
                 });
                 container.innerHTML = html + '</tbody></table>';
-            } catch (e) { container.innerHTML = "<p style='color:red;'>❌ 載入失敗。</p>"; }
+            } catch (e) { 
+                container.innerHTML = "<p style='color:red;'>❌ 載入失敗。</p>"; 
+            }
         }
 
         async function approvePendingItem(id, field, value) {
             if (!confirm(`確定要核准 ID: ${id} 嗎？`)) return;
             try {
                 await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'approvePending', id, field, value }) });
-                alert("✅ 已核准！"); getPendingList(); setTimeout(() => initPhase5(), 2000);
-            } catch (e) { alert("❌ 操作失敗。"); }
+                alert("✅ 已核准！"); 
+                getPendingList(); 
+                setTimeout(() => initPhase5(), 2000);
+            } catch (e) { 
+                alert("❌ 操作失敗。"); 
+            }
         }
 
         async function rejectPendingItem(id, field) {
             if (!confirm(`確定要拒絕嗎？`)) return;
             try {
                 await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'rejectPending', id, field }) });
-                alert("🚫 已拒絕。"); getPendingList();
-            } catch (e) { alert("❌ 操作失敗。"); }
+                alert("🚫 已拒絕。"); 
+                getPendingList();
+            } catch (e) { 
+                alert("❌ 操作失敗。"); 
+            }
         }
 
         function updateAdminUI() {
@@ -1211,50 +1335,85 @@
             let pwdInput = document.getElementById('pwdInput');
             if (!pwdInput) return;
             let inputPwd = pwdInput.value;
-            if (!inputPwd) { alert("請輸入密碼！"); return; }
+            if (!inputPwd) { 
+                alert("請輸入密碼！"); 
+                return; 
+            }
             try {
                 let response = await fetch(`${GAS_URL}?action=verifyLogin&pwd=${encodeURIComponent(inputPwd)}`);
                 let result = await response.json();
                 if (result.status === "success") {
-                    isAdmin = true; sessionStorage.setItem('isAdmin', 'true');
-                    alert("登入成功！"); document.getElementById('adminModal').style.display = 'none';
-                    pwdInput.value = ''; updateAdminUI(); openPendingModal();
-                } else { alert("密碼錯誤！"); }
-            } catch (e) { alert("連線異常。"); }
+                    isAdmin = true; 
+                    sessionStorage.setItem('isAdmin', 'true');
+                    alert("登入成功！"); 
+                    document.getElementById('adminModal').style.display = 'none';
+                    pwdInput.value = ''; 
+                    updateAdminUI(); 
+                    openPendingModal();
+                } else { 
+                    alert("密碼錯誤！"); 
+                }
+            } catch (e) { 
+                alert("連線異常。"); 
+            }
         }
 
         async function changePassword() {
             let oldP = document.getElementById('oldPwd').value;
             let newP = document.getElementById('newPwd').value;
-            if (!oldP || !newP) { alert("請完整輸入"); return; }
+            if (!oldP || !newP) { 
+                alert("請完整輸入"); 
+                return; 
+            }
             try {
                 await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updatePassword', oldPwd: oldP, newPwd: newP }) });
-                alert("密碼變更請求已送出！"); document.getElementById('adminModal').style.display = 'none';
-            } catch (e) { alert("修改失敗"); }
+                alert("密碼變更請求已送出！"); 
+                document.getElementById('adminModal').style.display = 'none';
+            } catch (e) { 
+                alert("修改失敗"); 
+            }
         }
 
-        function adminLogout() { isAdmin = false; sessionStorage.removeItem('isAdmin'); updateAdminUI(); alert("已登出"); document.getElementById('adminModal').style.display = 'none'; }
+        function adminLogout() { 
+            isAdmin = false; 
+            sessionStorage.removeItem('isAdmin'); 
+            updateAdminUI(); 
+            alert("已登出"); 
+            document.getElementById('adminModal').style.display = 'none'; 
+        }
 
         async function deleteRow(id) {
             if (!confirm(`確定要刪除 ID: ${id} 嗎？`)) return;
             try {
                 await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'deleteRecord', id: id }) });
-                alert("已送出刪除請求。"); setTimeout(() => initPhase5(), 2000);
-            } catch (e) { alert("刪除失敗"); }
+                alert("已送出刪除請求。"); 
+                setTimeout(() => initPhase5(), 2000);
+            } catch (e) { 
+                alert("刪除失敗"); 
+            }
         }
 
-        function openAddModal() { document.getElementById('addModal').style.display = 'block'; }
+        function openAddModal() { 
+            document.getElementById('addModal').style.display = 'block'; 
+        }
 
         async function submitAdd() {
             let newId = document.getElementById('addId').value.trim();
             let newCat = document.getElementById('addCategory').value.trim();
             let newName = document.getElementById('addName').value.trim();
             let newImg = document.getElementById('addImg').value.trim();
-            if (!newId || !newCat || !newName) { alert("請填寫完整"); return; }
+            if (!newId || !newCat || !newName) { 
+                alert("請填寫完整"); 
+                return; 
+            }
             try {
                 await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'addRecord', id: newId, category: newCat, name: newName, svg_url: newImg }) });
-                alert(`✅ 新增成功！`); document.getElementById('addModal').style.display = 'none'; setTimeout(() => initPhase5(), 1500);
-            } catch (e) { alert("失敗"); }
+                alert(`✅ 新增成功！`); 
+                document.getElementById('addModal').style.display = 'none'; 
+                setTimeout(() => initPhase5(), 1500);
+            } catch (e) { 
+                alert("失敗"); 
+            }
         }
     </script>
 </body>
