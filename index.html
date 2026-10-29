@@ -1141,9 +1141,10 @@
         }
 
         // 【已恢復】支援 7 大危害評估對應題型的隨堂小考與正式考核生成邏輯
+        // 【優化後】支援強制分配 3 題危害評估題型與 2 題一般題型的抽題機制
         function startQuiz(mode) {
-            if (!masterData || masterData.length < 2) { 
-                alert("資料庫中的標誌數量不足，無法自動產生測驗題！"); 
+            if (!masterData || masterData.length < 5) { 
+                alert("資料庫中的標誌數量不足 5 筆，無法自動產生測驗題！"); 
                 return; 
             }
             currentQuizMode = mode;
@@ -1163,16 +1164,51 @@
                     }
                 });
             });
-
-            let shuffledItems = [...masterData].sort(() => 0.5 - Math.random());
-            let selectedItems = shuffledItems.slice(0, Math.min(5, shuffledItems.length));
-            
+        
+            // 1. 依據是否有填寫 7 大危害評估資料，將標誌分為「多元題型池」與「一般題型池」
+            let controlEligibleItems = [];
+            let generalItems = [];
+        
+            masterData.forEach(item => {
+                let controlFields = ['elim', 'sub', 'eng', 'admin', 'ppe'];
+                let hasControl = controlFields.some(f => {
+                    let val = item[f] || item[f.toUpperCase()] || '';
+                    return val && typeof val === 'string' && val.trim() !== '-' && val.trim() !== '';
+                });
+        
+                if (hasControl) {
+                    controlEligibleItems.push(item);
+                } else {
+                    generalItems.push(item);
+                }
+            });
+        
+            let selectedItems = [];
+        
+            // 2. 強制從「多元題型池」中隨機抽選至少 3 題（若該池不足 3 題則全數納入）
+            let shuffledControlPool = [...controlEligibleItems].sort(() => 0.5 - Math.random());
+            let neededControlCount = Math.min(3, shuffledControlPool.length);
+            let chosenControlItems = shuffledControlPool.slice(0, neededControlCount);
+            selectedItems.push(...chosenControlItems);
+        
+            // 3. 剩下的名額從「剩餘所有標誌（包含沒被抽到的多元池 + 一般池）」中隨機補滿 5 題
+            let remainingPool = masterData.filter(item => !selectedItems.includes(item));
+            let shuffledRemaining = remainingPool.sort(() => 0.5 - Math.random());
+            let neededRemainingCount = 5 - selectedItems.length;
+            selectedItems.push(...shuffledRemaining.slice(0, neededRemainingCount));
+        
+            // 如果總數仍小於 5（例如全庫不到 5 筆），則從全庫隨機補齊
+            if (selectedItems.length < 5) {
+                selectedItems = [...masterData].sort(() => 0.5 - Math.random()).slice(0, 5);
+            }
+        
+            // 4. 正式生成這 5 道題目的內容與選項
             currentQuizQuestions = selectedItems.map((item) => {
                 let correctName = item.name || item.Name || '未知標誌';
                 let itemId = item.id || item.ID || '';
                 let imgUrl = item.svg_url || item.image || '';
-
-                let qTypes = ['name'];
+        
+                // 檢查該筆標誌是否具備控制措施欄位
                 let controlFields = [
                     { key: 'elim', label: '消除 (elim)' },
                     { key: 'sub', label: '取代 (sub)' },
@@ -1185,14 +1221,26 @@
                     let val = item[f.key] || item[f.key.toUpperCase()] || '';
                     return val && typeof val === 'string' && val.trim() !== '-' && val.trim() !== '';
                 });
-
-                if (availableControls.length > 0) {
-                    qTypes.push('control');
-                }
-
-                let chosenType = qTypes[Math.floor(Math.random() * qTypes.length)];
-
-                if (chosenType === 'name') {
+        
+                // 決定這一題要考「危害評估」還是「圖片含義」
+                // 如果該筆標誌有控制措施，有 80% 機率出危害評估題，20% 出名稱題；若沒有則只能出名稱題
+                let chosenType = (availableControls.length > 0 && Math.random() < 0.8) ? 'control' : 'name';
+        
+                if (chosenType === 'control' && availableControls.length > 0) {
+                    let targetField = availableControls[Math.floor(Math.random() * availableControls.length)];
+                    let correctAnswer = (item[targetField.key] || item[targetField.key.toUpperCase()] || '').trim();
+        
+                    let candidateWrong = [...new Set(globalControlPool.filter(ans => ans !== correctAnswer))];
+                    let shuffledWrong = candidateWrong.sort(() => 0.5 - Math.random()).slice(0, 3);
+                    let options = [correctAnswer, ...shuffledWrong].sort(() => 0.5 - Math.random());
+        
+                    return {
+                        questionText: `針對安全標誌 [${itemId}]《${correctName}》，下列何者為其「${targetField.label}」的正確對應措施？`,
+                        imgUrl: imgUrl,
+                        options: options,
+                        correctAnswer: correctAnswer
+                    };
+                } else {
                     let wrongPool = masterData.filter(d => (d.name || d.Name) !== correctName);
                     let shuffledWrong = wrongPool.sort(() => 0.5 - Math.random()).slice(0, 3);
                     let options = [correctName, ...shuffledWrong.map(w => w.name || w.Name)].sort(() => 0.5 - Math.random());
@@ -1202,23 +1250,9 @@
                         options: options,
                         correctAnswer: correctName
                     };
-                } else {
-                    let targetField = availableControls[Math.floor(Math.random() * availableControls.length)];
-                    let correctAnswer = (item[targetField.key] || item[targetField.key.toUpperCase()] || '').trim();
-
-                    let candidateWrong = [...new Set(globalControlPool.filter(ans => ans !== correctAnswer))];
-                    let shuffledWrong = candidateWrong.sort(() => 0.5 - Math.random()).slice(0, 3);
-                    let options = [correctAnswer, ...shuffledWrong].sort(() => 0.5 - Math.random());
-
-                    return {
-                        questionText: `針對安全標誌 [${itemId}]《${correctName}》，下列何者為其「${targetField.label}」的正確對應措施？`,
-                        imgUrl: imgUrl,
-                        options: options,
-                        correctAnswer: correctAnswer
-                    };
                 }
             });
-
+        
             renderQuizUI();
             showView('quizView');
         }
